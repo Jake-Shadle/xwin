@@ -1,0 +1,217 @@
+# TODO: Replace this line with the commented ones to actually run the action in your repo(s)
+on: public
+# on:
+#   push:
+#     branches:
+#       - main
+#     tags:
+#       - "*"
+#   pull_request:
+
+name: CI
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      # make sure all code has been formatted with rustfmt
+      - name: check rustfmt
+        run: |
+          rustup component add rustfmt
+          cargo fmt -- --check --color always
+
+      # run clippy to verify we have no warnings
+      - run: cargo fetch
+      - name: cargo clippy
+        run: |
+          rustup component add clippy
+          cargo clippy --all-targets --all-features -- -D warnings
+
+  test:
+    name: Test
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - run: cargo fetch
+      - name: cargo test build
+        # Note the use of release here means longer compile time, but much
+        # faster test execution time. If you don't have any heavy tests it
+        # might be faster to take off release and just compile in debug
+        run: cargo build --tests --release
+      - name: cargo test
+        run: cargo test --release
+
+  # TODO: Remove this check if you don't use cargo-deny in the repo
+  deny-check:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: EmbarkStudios/cargo-deny-action@v1
+
+  # TODO: Remove this check if you don't publish the crate(s) from this repo
+  publish-check:
+    name: Publish Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - run: cargo fetch
+      - name: cargo publish check
+        run: cargo publish --dry-run
+
+  # TODO: Remove this job if you don't publish the crate(s) from this repo
+  # You must add a crates.io API token to your GH secrets and name it CRATES_IO_TOKEN
+  publish:
+    name: Publish
+    needs: [test, deny-check, publish-check]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - run: cargo fetch
+      - name: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: cargo publish
+
+  # TODO: Remove this job if you don't release binaries
+  # Replace occurances of $BIN_NAME with the name of your binary
+  release:
+    name: Release
+    needs: [test, deny-check]
+    if: startsWith(github.ref, 'refs/tags/')
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macOS-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            rust: stable
+            target: x86_64-unknown-linux-musl
+            bin: $BIN_NAME
+            # We don't enable the progress feature when targeting
+            # musl since there are some dependencies on shared libs
+            features: ""
+          - os: windows-latest
+            rust: stable
+            target: x86_64-pc-windows-msvc
+            bin: $BIN_NAME.exe
+            features: progress
+          - os: macOS-latest
+            rust: stable
+            target: x86_64-apple-darwin
+            bin: $BIN_NAME
+            features: progress
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust }}
+          override: true
+          target: ${{ matrix.target }}
+      - name: Install musl tools
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get install -y musl-tools
+      - name: Checkout
+        uses: actions/checkout@v2
+      - run: cargo fetch --target ${{ matrix.target }}
+      - name: Release build
+        shell: bash
+        run: |
+          if [ "${{ matrix.features }}" != "" ]; then
+            cargo build --release --target ${{ matrix.target }} --features ${{ matrix.features }}
+          else
+            cargo build --release --target ${{ matrix.target }}
+          fi
+      - name: Package
+        shell: bash
+        run: |
+          name=$BIN_NAME
+          tag=$(git describe --tags --abbrev=0)
+          release_name="$name-$tag-${{ matrix.target }}"
+          release_tar="${release_name}.tar.gz"
+          mkdir "$release_name"
+
+          if [ "${{ matrix.target }}" != "x86_64-pc-windows-msvc" ]; then
+              strip "target/${{ matrix.target }}/release/${{ matrix.bin }}"
+          fi
+
+          cp "target/${{ matrix.target }}/release/${{ matrix.bin }}" "$release_name/"
+          cp README.md LICENSE-APACHE LICENSE-MIT "$release_name/"
+          tar czvf "$release_tar" "$release_name"
+
+          rm -r "$release_name"
+
+          # Windows environments in github actions don't have the gnu coreutils installed,
+          # which includes the shasum exe, so we just use powershell instead
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            echo "(Get-FileHash \"${release_tar}\" -Algorithm SHA256).Hash | Out-File -Encoding ASCII -NoNewline \"${release_tar}.sha256\"" | pwsh -c -
+          else
+            echo -n "$(shasum -ba 256 "${release_tar}" | cut -d " " -f 1)" > "${release_tar}.sha256"
+          fi
+      - name: Publish
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: true
+          files: "$BIN_NAME*"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # TODO: Remove this job if you don't publish container images on each release
+  # TODO: Create a repository on DockerHub with the same name as the GitHub repo
+  # TODO: Add the new repo to the buildbot group with read & write permissions 
+  # TODO: Add the embarkbot dockerhub password to the repo secrets as DOCKERHUB_PASSWORD
+  publish-container-images:
+    name: Publish container images
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [test, deny-check]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Login to Dockerhub
+        uses: docker/login-action@v1 
+        with:
+          username: embarkbot
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+      - name: Docker meta
+        id: docker_meta
+        uses: crazy-max/ghaction-docker-meta@v1
+        with:
+          images: embarkstudios/${{ github.event.repository.name }}
+          tag-semver: |
+            {{version}}
+            {{major}}.{{minor}}
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.docker_meta.outputs.tags }}
+          labels: ${{ steps.docker_meta.outputs.labels }}
