@@ -13,6 +13,8 @@ Template for creating new open source repositories that follow the Embark open s
 
 ## TEMPLATE INSTRUCTIONS
 
+Based off of https://github.com/mstorsjo/msvc-wine.
+
 1. Create a new repository under EmbarkStudios using this template.
 1. __Title:__ Change the first line of this README to the name of your project, and replace the sunflower with an emoji that represents your project. 🚨 Your emoji selection is critical.
 1. __Badges:__ In the badges section above, change the repo name in each URL. If you are creating something other than a Rust crate, remove the crates.io and docs badges (and feel free to add more appropriate ones for your language).
