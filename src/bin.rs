@@ -1,5 +1,5 @@
 use anyhow::{Context as _, Error};
-use camino::Utf8PathBuf;
+use camino::Utf8PathBuf as PathBuf;
 use structopt::StructOpt;
 use tracing_subscriber::filter::LevelFilter;
 
@@ -25,21 +25,59 @@ fn setup_logger(json: bool, log_level: LevelFilter) -> Result<(), Error> {
 
 #[derive(StructOpt)]
 pub enum Command {
-    /// Displays a summary of the packages that would be downloaded
+    /// Displays a summary of the packages that would be downloaded.
+    ///
+    /// Note that this is not a full list as the SDK uses MSI files for many
+    /// packages, so they would need to be downloaded and inspected to determine
+    /// which CAB files must also be downloaded to get the content needed.
     List,
     /// Downloads all the selected packages that aren't already present in
     /// the download cache
     Download,
     /// Unpacks all of the downloaded packages to disk
     Unpack,
-    /// Fixes the packages to prune unneeded files and add symlinks to address
+    /// Fixes the packages to prune unneeded files and adds symlinks to address
     /// file casing issues and then packs the final artifacts into directories
     /// or tarballs
-    Pack,
+    Pack {
+        /// The MSVCRT includes (non-redistributable) debug versions of the
+        /// various libs that are generally uninteresting to keep for most usage
+        #[structopt(long)]
+        include_debug_libs: bool,
+        /// The MSVCRT includes PDB (debug symbols) files for several of the
+        /// libraries that are genrally uninteresting to keep for most usage
+        #[structopt(long)]
+        include_debug_symbols: bool,
+        /// By default, symlinks are added to both the CRT and WindowsSDK to
+        /// address casing issues in general usage. For example, if you are
+        /// compiling C/C++ code that does `#include <windows.h>`, it will break
+        /// on a case-sensitive file system, as the actual path in the WindowsSDK
+        /// is `Windows.h`. This also applies even if the C/C++ you are compiling
+        /// uses correct casing for all CRT/SDK includes, as the internal headers
+        /// also use incorrect casing in most cases.
+        #[structopt(long)]
+        disable_symlinks: bool,
+        /// By default, we convert the MS specific `x64`, `arm`, and `arm64`
+        /// target architectures to the more canonical `x86_64`, `aarch`, and
+        /// `aarch64` of LLVM etc when creating directories/names. Passing this
+        /// flag will preserve the MS names for those targets.
+        #[structopt(long)]
+        preserve_ms_arch_notation: bool,
+        /// The root output directory. Defaults to `./.xwin-cache/pack` if not
+        /// specified.
+        #[structopt(long)]
+        output: Option<PathBuf>,
+        // Splits the CRT and SDK into architecture and variant specific
+        // directories. The shared headers in the CRT and SDK are duplicated
+        // for each output so that each combination is self-contained.
+        // #[structopt(long)]
+        // isolated: bool,
+    },
 }
 
 const ARCHES: &[&str] = &["x86", "x86_64", "aarch", "aarch64"];
-const VARIANTS: &[&str] = &["desktop", "onecore", "store", "spectre"];
+const VARIANTS: &[&str] = &["desktop", "onecore", /*"store",*/ "spectre"];
+const LOG_LEVELS: &[&str] = &["off", "error", "warn", "info", "debug", "trace"];
 
 fn parse_level(s: &str) -> Result<LevelFilter, Error> {
     s.parse::<LevelFilter>()
@@ -51,20 +89,13 @@ pub struct Args {
     /// Doesn't display prompt to accept the license
     #[structopt(long, env = "XWIN_ACCEPT_LICENSE")]
     accept_license: bool,
+    /// The log level for messages, only log messages at or above the level will be emitted.
     #[structopt(
         short = "L",
         long = "log-level",
         default_value = "info",
         parse(try_from_str = parse_level),
-        long_help = "The log level for messages, only log messages at or above the level will be emitted.
-
-Possible values:
-* off
-* error
-* warn
-* info (default)
-* debug
-* trace"
+        possible_values(LOG_LEVELS),
     )]
     level: LevelFilter,
     /// Output log messages as json
@@ -72,13 +103,13 @@ Possible values:
     json: bool,
     /// If set, will use a temporary directory for all files used for creating
     /// the archive and deleted upon exit, otherwise, all downloaded files
-    /// are kept in the current working directory and won't be retrieved again
+    /// are kept in the `--cache-dir` won't be retrieved again
     #[structopt(long)]
     temp: bool,
     /// Specifies the cache directory used to persist downloaded items to disk.
-    /// Defaults to ./.xwin-cache if not specified.
+    /// Defaults to `./.xwin-cache` if not specified.
     #[structopt(long)]
-    cache_dir: Option<Utf8PathBuf>,
+    cache_dir: Option<PathBuf>,
     /// The version to retrieve, can either be a major version of 15 or 16, or
     /// a "<major>.<minor>" version.
     #[structopt(long, default_value = "16")]
@@ -111,21 +142,30 @@ async fn main() -> Result<(), Error> {
     let args = Args::from_args();
     setup_logger(args.json, args.level)?;
 
+    if !args.accept_license {
+        // The license link is the same for every locale, but we should probably
+        // retrieve it from the manifest in the future
+        println!("Do you accept the license at https://go.microsoft.com/fwlink/?LinkId=2086102 (yes | no)?");
+
+        let mut accept = String::new();
+        std::io::stdin().read_line(&mut accept)?;
+
+        match accept.trim() {
+            "yes" => println!("license accepted!"),
+            "no" => anyhow::bail!("license not accepted"),
+            other => anyhow::bail!("unknown response to license request {}", other),
+        }
+    }
+
+    let cwd = PathBuf::from_path_buf(std::env::current_dir().context("unable to retrieve cwd")?)
+        .map_err(|pb| anyhow::anyhow!("cwd {} is not a valid utf-8 path", pb.display()))?;
+
     let ctx = if args.temp {
         xwin::Ctx::with_temp()?
     } else {
         let cache_dir = match args.cache_dir {
             Some(cd) => cd,
-            None => {
-                let mut cwd = Utf8PathBuf::from_path_buf(
-                    std::env::current_dir().context("unable to retrieve cwd")?,
-                )
-                .map_err(|pb| {
-                    anyhow::anyhow!("cache-dir {} is not a valid utf-8 path", pb.display())
-                })?;
-                cwd.push(".xwin-cache");
-                cwd
-            }
+            None => cwd.join(".xwin-cache"),
         };
         xwin::Ctx::with_dir(cache_dir)?
     };
@@ -152,10 +192,31 @@ async fn main() -> Result<(), Error> {
             xwin::download(ctx.clone(), pkgs, pruned.clone()).await?;
             xwin::unpack(ctx, pruned).await?;
         }
-        Command::Pack => {
+        Command::Pack {
+            include_debug_libs,
+            include_debug_symbols,
+            disable_symlinks,
+            preserve_ms_arch_notation,
+            output,
+        } => {
             xwin::download(ctx.clone(), pkgs, pruned.clone()).await?;
             xwin::unpack(ctx.clone(), pruned.clone()).await?;
-            //xwin::pack(ctx, pruned).await?;
+
+            let output = output.unwrap_or_else(|| ctx.work_dir.join("pack"));
+
+            xwin::pack(
+                ctx,
+                xwin::PackConfig {
+                    include_debug_libs,
+                    include_debug_symbols,
+                    disable_symlinks,
+                    preserve_ms_arch_notation,
+                    output,
+                },
+                pruned,
+                arches,
+                variants,
+            )?;
         }
     }
 

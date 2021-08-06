@@ -5,11 +5,13 @@ use std::{collections::BTreeMap, fmt};
 mod ctx;
 mod download;
 pub mod manifest;
+mod pack;
 mod unpack;
 pub mod util;
 
 pub use ctx::Ctx;
 pub use download::download;
+pub use pack::{pack, PackConfig};
 pub use unpack::unpack;
 
 pub enum Ops {
@@ -24,23 +26,6 @@ pub enum Arch {
     X86_64 = 0x2,
     Aarch = 0x4,
     Aarch64 = 0x8,
-}
-
-impl Arch {
-    #[inline]
-    fn from_chip(chip: Option<manifest::Chip>) -> Option<Self> {
-        use manifest::Chip;
-
-        chip.and_then(|chip| {
-            Some(match chip {
-                Chip::X86 => Self::X86,
-                Chip::X64 => Self::X86_64,
-                Chip::Arm => Self::Aarch,
-                Chip::Arm64 => Self::Aarch64,
-                Chip::Neutral => return None,
-            })
-        })
-    }
 }
 
 impl std::str::FromStr for Arch {
@@ -59,27 +44,37 @@ impl std::str::FromStr for Arch {
 
 impl fmt::Display for Arch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Self::X86 => "x86",
-            Self::X86_64 => "x86_64",
-            Self::Aarch => "aarch",
-            Self::Aarch64 => "aarch64",
-        })
+        f.write_str(self.as_str())
     }
 }
 
 impl Arch {
-    pub fn iter(val: u32) -> impl Iterator<Item = (Self, &'static str)> {
+    #[inline]
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::X86 => "x86",
+            Self::X86_64 => "x86_64",
+            Self::Aarch => "aarch",
+            Self::Aarch64 => "aarch64",
+        }
+    }
+
+    #[inline]
+    pub fn as_ms_str(&self) -> &'static str {
+        match self {
+            Self::X86 => "x86",
+            Self::X86_64 => "x64",
+            Self::Aarch => "arm",
+            Self::Aarch64 => "arm64",
+        }
+    }
+
+    pub fn iter(val: u32) -> impl Iterator<Item = Self> {
         [Self::X86, Self::X86_64, Self::Aarch, Self::Aarch64]
             .iter()
             .filter_map(move |arch| {
                 if *arch as u32 & val != 0 {
-                    Some(match *arch {
-                        Self::X86 => (Self::X86, "x86"),
-                        Self::X86_64 => (Self::X86_64, "x64"),
-                        Self::Aarch => (Self::Aarch, "arm"),
-                        Self::Aarch64 => (Self::Aarch64, "arm64"),
-                    })
+                    Some(*arch)
                 } else {
                     None
                 }
@@ -114,7 +109,7 @@ impl std::str::FromStr for Variant {
         Ok(match s {
             "desktop" => Self::Desktop,
             "onecore" => Self::OneCore,
-            "store" => Self::Store,
+            //"store" => Self::Store,
             "spectre" => Self::Spectre,
             o => anyhow::bail!("unknown variant '{}'", o),
         })
@@ -145,8 +140,8 @@ pub async fn get_pkg_manifest(
     version: &str,
     channel: &str,
 ) -> Result<manifest::PackageManifest, Error> {
-    let vs_manifest = manifest::get_manifest(&ctx, version, channel).await?;
-    manifest::get_package_manifest(&ctx, &vs_manifest).await
+    let vs_manifest = manifest::get_manifest(ctx, version, channel).await?;
+    manifest::get_package_manifest(ctx, &vs_manifest).await
 }
 
 #[derive(Clone, Debug)]
@@ -170,12 +165,14 @@ pub struct Payload {
     pub variant: Option<Variant>,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum PayloadKind {
     CrtHeaders,
     CrtLibs,
     SdkHeaders,
     SdkLibs,
+    SdkStoreLibs,
+    Ucrt,
 }
 
 /// Returns the list of packages that are actually needed for cross compilation
@@ -235,7 +232,11 @@ fn get_crt(
         .find_map(|(s, arch)| payload.file_name.contains(s).then(|| *arch));
 
         Payload {
-            filename: payload.file_name.clone().into(),
+            filename: if let Some(Arch::Aarch64) = target_arch {
+                payload.file_name.replace("ARM", "arm").into()
+            } else {
+                payload.file_name.clone().into()
+            },
             sha256: payload.sha256.clone(),
             url: payload.url.clone(),
             size: payload.size,
@@ -281,9 +282,13 @@ fn get_crt(
         // The spectre versions include both the regular and spectre version of every lib
         let spectre = (variants & Variant::Spectre as u32) != 0;
 
+        // We need to force include the Store version as well, as they
+        // include some libraries that are often linked by default, eg oldnames.lib
+        let variants = variants | Variant::Store as u32;
+
         let mut crt_lib_id = String::new();
 
-        for (arch, arch_str) in Arch::iter(arches) {
+        for arch in Arch::iter(arches) {
             for variant in Variant::iter(variants) {
                 crt_lib_id.clear();
 
@@ -297,7 +302,7 @@ fn get_crt(
                     if arch == Arch::Aarch64 {
                         "ARM64"
                     } else {
-                        arch_str
+                        arch.as_ms_str()
                     },
                     variant,
                     // The Store variant doesn't have a spectre version
@@ -335,9 +340,11 @@ fn get_sdk(
         .max()
         .context("unable to find latest Win10SDK version")?;
 
-    // For some reason, their are multiple `Windows SDK Desktop Headers`, but
-    // all of them other than x86-x86 appear to not actually have files in them
-    // (though they are still 300KiB+)? Very confused.
+    // So. There are multiple SDK Desktop Headers, one per architecture. However,
+    // all of the non-x86 ones include either 0 or few files, with x86 containing
+    // the vast majority of the actual needed headers. However, it also doesn't
+    // have all of them, as there are even more required headers in the completely
+    // separate `Windows Store Apps Headers-x86` package as well. Incredibly annoying.
     {
         let header_payload = sdk
             .payloads
@@ -360,11 +367,63 @@ fn get_sdk(
             variant: None,
             target_arch: None,
         });
+
+        let header_payload = sdk
+            .payloads
+            .iter()
+            .find(|payload| {
+                payload
+                    .file_name
+                    .ends_with("Windows SDK for Windows Store Apps Headers-x86_en-us.msi")
+            })
+            .with_context(|| format!("unable to find Windows SDK for Windows Store Apps Headers-x86_en-us.msi for {}", sdk.id))?;
+
+        pruned.push(Payload {
+            filename: format!("{}_store_headers.msi", sdk.id).into(),
+            sha256: header_payload.sha256.clone(),
+            url: header_payload.url.clone(),
+            size: header_payload.size,
+            install_size: None,
+            kind: PayloadKind::SdkHeaders,
+            variant: None,
+            target_arch: None,
+        });
+
+        for arch in Arch::iter(arches) {
+            if arch == Arch::X86 {
+                continue;
+            }
+
+            let header_payload = sdk
+                .payloads
+                .iter()
+                .find(|payload| {
+                    payload
+                        .file_name
+                        .strip_prefix("Installers\\Windows SDK Desktop Headers ")
+                        .and_then(|fname| fname.strip_suffix("-x86_en-us.msi"))
+                        .map_or(false, |fname| fname == arch.as_ms_str())
+                })
+                .with_context(|| format!("unable to find {} headers for {}", arch, sdk.id))?;
+
+            pruned.push(Payload {
+                filename: format!("{}_{}_headers.msi", sdk.id, arch.as_ms_str()).into(),
+                sha256: header_payload.sha256.clone(),
+                url: header_payload.url.clone(),
+                size: header_payload.size,
+                install_size: None,
+                kind: PayloadKind::SdkHeaders,
+                variant: None,
+                target_arch: Some(arch),
+            });
+        }
     }
 
-    // Each target architecture has its own separate installer
+    // Each target architecture has its own separate installer. Oh, and we also
+    // have to get the Windows Store Apps Libs, which has such libraries as
+    // kernel32 etc. :p
     {
-        for (arch, arch_str) in Arch::iter(arches) {
+        for arch in Arch::iter(arches) {
             let lib = sdk
                 .payloads
                 .iter()
@@ -373,7 +432,7 @@ fn get_sdk(
                         .file_name
                         .strip_prefix("Installers\\Windows SDK Desktop Libs ")
                         .and_then(|fname| fname.strip_suffix("-x86_en-us.msi"))
-                        .map(|arch_id| arch_id == arch_str)
+                        .map(|arch_id| arch_id == arch.as_ms_str())
                         .unwrap_or(false)
                 })
                 .with_context(|| format!("unable to find SDK libs for '{}'", arch))?;
@@ -389,6 +448,58 @@ fn get_sdk(
                 target_arch: Some(arch),
             });
         }
+
+        let lib_payload = sdk
+            .payloads
+            .iter()
+            .find(|payload| {
+                payload
+                    .file_name
+                    .ends_with("Windows SDK for Windows Store Apps Libs-x86_en-us.msi")
+            })
+            .with_context(|| {
+                format!(
+                    "unable to find Windows SDK for Windows Store Apps Libs-x86_en-us.msi for {}",
+                    sdk.id
+                )
+            })?;
+
+        pruned.push(Payload {
+            filename: format!("{}_store_libs.msi", sdk.id).into(),
+            sha256: lib_payload.sha256.clone(),
+            url: lib_payload.url.clone(),
+            size: lib_payload.size,
+            install_size: None,
+            kind: PayloadKind::SdkStoreLibs,
+            variant: None,
+            target_arch: None,
+        });
+    }
+
+    // We also need the Universal CRT, which is luckily all just in a single MSI
+    {
+        let ucrt = pkgs
+            .get("Microsoft.Windows.UniversalCRT.HeadersLibsSources.Msi")
+            .context("unable to find Universal CRT")?;
+
+        let msi = ucrt
+            .payloads
+            .iter()
+            .find(|payload| {
+                payload.file_name == "Universal CRT Headers Libraries and Sources-x86_en-us.msi"
+            })
+            .context("unable to find Universal CRT MSI")?;
+
+        pruned.push(Payload {
+            filename: "ucrt.msi".into(),
+            sha256: msi.sha256.clone(),
+            url: msi.url.clone(),
+            size: msi.size,
+            install_size: None,
+            kind: PayloadKind::Ucrt,
+            variant: None,
+            target_arch: None,
+        });
     }
 
     Ok(())

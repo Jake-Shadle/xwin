@@ -9,9 +9,9 @@ pub struct Unpack {
 }
 
 pub struct Ctx {
-    work_dir: PathBuf,
-    tempdir: Option<tempfile::TempDir>,
-    client: reqwest::Client,
+    pub work_dir: PathBuf,
+    pub tempdir: Option<tempfile::TempDir>,
+    pub client: reqwest::Client,
 }
 
 impl Ctx {
@@ -164,14 +164,17 @@ impl Ctx {
 
         unpack_dir.pop();
 
+        // If we didn't validate the .unpack file, ensure that we clean up anything
+        // that might be leftover from a failed unpack
         if unpack_dir.exists() {
             std::fs::remove_dir_all(&unpack_dir)
                 .with_context(|| format!("unable to remove invalid unpack dir '{}'", unpack_dir))?;
         }
+
         std::fs::create_dir_all(&unpack_dir)
             .with_context(|| format!("unable to create unpack dir '{}'", unpack_dir))?;
 
-        let dir = unpack_dir.clone();
+        let output_dir = unpack_dir.clone();
         let pkg = {
             let mut pb = self.work_dir.clone();
             pb.push("dl");
@@ -198,7 +201,9 @@ impl Ctx {
                     let to_extract: Vec<_> = zip
                         .file_names()
                         .filter_map(|fname| {
-                            fname.starts_with("Contents/").then(|| fname.to_owned())
+                            (fname.starts_with("Contents/")
+                                && (fname.contains("lib") || fname.contains("include")))
+                            .then(|| fname.to_owned())
                         })
                         .collect();
 
@@ -207,7 +212,7 @@ impl Ctx {
                             .by_name(&fname)
                             .with_context(|| format!("no file '{}' in zip '{}'", fname, pkg))?;
                         let zip_path = Path::new(&fname);
-                        let mut fs_path = dir.clone();
+                        let mut fs_path = output_dir.clone();
 
                         for comp in zip_path
                             .components()
@@ -248,14 +253,134 @@ impl Ctx {
                 })
             }
             Some("msi") => tokio::task::spawn_blocking(move || -> Result<Unpack, Error> {
-                let msi = std::io::Cursor::new(
-                    std::fs::read(&pkg).with_context(|| format!("unable to read {}", pkg))?,
-                );
+                let msi = std::fs::read(&pkg).with_context(|| format!("unable to read {}", pkg))?;
 
-                let mut msi = msi::Package::open(msi)
+                up.compressed += msi.len() as u64;
+
+                let mut msi = msi::Package::open(std::io::Cursor::new(msi))
                     .with_context(|| format!("unable to read MSI from {}", pkg))?;
 
                 // Open source ftw https://gitlab.gnome.org/GNOME/msitools/-/blob/master/tools/msiextract.vala
+
+                // For some reason many filenames in the table(s) have a weird
+                // checksum(?) filename with an extension separated from the
+                // _actual_ filename with a `|` so we need to detect that and
+                // strip off just the real name we want
+                #[inline]
+                fn fix_name(name: &msi::Value) -> Result<&str, Error> {
+                    let name = name.as_str().context("filename is not a string")?;
+
+                    Ok(match name.find('|') {
+                        Some(ind) => &name[ind + 1..],
+                        None => name,
+                    })
+                }
+
+                let components = {
+                    #[derive(Debug)]
+                    struct Dir {
+                        id: String,
+                        parent: Option<String>,
+                        path: PathBuf,
+                    }
+
+                    // Collect the directories that can be referenced by a component
+                    // that are reference by files. Ugh.
+                    let mut directories: Vec<_> = msi
+                        .select_rows(msi::Select::table("Directory"))
+                        .with_context(|| format!("MSI {} has no 'Directory' table", pkg))?
+                        .map(|row| -> Result<_, _> {
+                            // Columns:
+                            // 0 - Directory (name)
+                            // 1 - Directory_Parent (name of parent)
+                            // 2 - DefaultDir (location of directory on disk)
+                            // ...
+                            anyhow::ensure!(row.len() >= 3, "invalid row in 'Directory'");
+
+                            Ok(Dir {
+                                id: row[0]
+                                    .as_str()
+                                    .context("directory name is not a string")?
+                                    .to_owned(),
+                                // This can be `null`
+                                parent: row[1].as_str().map(String::from),
+                                path: fix_name(&row[2])?.into(),
+                            })
+                        })
+                        .collect::<Result<_, _>>()
+                        .with_context(|| format!("unable to read directories for {}", pkg))?;
+
+                    directories.sort_by(|a, b| a.id.cmp(&b.id));
+
+                    let components: std::collections::BTreeMap<_, _> = msi
+                        .select_rows(msi::Select::table("Component"))
+                        .with_context(|| format!("MSI {} has no 'Directory' table", pkg))?
+                        .map(|row| -> Result<_, _> {
+                            // Columns:
+                            // 0 - Component (name, really, id)
+                            // 1 - ComponentId
+                            // 2 - Directory_ (directory id)
+                            anyhow::ensure!(row.len() >= 3, "invalid row in 'Component'");
+
+                            // The recursion depth for directory lookup is quite shallow
+                            // typically, the full path to a file would be something like
+                            // `Program Files/Windows Kits/10/Lib/10.0.19041.0/um/x64`
+                            // but this a terrible path, so we massage it to instead be
+                            // `lib/um/x64`
+                            fn build_dir(dirs: &[Dir], id: &str, dir: &mut PathBuf) {
+                                let cur_dir = match dirs.binary_search_by(|d| d.id.as_str().cmp(id))
+                                {
+                                    Ok(i) => &dirs[i],
+                                    Err(_) => {
+                                        tracing::warn!("unable to find directory {}", id);
+                                        return;
+                                    }
+                                };
+
+                                match cur_dir.path.file_name() {
+                                    Some("Lib") => {
+                                        dir.push("lib");
+                                    }
+                                    Some("Include") => {
+                                        dir.push("include");
+                                    }
+                                    other => {
+                                        if let Some(parent) = &cur_dir.parent {
+                                            build_dir(dirs, parent, dir);
+                                        }
+
+                                        if let Some(other) = other {
+                                            // Ignore the SDK version directory between
+                                            // Lib/Include and the actual subdirs we care about
+                                            if !other.starts_with(|c: char| c.is_digit(10)) {
+                                                dir.push(other);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            let component_id = row[0]
+                                .as_str()
+                                .context("component id is not a string")?
+                                .to_owned();
+
+                            let mut dir = output_dir.clone();
+                            build_dir(
+                                &directories,
+                                row[2]
+                                    .as_str()
+                                    .context("component directory is not a string")?,
+                                &mut dir,
+                            );
+
+                            Ok((component_id, dir))
+                        })
+                        .collect::<Result<_, _>>()
+                        .with_context(|| format!("unable to read components for {}", pkg))?;
+
+                    components
+                };
 
                 struct Cab {
                     /// The max sequence number, each `File` in an MSI has a
@@ -292,6 +417,9 @@ impl Ctx {
                                         std::fs::read(&cab_path).with_context(|| {
                                             format!("unable to read CAB from path {}", cab_path)
                                         })?;
+
+                                    up.compressed += cab_contents.len() as u64;
+
                                     let cab = cab::Cabinet::new(std::io::Cursor::new(cab_contents))
                                         .with_context(|| format!("CAB {} is invalid", cab_path))?;
 
@@ -315,14 +443,14 @@ impl Ctx {
                 struct CabFile {
                     id: String,
                     name: PathBuf,
-                    size: u64,
+                    //size: u64,
                     sequence: u32,
                 }
 
                 let mut files: Vec<_> = msi
                     .select_rows(msi::Select::table("File"))
                     .with_context(|| format!("MSI {} has no 'File' table", pkg))?
-                    .map(|row| -> Result<_, Error> {
+                    .filter_map(|row| -> Option<Result<_, Error>> {
                         // Columns:
                         // 0 - File Id (lookup in CAB)
                         // 1 - Component_ (target directory)
@@ -332,31 +460,49 @@ impl Ctx {
                         // 5 - Language
                         // 6 - Attributes
                         // 7 - Sequence (determines which CAB file)
-                        anyhow::ensure!(row.len() >= 8, "invalid row in 'File'");
+                        if row.len() < 8 {
+                            return Some(Err(anyhow::anyhow!("invalid row in 'File'")));
+                        }
 
-                        let cf = CabFile {
-                            id: row[0]
-                                .as_str()
-                                .context("File (id) is not a string")?
-                                .to_owned(),
-                            // For some reason many filenames in the table have a weird
-                            // checksum(?) filename with an extension separated from the
-                            // _actual_ filename with a `|` so we need to detect that and
-                            // strip off just the real filename
-                            name: {
-                                let name = row[2].as_str().context("filename is not a string")?;
+                        let (dir, fname, id, seq) = match || -> Result<_, Error> {
+                            let fname = fix_name(&row[2])?;
+                            let dir = components
+                                .get(row[1].as_str().context("component id was not a string")?)
+                                .with_context(|| {
+                                    format!("file {} referenced an unknown component", row[2])
+                                })?;
 
-                                match name.find('|') {
-                                    Some(ind) => &name[ind + 1..],
-                                    None => name,
-                                }
-                            }
-                            .into(),
-                            size: row[3].as_int().context("filesize is not an integer")? as u64,
-                            sequence: row[7].as_int().context("sequence is not an integer")? as u32,
+                            let id = row[0].as_str().context("File (id) is not a string")?;
+
+                            let seq = row[7].as_int().context("sequence is not an integer")? as u32;
+
+                            Ok((dir, fname, id, seq))
+                        }() {
+                            Ok(items) => items,
+                            Err(e) => return Err(e).transpose(),
                         };
 
-                        Ok(cf)
+                        if let Some(camino::Utf8Component::Normal(first)) = dir
+                            .strip_prefix(&output_dir)
+                            .ok()
+                            .and_then(|rel| rel.components().nth(0))
+                        {
+                            match first {
+                                "Catalogs" | "bin" | "Source" | "SourceDir" => {
+                                    tracing::debug!("ignoring {}/{}", dir, fname);
+                                    return None;
+                                }
+                                _ => {}
+                            }
+                        }
+
+                        let cf = CabFile {
+                            id: id.to_owned(),
+                            name: dir.join(fname),
+                            sequence: seq,
+                        };
+
+                        Some(Ok(cf))
                     })
                     .collect::<Result<Vec<_>, Error>>()
                     .with_context(|| format!("unable to read 'File' metadata for {}", pkg))?;
@@ -370,7 +516,7 @@ impl Ctx {
                     for file in files
                         .iter()
                         .skip_while(|f| f.sequence <= file_skip)
-                        .take_while(|f| f.sequence < cab_sequence)
+                        .take_while(|f| f.sequence <= cab_sequence)
                     {
                         let mut cab_file = match cabinet.cab.read_file(file.id.as_str()) {
                             Ok(cf) => cf,
@@ -379,14 +525,16 @@ impl Ctx {
                             })?,
                         };
 
-                        let unpack_path = dir.join(&file.name);
+                        let unpack_path = output_dir.join(&file.name);
 
                         if let Some(parent) = unpack_path.parent() {
-                            std::fs::create_dir_all(parent)?;
+                            if !parent.exists() {
+                                std::fs::create_dir_all(parent)?;
+                            }
                         }
 
                         let mut unpacked_file = std::fs::File::create(&unpack_path)?;
-                        std::io::copy(&mut cab_file, &mut unpacked_file)?;
+                        up.decompressed += std::io::copy(&mut cab_file, &mut unpacked_file)?;
                     }
 
                     file_skip = cab_sequence;

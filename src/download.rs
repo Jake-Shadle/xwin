@@ -112,10 +112,6 @@ async fn download_cabs(
         .select_rows(msi::Select::table("Media"))
         .with_context(|| format!("{} does not contain a list of CAB files", msi.filename))?
         .filter_map(|row| {
-            for column in 0..row.len() {
-                tracing::debug!("{} {:#?}", column, row[column]);
-            }
-
             if row.len() >= 3 {
                 // For some reason most/all of the msi files contain a NULL cabinet
                 // in the first position which is useless
