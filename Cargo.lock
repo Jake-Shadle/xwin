@@ -114,6 +114,7 @@ checksum = "e3c69b077ad434294d3ce9f1f6143a2a4b89a8a2d54ef813d85003a4fd1137fd"
 [[package]]
 name = "cfb"
 version = "0.4.0"
+source = "git+https://github.com/Jake-Shadle/rust-cfb?rev=3dcfcf6#3dcfcf6b91b63b69780d21323a05b27ec95cffea"
 dependencies = [
  "byteorder",
  "uuid",

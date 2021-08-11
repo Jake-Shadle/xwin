@@ -1,8 +1,12 @@
 [package]
 name = "xwin"
 version = "0.1.0"
+description = "Allows downloading and repacking the MSVC and Windows SDK for cross compilation"
 authors = ["Jake Shadle <jake.shadle@embark-studios.com>"]
 edition = "2018"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/Jake-Shadle/xwin"
+homepage = "https://github.com/Jake-Shadle/xwin"
 
 [dependencies]
 ansi_term = "0.12"
@@ -55,4 +59,4 @@ name = "xwin"
 path = "src/bin.rs"
 
 [patch.crates-io]
-cfb = { path = "../rust-cfb" }
+cfb = { git = "https://github.com/Jake-Shadle/rust-cfb", rev = "3dcfcf6" }
