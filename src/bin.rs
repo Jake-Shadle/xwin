@@ -220,7 +220,7 @@ async fn main() -> Result<(), Error> {
             include_debug_symbols,
             disable_symlinks,
             preserve_ms_arch_notation,
-            copy: copy,
+            copy,
             output: output.unwrap_or_else(|| ctx.work_dir.join("splat")),
         }),
     };

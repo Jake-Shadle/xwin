@@ -257,6 +257,7 @@ impl Ctx {
         Ok(Unpack::Needed(unpack_dir))
     }
 
+    #[allow(clippy::unused_self)]
     pub(crate) fn finish_unpack(
         &self,
         mut unpack_dir: PathBuf,

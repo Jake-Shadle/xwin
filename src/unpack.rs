@@ -412,7 +412,7 @@ pub(crate) fn unpack(
                         if let Some(camino::Utf8Component::Normal(first)) = dir
                             .strip_prefix(&output_dir)
                             .ok()
-                            .and_then(|rel| rel.components().nth(0))
+                            .and_then(|rel| rel.components().next())
                         {
                             match first {
                                 "Catalogs" | "bin" | "Source" | "SourceDir" => {

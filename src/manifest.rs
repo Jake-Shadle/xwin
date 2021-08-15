@@ -148,7 +148,7 @@ pub fn get_package_manifest(
         payload.url.clone(),
         &format!("pkg_manifest_{}.vsman", payload.sha256),
         None,
-        progress.clone(),
+        progress,
     )?;
 
     #[derive(Deserialize)]

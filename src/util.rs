@@ -72,7 +72,7 @@ impl<'de> serde::Deserialize<'de> for Sha256 {
         impl<'de> serde::de::Visitor<'de> for Visitor {
             type Value = Sha256;
 
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("sha256 string")
             }
 

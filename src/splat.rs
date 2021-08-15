@@ -297,11 +297,11 @@ pub(crate) fn splat(
 
                         if !include_debug_libs {
                             if let Some(stripped) = fnamestr.strip_suffix(".lib") {
-                                if stripped.ends_with("d")
+                                if stripped.ends_with('d')
                                     || stripped.ends_with("d_netcore")
                                     || stripped
                                         .strip_suffix(|c: char| c.is_digit(10))
-                                        .map_or(false, |fname| fname.ends_with("d"))
+                                        .map_or(false, |fname| fname.ends_with('d'))
                                 {
                                     tracing::debug!("skipping {}", fname);
                                     continue;
@@ -318,8 +318,9 @@ pub(crate) fn splat(
                         let name_hash = calc_lower_hash(fnamestr);
 
                         let mut lock = sdk_files.lock();
-                        if !lock.contains_key(&name_hash) {
-                            lock.insert(name_hash, tar.clone());
+                        if let std::collections::hash_map::Entry::Vacant(e) = lock.entry(name_hash)
+                        {
+                            e.insert(tar.clone());
                             true
                         } else {
                             false
@@ -345,7 +346,15 @@ pub(crate) fn splat(
                             // These are all internally consistent and lowercased, so if
                             // a library is including them with different casing that is
                             // kind of on them
-                            PayloadKind::CrtHeaders | PayloadKind::Ucrt => {}
+                            //
+                            // The SDK headers are also all over the place with casing
+                            // as well as being internally inconsistent, so we scan
+                            // them all for includes and add those that are referenced
+                            // incorrectly, but we wait until after all the of headers
+                            // have been unpacked before fixing them
+                            PayloadKind::CrtHeaders
+                            | PayloadKind::Ucrt
+                            | PayloadKind::SdkHeaders => {}
                             PayloadKind::CrtLibs => {
                                 // While _most_ of the libs *stares at Microsoft.VisualC.STLCLR.dll*,
                                 // sometimes when they are specified as linker arguments libs
@@ -363,13 +372,6 @@ pub(crate) fn splat(
 
                                     symlink(fnamestr, &tar)?;
                                 }
-                            }
-                            PayloadKind::SdkHeaders => {
-                                // The SDK headers are again all over the place with casing
-                                // as well as being internally inconsistent, so we scan
-                                // them all for includes and add those that are referenced
-                                // incorrectly, but we wait until after all the of headers
-                                // have been unpacked before fixing them
                             }
                             PayloadKind::SdkLibs | PayloadKind::SdkStoreLibs => {
                                 // The SDK libraries are just completely inconsistent, but
