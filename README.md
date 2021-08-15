@@ -1,42 +1,25 @@
-<!--- FIXME: Pick an emoji! --->
-# 🌻 opensource-template
+# xwin
 
-<!--- FIXME: Update crate, repo and CI workflow names here! Remove any that are not relevant --->
-[![Embark](https://img.shields.io/badge/embark-open%20source-blueviolet.svg)](https://embark.dev)
-[![Embark](https://img.shields.io/badge/discord-ark-%237289da.svg?logo=discord)](https://discord.gg/dAuKfZS)
-[![Crates.io](https://img.shields.io/crates/v/rust-gpu.svg)](https://crates.io/crates/rust-gpu)
-[![Docs](https://docs.rs/rust-gpu/badge.svg)](https://docs.rs/rust-gpu)
-[![dependency status](https://deps.rs/repo/github/EmbarkStudios/rust-gpu/status.svg)](https://deps.rs/repo/github/EmbarkStudios/rust-gpu)
-[![Build status](https://github.com/EmbarkStudios/physx-rs/workflows/CI/badge.svg)](https://github.com/EmbarkStudios/physx-rs/actions)
+[![Crates.io](https://img.shields.io/crates/v/xwin.svg)](https://crates.io/crates/xwin)
+[![Docs](https://docs.rs/xwin/badge.svg)](https://docs.rs/xwin)
+[![dependency status](https://deps.rs/repo/github/Jake-Shadle/xwin/status.svg)](https://deps.rs/repo/github/Jake-Shadle/xwin)
+[![Build status](https://github.com/Jake-Shadle/xwin/workflows/CI/badge.svg)](https://github.com/Jake-Shadle/xwin/actions)
 
-Template for creating new open source repositories that follow the Embark open source guidelines.
+A utility for downloading and packaging the [Microsoft CRT](https://docs.microsoft.com/en-us/cpp/c-runtime-library/crt-library-features?redirectedfrom=MSDN&view=msvc-160) headers and libraries, and [Windows SDK](https://en.wikipedia.org/wiki/Microsoft_Windows_SDK) headers and libraries needed for compiling and linking programs targetting Windows.
 
-## TEMPLATE INSTRUCTIONS
+## Introduction
 
-1. Create a new repository under EmbarkStudios using this template.
-1. __Title:__ Change the first line of this README to the name of your project, and replace the sunflower with an emoji that represents your project. 🚨 Your emoji selection is critical.
-1. __Badges:__ In the badges section above, change the repo name in each URL. If you are creating something other than a Rust crate, remove the crates.io and docs badges (and feel free to add more appropriate ones for your language).
-1. __CI:__ In `./github/workflows/` rename `rust-ci.yml` (or the appropriate config for your language) to `ci.yml`. And go over it and adapt it to work for your project
-1. __Cleanup:__ Remove this section of the README and any unused files (such as configs for other languages) from the repo.
+The goal of this project is to create a root directory for both the CRT and Windows SDK that each contain all of the necessary includes and libraries needed for an application to compile and link from a non-Windows platform, using a native cross compiling toolchain like clang/LLVM.
 
-## Contribution
+### Thanks
 
-[![Contributor Covenant](https://img.shields.io/badge/contributor%20covenant-v1.4-ff69b4.svg)](../main/CODE_OF_CONDUCT.md)
-
-We welcome community contributions to this project.
-
-Please read our [Contributor Guide](CONTRIBUTING.md) for more information on how to get started.
-Please also read our [Contributor Terms](CONTRIBUTING.md/#Contributor-Terms) before you make any contributions.
-
-Any contribution intentionally submitted for inclusion in an Embark Studios project, shall comply with the Rust standard licensing model (MIT + Apache 2.0) and therefore be dual licensed as described below, without any additional terms or conditions:
+Special thanks to <https://github.com/mstorsjo/msvc-wine> for the inspiration.
 
 ### License
 
-This [contribution] is dual licensed under EITHER OF
+This contribution is dual licensed under EITHER OF
 
-* Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
-* MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+* Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>)
+* MIT license ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
 
 at your option.
-
-For clarity, "your" refers to Embark or any other licensee/user of the contribution.

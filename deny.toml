@@ -1,0 +1,65 @@
+targets = [
+    { triple = "x86_64-unknown-linux-musl" },
+    { triple = "x86_64-unknown-linux-gnu" },
+]
+
+[advisories]
+vulnerability = "deny"
+unmaintained = "deny"
+yanked = "deny"
+ignore = [
+    #"RUSTSEC-0000-0000",
+]
+
+[licenses]
+unlicensed = "deny"
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-3-Clause",
+    "ISC",
+    # This is not really a license for source code, but the encoding* crates
+    # pulled in by msi all use it for some reason
+    "CC0-1.0",
+]
+copyleft = "deny"
+exceptions = [
+    { allow = ["MPL-2.0"], name = "webpki-roots" },
+    # ring uses code from multiple libraries but all with permissive licenses
+    # https://tldrlegal.com/license/openssl-license-(openssl)
+    { allow = ["ISC", "MIT", "OpenSSL"], name = "ring" },
+]
+
+[[licenses.clarify]]
+name = "ring"
+# SPDX considers OpenSSL to encompass both the OpenSSL and SSLeay licenses
+# https://spdx.org/licenses/OpenSSL.html
+# ISC - Both BoringSSL and ring use this for their new files
+# MIT - "Files in third_party/ have their own licenses, as described therein. The MIT
+# license, for third_party/fiat, which, unlike other third_party directories, is
+# compiled into non-test libraries, is included below."
+# OpenSSL - Obviously
+expression = "ISC AND MIT AND OpenSSL"
+license-files = [
+    { path = "LICENSE", hash = 0xbd0eed23 },
+]
+
+[bans]
+multiple-versions = "deny"
+deny = [
+    { name = "openssl-sys" },
+]
+skip = [
+    # clap depends on an old version
+    { name = "ansi_term", version = "=0.11.0" },
+]
+
+[sources]
+unknown-registry = "deny"
+# Lint level for what to happen when a crate from a git repository that is not
+# in the allow list is encountered
+unknown-git = "deny"
+allow-git = []
+
+[sources.allow-org]
+github = ["Jake-Shadle"]

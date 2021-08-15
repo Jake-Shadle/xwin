@@ -1,9 +1,63 @@
 [package]
 name = "xwin"
 version = "0.1.0"
+description = "Allows downloading and repacking the MSVC and Windows SDK for cross compilation"
 authors = ["Jake Shadle <jake.shadle@embark-studios.com>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/Jake-Shadle/xwin"
+homepage = "https://github.com/Jake-Shadle/xwin"
 
 [dependencies]
+# Easy errors
+anyhow = "1.0"
+# Network/file buffers
+bytes = "1.0"
+# CAB files are used in conjunction with MSI files for SDK packages
+cab = "0.2"
+# Nicer to use utf-8 paths
+camino = "1.0"
+# Timestamps
+chrono = "0.4"
+# Easy CLI tables
+cli-table = { version = "0.4", default-features = false }
+# GZIP/Deflate
+flate2 = { version = "1.0", default-features = false, features = ["rust_backend"] }
+# Pretty progress bars
+indicatif = "0.17.0-beta.1"
+# Decoding of MSI installer packages
+msi = "0.3"
+parking_lot = "0.11"
+# brrr
+rayon = "1.5"
+# Include scanning 
+regex = "1.0"
+# HTTP requests
+reqwest = { version = "0.11", default-features = false, features = ["blocking", "rustls-tls"] }
+# SHA-256 verification
+ring = "0.16"
+# Deserialization
+serde = { version = "1.0", features = ["derive"] }
+# JSON deserialization
+serde_json = "1.0"
+# Argument parsing
+structopt = "0.3"
+# Easy management of temp files
+tempfile = "3.1"
+# Async runtime
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+# Tracing logs
+tracing = { version = "0.1", default-features = false, features = ["attributes", "std"] }
+# Emission of logs to stdout
+tracing-subscriber = "0.2"
+# Hashing
+twox-hash = "1.6"
+# Unpacking of VSIX "packages"
+zip = { version = "0.5", default-features = false, features = ["deflate"] }
+
+[[bin]]
+name = "xwin"
+path = "src/bin.rs"
+
+[patch.crates-io]
+cfb = { git = "https://github.com/Jake-Shadle/rust-cfb", rev = "98efc63" }
