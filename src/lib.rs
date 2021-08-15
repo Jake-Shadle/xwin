@@ -1,24 +1,16 @@
 use anyhow::{Context as _, Error};
-use camino::Utf8PathBuf as PathBuf;
+pub use camino::{Utf8Path as Path, Utf8PathBuf as PathBuf};
 use std::{collections::BTreeMap, fmt};
 
 mod ctx;
 mod download;
 pub mod manifest;
-mod pack;
+mod splat;
 mod unpack;
 pub mod util;
 
 pub use ctx::Ctx;
-pub use download::download;
-pub use pack::{pack, PackConfig};
-pub use unpack::unpack;
-
-pub enum Ops {
-    Download = 0x1,
-    Unpack = 0x2,
-    Pack = 0x4,
-}
+pub use splat::SplatConfig;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Arch {
@@ -93,12 +85,7 @@ pub enum Variant {
 
 impl fmt::Display for Variant {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Self::Desktop => "desktop",
-            Self::OneCore => "onecore",
-            Self::Store => "store",
-            Self::Spectre => "spectre",
-        })
+        f.write_str(self.as_str())
     }
 }
 
@@ -117,6 +104,15 @@ impl std::str::FromStr for Variant {
 }
 
 impl Variant {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Desktop => "desktop",
+            Self::OneCore => "onecore",
+            Self::Store => "store",
+            Self::Spectre => "spectre",
+        }
+    }
+
     pub fn iter(val: u32) -> impl Iterator<Item = &'static str> {
         [Self::Desktop, Self::OneCore, Self::Store]
             .iter()
@@ -135,13 +131,26 @@ impl Variant {
     }
 }
 
-pub async fn get_pkg_manifest(
+pub fn get_pkg_manifest(
     ctx: &Ctx,
     version: &str,
     channel: &str,
+    progress: indicatif::ProgressBar,
 ) -> Result<manifest::PackageManifest, Error> {
-    let vs_manifest = manifest::get_manifest(ctx, version, channel).await?;
-    manifest::get_package_manifest(ctx, &vs_manifest).await
+    let vs_manifest = manifest::get_manifest(ctx, version, channel, progress.clone())?;
+    manifest::get_package_manifest(ctx, &vs_manifest, progress)
+}
+
+pub enum Ops {
+    Download,
+    Unpack,
+    Splat(crate::splat::SplatConfig),
+}
+
+#[derive(Clone)]
+pub struct WorkItem {
+    pub progress: indicatif::ProgressBar,
+    pub payload: std::sync::Arc<Payload>,
 }
 
 #[derive(Clone, Debug)]
@@ -385,7 +394,7 @@ fn get_sdk(
             size: header_payload.size,
             install_size: None,
             kind: PayloadKind::SdkHeaders,
-            variant: None,
+            variant: Some(Variant::Store),
             target_arch: None,
         });
 

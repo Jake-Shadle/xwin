@@ -1,171 +1,159 @@
-use crate::{manifest, util::Sha256, Ctx, Error, Payload};
+use crate::{manifest, util::Sha256, Ctx, Error};
 use anyhow::Context as _;
 use camino::Utf8PathBuf as PathBuf;
-use futures::StreamExt;
+use std::sync::Arc;
 
 #[derive(Debug)]
 struct Cab {
     filename: PathBuf,
     sha256: Sha256,
     url: String,
+    size: u64,
 }
 
-pub async fn download(
-    ctx: std::sync::Arc<Ctx>,
-    pkgs: &std::collections::BTreeMap<String, manifest::ManifestItem>,
-    items: Vec<Payload>,
-) -> Result<(), Error> {
-    let resu = futures::stream::iter(items.into_iter().map(|payload| {
-        let cabs = if payload.filename.extension() == Some("msi") {
-            match pkgs.values().find(|mi| {
+pub(crate) struct CabContents {
+    pub(crate) path: PathBuf,
+    pub(crate) content: bytes::Bytes,
+    pub(crate) sequence: u32,
+}
+
+pub(crate) enum PayloadContents {
+    Vsix(bytes::Bytes),
+    Msi {
+        msi: bytes::Bytes,
+        cabs: Vec<CabContents>,
+    },
+}
+
+pub(crate) fn download(
+    ctx: Arc<Ctx>,
+    pkgs: Arc<std::collections::BTreeMap<String, manifest::ManifestItem>>,
+    item: &crate::WorkItem,
+) -> Result<PayloadContents, Error> {
+    item.progress.set_message("📥 downloading..");
+
+    let contents = ctx.get_and_validate(
+        &item.payload.url,
+        &item.payload.filename,
+        Some(item.payload.sha256.clone()),
+        item.progress.clone(),
+    )?;
+
+    let pc = match item.payload.filename.extension() {
+        Some("msi") => {
+            let cabs: Vec<_> = match pkgs.values().find(|mi| {
                 mi.payloads
                     .iter()
-                    .any(|mi_payload| mi_payload.sha256 == payload.sha256)
+                    .any(|mi_payload| mi_payload.sha256 == item.payload.sha256)
             }) {
-                Some(mi) => {
-                    let cabs: Vec<_> = mi
-                        .payloads
-                        .iter()
-                        .filter_map(|pay| {
-                            pay.file_name.ends_with(".cab").then(|| Cab {
-                                filename: pay
-                                    .file_name
-                                    .strip_prefix("Installers\\")
-                                    .unwrap_or(&pay.file_name)
-                                    .into(),
-                                sha256: pay.sha256.clone(),
-                                url: pay.url.clone(),
-                            })
+                Some(mi) => mi
+                    .payloads
+                    .iter()
+                    .filter_map(|pay| {
+                        pay.file_name.ends_with(".cab").then(|| Cab {
+                            filename: pay
+                                .file_name
+                                .strip_prefix("Installers\\")
+                                .unwrap_or(&pay.file_name)
+                                .into(),
+                            sha256: pay.sha256.clone(),
+                            url: pay.url.clone(),
+                            size: pay.size,
                         })
-                        .collect();
+                    })
+                    .collect(),
+                None => anyhow::bail!(
+                    "unable to find manifest parent for {}",
+                    item.payload.filename
+                ),
+            };
 
-                    Some(cabs)
-                }
-                None => {
-                    tracing::error!("unable to find manifest parent for {}", payload.filename);
-                    None
-                }
-            }
-        } else {
-            None
-        };
-
-        (payload, cabs)
-    }))
-    .map(|(payload, cabs)| {
-        let ctx = ctx.clone();
-        async move {
-            let dl_ctx = ctx.clone();
-            let (dl_url, dl_filename, dl_sha) = (
-                payload.url.clone(),
-                payload.filename.clone(),
-                payload.sha256.clone(),
-            );
-
-            match async move {
-                dl_ctx
-                    .get_and_validate(dl_url, &dl_filename, Some(dl_sha))
-                    .await
-            }
-            .await
-            {
-                Ok(msi_data) => match cabs {
-                    Some(cabs) => download_cabs(ctx.clone(), &cabs, &payload, &msi_data).await,
-                    None => Ok(()),
-                },
-                Err(e) => Err(e),
-            }
+            download_cabs(ctx, &cabs, item, contents)
         }
-    })
-    .buffer_unordered(32);
+        Some("vsix") => Ok(PayloadContents::Vsix(contents)),
+        ext => anyhow::bail!("unknown extension {:?}", ext),
+    };
 
-    resu.fold((), |u, res| async move {
-        match res {
-            Ok(a) => a,
-            Err(e) => {
-                tracing::error!("{:#}", e);
-                u
-            }
-        }
-    })
-    .await;
+    item.progress.finish_with_message("downloaded");
 
-    Ok(())
+    pc
 }
 
 /// Each SDK MSI has 1 or more cab files associated with it containing the actual
 /// data we need that must be downloaded separately and indexed from the MSI
-#[tracing::instrument(skip(ctx, cabs, msi_content))]
-async fn download_cabs(
-    ctx: std::sync::Arc<Ctx>,
+fn download_cabs(
+    ctx: Arc<Ctx>,
     cabs: &[Cab],
-    msi: &Payload,
-    msi_content: &[u8],
-) -> Result<(), Error> {
-    let mut msi_pkg = msi::Package::open(std::io::Cursor::new(msi_content))
-        .with_context(|| format!("invalid MSI for {}", msi.filename))?;
+    msi: &crate::WorkItem,
+    msi_content: bytes::Bytes,
+) -> Result<PayloadContents, Error> {
+    use rayon::prelude::*;
+
+    let msi_filename = &msi.payload.filename;
+
+    let mut msi_pkg = msi::Package::open(std::io::Cursor::new(msi_content.clone()))
+        .with_context(|| format!("invalid MSI for {}", msi_filename))?;
 
     // The `Media` table contains the list of cabs by name, which we then need
     // to lookup in the list of payloads.
     // Columns: [DiskId, LastSequence, DiskPrompt, Cabinet, VolumeLabel, Source]
-    let cabs: Vec<_> = msi_pkg
+    let cab_files: Vec<_> = msi_pkg
         .select_rows(msi::Select::table("Media"))
-        .with_context(|| format!("{} does not contain a list of CAB files", msi.filename))?
+        .with_context(|| format!("{} does not contain a list of CAB files", msi_filename))?
         .filter_map(|row| {
+            // Columns:
+            // 0 - DiskId
+            // 1 - LastSequence
+            // 2 - DiskPrompt
+            // 3 - Cabinet name
+            // ...
             if row.len() >= 3 {
                 // For some reason most/all of the msi files contain a NULL cabinet
                 // in the first position which is useless
-                row[3].as_str().and_then(|s| {
-                    let cab_name = s.trim_matches('"');
+                row[3]
+                    .as_str()
+                    .and_then(|s| row[1].as_int().map(|seq| (s, seq as u32)))
+                    .and_then(|(name, seq)| {
+                        let cab_name = name.trim_matches('"');
 
-                    cabs.iter().find_map(|payload| {
-                        (payload.filename == cab_name).then(|| {
-                            (
-                                PathBuf::from(format!(
-                                    "{}/{}",
-                                    msi.filename.file_stem().unwrap(),
-                                    cab_name
-                                )),
-                                payload.sha256.clone(),
-                                payload.url.clone(),
-                            )
+                        cabs.iter().find_map(|payload| {
+                            (payload.filename == cab_name).then(|| {
+                                (
+                                    PathBuf::from(format!(
+                                        "{}/{}",
+                                        msi_filename.file_stem().unwrap(),
+                                        cab_name
+                                    )),
+                                    payload.sha256.clone(),
+                                    payload.url.clone(),
+                                    seq,
+                                )
+                            })
                         })
                     })
-                })
             } else {
                 None
             }
         })
         .collect();
 
-    let cabs = futures::stream::iter(cabs)
-        .map(|(cab_name, chksum, url)| {
-            let ctx = ctx.clone();
+    let cabs = cab_files
+        .into_par_iter()
+        .map(
+            |(cab_name, chksum, url, sequence)| -> Result<CabContents, Error> {
+                let cab_contents =
+                    ctx.get_and_validate(&url, &cab_name, Some(chksum), msi.progress.clone())?;
+                Ok(CabContents {
+                    path: cab_name,
+                    content: cab_contents,
+                    sequence,
+                })
+            },
+        )
+        .collect::<Result<Vec<_>, _>>()?;
 
-            async move {
-                ctx.get_and_validate(url, &cab_name, Some(chksum))
-                    .await
-                    .map(|cab_bytes| cab_bytes.len())
-            }
-        })
-        .buffer_unordered(4);
-
-    let (count, downloaded) = cabs
-        .fold((0, 0), |acc, res| async move {
-            match res {
-                Ok(size) => (acc.0 + 1, acc.1 + size),
-                Err(e) => {
-                    tracing::error!("{:#}", e);
-                    acc
-                }
-            }
-        })
-        .await;
-
-    tracing::debug!(
-        "downloaded {} cabs totalling {}",
-        count,
-        indicatif::HumanBytes(downloaded as u64)
-    );
-    Ok(())
+    Ok(PayloadContents::Msi {
+        msi: msi_content,
+        cabs,
+    })
 }

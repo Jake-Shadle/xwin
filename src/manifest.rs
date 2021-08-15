@@ -104,27 +104,28 @@ pub struct Manifest {
     channel_items: Vec<ManifestItem>,
 }
 
-pub async fn get_manifest(
+pub fn get_manifest(
     ctx: &Ctx,
     version: &str,
     channel: &str,
+    progress: indicatif::ProgressBar,
 ) -> Result<Manifest, anyhow::Error> {
-    let manifest_bytes = ctx
-        .get_and_validate(
-            format!("https://aka.ms/vs/{}/{}/channel", version, channel),
-            &format!("manifest_{}.json", version),
-            None,
-        )
-        .await?;
+    let manifest_bytes = ctx.get_and_validate(
+        format!("https://aka.ms/vs/{}/{}/channel", version, channel),
+        &format!("manifest_{}.json", version),
+        None,
+        progress,
+    )?;
 
     let manifest: Manifest = serde_json::from_slice(&manifest_bytes)?;
 
     Ok(manifest)
 }
 
-pub async fn get_package_manifest(
+pub fn get_package_manifest(
     ctx: &Ctx,
     manifest: &Manifest,
+    progress: indicatif::ProgressBar,
 ) -> Result<PackageManifest, anyhow::Error> {
     let pkg_manifest = manifest
         .channel_items
@@ -143,13 +144,12 @@ pub async fn get_package_manifest(
     // it without checking, which is terrible but...¯\_(ツ)_/¯
     let payload = &pkg_manifest.payloads[0];
 
-    let manifest_bytes = ctx
-        .get_and_validate(
-            payload.url.clone(),
-            &format!("pkg_manifest_{}.vsman", payload.sha256),
-            None,
-        )
-        .await?;
+    let manifest_bytes = ctx.get_and_validate(
+        payload.url.clone(),
+        &format!("pkg_manifest_{}.vsman", payload.sha256),
+        None,
+        progress.clone(),
+    )?;
 
     #[derive(Deserialize)]
     struct PkgManifest {

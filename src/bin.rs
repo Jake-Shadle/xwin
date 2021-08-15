@@ -1,5 +1,6 @@
 use anyhow::{Context as _, Error};
 use camino::Utf8PathBuf as PathBuf;
+use indicatif as ia;
 use structopt::StructOpt;
 use tracing_subscriber::filter::LevelFilter;
 
@@ -10,7 +11,9 @@ fn setup_logger(json: bool, log_level: LevelFilter) -> Result<(), Error> {
     // if they want to trace other crates they can use the RUST_LOG env approach
     env_filter = env_filter.add_directive(format!("xwin={}", log_level).parse()?);
 
-    let subscriber = tracing_subscriber::FmtSubscriber::builder().with_env_filter(env_filter);
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        .with_env_filter(env_filter)
+        .with_writer(std::io::stderr);
 
     if json {
         tracing::subscriber::set_global_default(subscriber.json().finish())
@@ -37,9 +40,8 @@ pub enum Command {
     /// Unpacks all of the downloaded packages to disk
     Unpack,
     /// Fixes the packages to prune unneeded files and adds symlinks to address
-    /// file casing issues and then packs the final artifacts into directories
-    /// or tarballs
-    Pack {
+    /// file casing issues and then spalts the final artifacts into directories
+    Splat {
         /// The MSVCRT includes (non-redistributable) debug versions of the
         /// various libs that are generally uninteresting to keep for most usage
         #[structopt(long)]
@@ -63,10 +65,15 @@ pub enum Command {
         /// flag will preserve the MS names for those targets.
         #[structopt(long)]
         preserve_ms_arch_notation: bool,
-        /// The root output directory. Defaults to `./.xwin-cache/pack` if not
+        /// The root output directory. Defaults to `./.xwin-cache/splat` if not
         /// specified.
         #[structopt(long)]
         output: Option<PathBuf>,
+        /// Copies files from the unpack directory to the splat directory instead
+        /// of moving them, which preserves the original unpack directories but
+        /// increases overall time and disk usage
+        #[structopt(long)]
+        copy: bool,
         // Splits the CRT and SDK into architecture and variant specific
         // directories. The shared headers in the CRT and SDK are duplicated
         // for each output so that each combination is self-contained.
@@ -86,7 +93,7 @@ fn parse_level(s: &str) -> Result<LevelFilter, Error> {
 
 #[derive(StructOpt)]
 pub struct Args {
-    /// Doesn't display prompt to accept the license
+    /// Doesn't display the prompt to accept the license
     #[structopt(long, env = "XWIN_ACCEPT_LICENSE")]
     accept_license: bool,
     /// The log level for messages, only log messages at or above the level will be emitted.
@@ -172,7 +179,19 @@ async fn main() -> Result<(), Error> {
 
     let ctx = std::sync::Arc::new(ctx);
 
-    let pkg_manifest = xwin::get_pkg_manifest(&ctx, &args.version, &args.channel).await?;
+    let manifest_pb = ia::ProgressBar::with_draw_target(0, ia::ProgressDrawTarget::stdout())
+        .with_style(
+        ia::ProgressStyle::default_bar()
+            .template(
+                "{spinner:.green} {prefix:.bold} [{elapsed}] {wide_bar:.green} {bytes}/{total_bytes} {msg}",
+            )
+            .progress_chars("█▇▆▅▄▃▂▁  "),
+    );
+    manifest_pb.set_prefix("Manifest");
+    manifest_pb.set_message("📥 downloading");
+    let pkg_manifest =
+        xwin::get_pkg_manifest(&ctx, &args.version, &args.channel, manifest_pb.clone())?;
+    manifest_pb.finish_with_message("📥 downloaded");
 
     let arches = args.arch.into_iter().fold(0, |acc, arch| acc | arch as u32);
     let variants = args
@@ -181,46 +200,85 @@ async fn main() -> Result<(), Error> {
         .fold(0, |acc, var| acc | var as u32);
 
     let pruned = xwin::prune_pkg_list(&pkg_manifest, arches, variants)?;
-    let pkgs = &pkg_manifest.packages;
 
-    match args.cmd {
+    let op = match args.cmd {
         Command::List => {
             print_packages(&pruned);
+            return Ok(());
         }
-        Command::Download => xwin::download(ctx, pkgs, pruned).await?,
-        Command::Unpack => {
-            xwin::download(ctx.clone(), pkgs, pruned.clone()).await?;
-            xwin::unpack(ctx, pruned).await?;
-        }
-        Command::Pack {
+        Command::Download => xwin::Ops::Download,
+        Command::Unpack => xwin::Ops::Unpack,
+        Command::Splat {
             include_debug_libs,
             include_debug_symbols,
             disable_symlinks,
             preserve_ms_arch_notation,
+            copy,
             output,
-        } => {
-            xwin::download(ctx.clone(), pkgs, pruned.clone()).await?;
-            xwin::unpack(ctx.clone(), pruned.clone()).await?;
+        } => xwin::Ops::Splat(xwin::SplatConfig {
+            include_debug_libs,
+            include_debug_symbols,
+            disable_symlinks,
+            preserve_ms_arch_notation,
+            copy: copy,
+            output: output.unwrap_or_else(|| ctx.work_dir.join("splat")),
+        }),
+    };
 
-            let output = output.unwrap_or_else(|| ctx.work_dir.join("pack"));
+    let pkgs = pkg_manifest.packages;
 
-            xwin::pack(
-                ctx,
-                xwin::PackConfig {
-                    include_debug_libs,
-                    include_debug_symbols,
-                    disable_symlinks,
-                    preserve_ms_arch_notation,
-                    output,
-                },
-                pruned,
-                arches,
-                variants,
-            )?;
-        }
-    }
+    let mp = ia::MultiProgress::with_draw_target(ia::ProgressDrawTarget::stdout());
+    let work_items: Vec<_> = pruned
+        .into_iter()
+        .map(|pay| {
+            let prefix = match pay.kind {
+                xwin::PayloadKind::CrtHeaders => "CRT.headers".to_owned(),
+                xwin::PayloadKind::CrtLibs => {
+                    format!(
+                        "CRT.libs.{}.{}",
+                        pay.target_arch.map(|ta| ta.as_str()).unwrap_or("all"),
+                        pay.variant.map(|v| v.as_str()).unwrap_or("none")
+                    )
+                }
+                xwin::PayloadKind::SdkHeaders => {
+                    format!(
+                        "SDK.headers.{}.{}",
+                        pay.target_arch.map(|v| v.as_str()).unwrap_or("all"),
+                        pay.variant.map(|v| v.as_str()).unwrap_or("none")
+                    )
+                }
+                xwin::PayloadKind::SdkLibs => {
+                    format!(
+                        "SDK.libs.{}",
+                        pay.target_arch.map(|ta| ta.as_str()).unwrap_or("all")
+                    )
+                }
+                xwin::PayloadKind::SdkStoreLibs => "SDK.libs.store.all".to_owned(),
+                xwin::PayloadKind::Ucrt => "SDK.ucrt.all".to_owned(),
+            };
 
-    Ok(())
+            let pb = mp.add(
+                ia::ProgressBar::new(0).with_prefix(prefix).with_style(
+                    ia::ProgressStyle::default_bar()
+                        .template("{spinner:.green} {prefix:.bold} [{elapsed}] {wide_bar:.green} {bytes}/{total_bytes} {msg}")
+                        .progress_chars("█▇▆▅▄▃▂▁  "),
+                ),
+            );
+            xwin::WorkItem {
+                payload: std::sync::Arc::new(pay),
+                progress: pb,
+            }
+        })
+        .collect();
+
+    mp.set_move_cursor(true);
+
+    let res =
+        std::thread::spawn(move || ctx.execute(pkgs, work_items, arches, variants, op)).join();
+
+    //mp.join().unwrap();
+
+    res.unwrap()
 }
 
 fn print_packages(payloads: &[xwin::Payload]) {
