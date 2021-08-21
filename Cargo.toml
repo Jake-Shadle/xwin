@@ -58,6 +58,3 @@ zip = { version = "0.5", default-features = false, features = ["deflate"] }
 [[bin]]
 name = "xwin"
 path = "src/bin.rs"
-
-[patch.crates-io]
-cfb = { git = "https://github.com/Jake-Shadle/rust-cfb", rev = "98efc63" }

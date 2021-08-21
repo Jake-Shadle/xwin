@@ -60,6 +60,3 @@ unknown-registry = "deny"
 # in the allow list is encountered
 unknown-git = "deny"
 allow-git = []
-
-[sources.allow-org]
-github = ["Jake-Shadle"]
