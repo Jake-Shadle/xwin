@@ -110,7 +110,7 @@ pub struct Args {
     json: bool,
     /// If set, will use a temporary directory for all files used for creating
     /// the archive and deleted upon exit, otherwise, all downloaded files
-    /// are kept in the `--cache-dir` won't be retrieved again
+    /// are kept in the `--cache-dir` and won't be retrieved again
     #[structopt(long)]
     temp: bool,
     /// Specifies the cache directory used to persist downloaded items to disk.
