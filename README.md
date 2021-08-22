@@ -37,7 +37,7 @@ This downloads the top level manifest and any vsix, msi, or cab files that are n
 
 ### `xwin unpack`
 
-Decompresses all of the downloaded package contents to disk.
+Decompresses all of the downloaded package contents to disk. `download` is run automatically.
 
 ### `xwin splat`
 
@@ -47,7 +47,7 @@ Decompresses all of the downloaded package contents to disk.
 - `--include-debug-symbols` - The MSVCRT includes PDB (debug symbols) files for several of the libraries that are genrally uninteresting to keep for most usage
 - `--preserve-ms-arch-notation` - By default, we convert the MS specific `x64`, `arm`, and `arm64` target architectures to the more canonical `x86_64`, `aarch`, and `aarch64` of LLVM etc when creating directories/names. Passing this flag will preserve the MS names for those targets
 
-This moves all of the unpacked files which aren't pruned to their canonical locations under a root directory, for example here is what an `x86_64` `Desktop` splat looks like.
+This moves all of the unpacked files which aren't pruned to their canonical locations under a root directory, for example here is what an `x86_64` `Desktop` splat looks like. `unpack` is run automatically as needed.
 
 ```txt
 .xwin-cache/splat
