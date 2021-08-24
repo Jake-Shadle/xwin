@@ -388,6 +388,16 @@ pub(crate) fn splat(
 
                                     symlink(fnamestr, &tar)?;
                                 }
+
+                                // We also need to support SCREAMING case for the library names
+                                // due to...reasons https://github.com/microsoft/windows-rs/blob/a27a74784ccf304ab362bf2416f5f44e98e5eecd/src/bindings.rs#L3772
+                                if tar.extension() == Some("lib") {
+                                    tar.pop();
+                                    tar.push(fnamestr.to_ascii_uppercase());
+                                    tar.set_extension("lib");
+
+                                    symlink(fnamestr, &tar)?;
+                                }
                             }
                         }
                     }

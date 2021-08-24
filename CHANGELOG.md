@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#9](https://github.com/Jake-Shadle/xwin/pull/9) resolved [#8](https://github.com/Jake-Shadle/xwin/pull/9) by adding support for additional symlinks for each `.lib` in `SCREAMING` case, since [some crates](https://github.com/microsoft/windows-rs/blob/a27a74784ccf304ab362bf2416f5f44e98e5eecd/src/bindings.rs) link them that way.
 
 ## [0.1.0] - 2021-08-22
 ### Added
