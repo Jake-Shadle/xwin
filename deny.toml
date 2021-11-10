@@ -8,7 +8,10 @@ vulnerability = "deny"
 unmaintained = "deny"
 yanked = "deny"
 ignore = [
-    #"RUSTSEC-0000-0000",
+    # chrono: transitive dep, bleh
+    "RUSTSEC-2020-0159",
+    # time: transitive dep, bleh
+    "RUSTSEC-2020-0071",
 ]
 
 [licenses]
@@ -40,15 +43,11 @@ name = "ring"
 # compiled into non-test libraries, is included below."
 # OpenSSL - Obviously
 expression = "ISC AND MIT AND OpenSSL"
-license-files = [
-    { path = "LICENSE", hash = 0xbd0eed23 },
-]
+license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
 
 [bans]
 multiple-versions = "deny"
-deny = [
-    { name = "openssl-sys" },
-]
+deny = [{ name = "openssl-sys" }]
 skip = [
     # clap depends on an old version
     { name = "ansi_term", version = "=0.11.0" },
