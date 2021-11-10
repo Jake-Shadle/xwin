@@ -389,6 +389,17 @@ pub(crate) fn splat(
                                     symlink(fnamestr, &tar)?;
                                 }
 
+                                // There is also this: https://github.com/time-rs/time/blob/v0.3.2/src/utc_offset.rs#L454
+                                if let Some(additional_name) = match fnamestr {
+                                    "kernel32.Lib" => Some("Kernel32.lib"),
+                                    _ => None,
+                                } {
+                                    tar.pop();
+                                    tar.push(additional_name);
+
+                                    symlink(fnamestr, &tar)?;
+                                }
+
                                 // We also need to support SCREAMING case for the library names
                                 // due to...reasons https://github.com/microsoft/windows-rs/blob/a27a74784ccf304ab362bf2416f5f44e98e5eecd/src/bindings.rs#L3772
                                 if tar.extension() == Some("lib") {
