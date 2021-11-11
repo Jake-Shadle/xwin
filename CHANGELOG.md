@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.1.2] - 2021-11-11
 ### Fixed
 - [PR#11](https://github.com/Jake-Shadle/xwin/pull/11) added a workaround symlink for `Kernel32.lib` to fix the prevalent `time` crate in older versions. Thanks [@twistedfall](https://github.com/twistedfall)!
 
@@ -20,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation if downloading, unpacking, and splatting of the CRT and Windows SDK. This first pass focused on targeting x86_64 Desktop, so targeting the Windows Store or other architectures is not guaranteed to work.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/xwin-0.1.1...HEAD
+[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/xwin-0.1.2...HEAD
+[0.1.2]: https://github.com/Jake-Shadle/xwin/compare/xwin-0.1.1...xwin-0.1.2
 [0.1.1]: https://github.com/Jake-Shadle/xwin/compare/0.1.0...xwin-0.1.1
 [0.1.0]: https://github.com/Jake-Shadle/xwin/releases/tag/0.1.0
