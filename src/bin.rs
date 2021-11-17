@@ -144,8 +144,7 @@ pub struct Args {
     cmd: Command,
 }
 
-#[tokio::main(flavor = "multi_thread")]
-async fn main() -> Result<(), Error> {
+fn main() -> Result<(), Error> {
     let args = Args::from_args();
     setup_logger(args.json, args.level)?;
 
