@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.1.3] - 2021-11-17
 ### Fixed
 - [PR#15](https://github.com/Jake-Shadle/xwin/pull/15) resolved [#14](https://github.com/Jake-Shadle/xwin/issues/14) by removing the unnecessary use of `tokio::main`. Thanks [@mite-user](https://github.com/mite-user)!
 - [PR#13](https://github.com/Jake-Shadle/xwin/pull/13) resolved [#12](https://github.com/Jake-Shadle/xwin/issues/12) by using the actual output directory rather than a hardcoded default. Thanks [@mite-user](https://github.com/mite-user)!
@@ -25,7 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation if downloading, unpacking, and splatting of the CRT and Windows SDK. This first pass focused on targeting x86_64 Desktop, so targeting the Windows Store or other architectures is not guaranteed to work.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/xwin-0.1.2...HEAD
+[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/xwin-0.1.3...HEAD
+[0.1.3]: https://github.com/Jake-Shadle/xwin/compare/xwin-0.1.2...xwin-0.1.3
 [0.1.2]: https://github.com/Jake-Shadle/xwin/compare/xwin-0.1.1...xwin-0.1.2
 [0.1.1]: https://github.com/Jake-Shadle/xwin/compare/0.1.0...xwin-0.1.1
 [0.1.0]: https://github.com/Jake-Shadle/xwin/releases/tag/0.1.0
