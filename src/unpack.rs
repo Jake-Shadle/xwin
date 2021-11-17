@@ -571,7 +571,7 @@ pub(crate) fn unpack(
     };
 
     std::fs::write(
-        format!(".xwin-cache/unpack/{}/tree.txt", item.payload.filename),
+        format!("{}/tree.txt", output_dir),
         format!("{:#?}", tree).as_bytes(),
     )
     .unwrap();
