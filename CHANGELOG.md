@@ -1,13 +1,17 @@
+<!-- markdownlint-disable MD022 MD024 MD032 -->
+
 # Changelog
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-<!-- markdownlint-disable MD022 -->
-
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#15](https://github.com/Jake-Shadle/xwin/pull/15) resolved [#14](https://github.com/Jake-Shadle/xwin/issues/14) by removing the unnecessary use of `tokio::main`. Thanks [@mite-user](https://github.com/mite-user)!
+- [PR#13](https://github.com/Jake-Shadle/xwin/pull/13) resolved [#12](https://github.com/Jake-Shadle/xwin/issues/12) by using the actual output directory rather than a hardcoded default. Thanks [@mite-user](https://github.com/mite-user)!
+
 ## [0.1.2] - 2021-11-11
 ### Fixed
 - [PR#11](https://github.com/Jake-Shadle/xwin/pull/11) added a workaround symlink for `Kernel32.lib` to fix the prevalent `time` crate in older versions. Thanks [@twistedfall](https://github.com/twistedfall)!
