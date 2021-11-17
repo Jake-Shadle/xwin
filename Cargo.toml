@@ -14,7 +14,7 @@ anyhow = "1.0"
 # Network/file buffers
 bytes = "1.0"
 # CAB files are used in conjunction with MSI files for SDK packages
-cab = "0.2"
+cab = "0.3"
 # Nicer to use utf-8 paths
 camino = "1.0"
 # Timestamps
@@ -22,18 +22,23 @@ chrono = "0.4"
 # Easy CLI tables
 cli-table = { version = "0.4", default-features = false }
 # GZIP/Deflate
-flate2 = { version = "1.0", default-features = false, features = ["rust_backend"] }
+flate2 = { version = "1.0", default-features = false, features = [
+    "rust_backend",
+] }
 # Pretty progress bars
 indicatif = "0.17.0-beta.1"
 # Decoding of MSI installer packages
-msi = "0.3"
+msi = "0.4"
 parking_lot = "0.11"
 # brrr
 rayon = "1.5"
 # Include scanning 
 regex = "1.0"
 # HTTP requests
-reqwest = { version = "0.11", default-features = false, features = ["blocking", "rustls-tls"] }
+reqwest = { version = "0.11", default-features = false, features = [
+    "blocking",
+    "rustls-tls",
+] }
 # SHA-256 verification
 ring = "0.16"
 # Deserialization
@@ -45,11 +50,18 @@ structopt = "0.3"
 # Easy management of temp files
 tempfile = "3.1"
 # Async runtime
-tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+#tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
 # Tracing logs
-tracing = { version = "0.1", default-features = false, features = ["attributes", "std"] }
+tracing = { version = "0.1", default-features = false, features = [
+    "attributes",
+    "std",
+] }
 # Emission of logs to stdout
-tracing-subscriber = "0.2"
+tracing-subscriber = { version = "0.3", default-features = false, features = [
+    "env-filter",
+    "fmt",
+    "json",
+] }
 # Hashing
 twox-hash = "1.6"
 # Unpacking of VSIX "packages"
