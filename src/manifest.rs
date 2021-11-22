@@ -79,6 +79,7 @@ pub struct ManifestItem {
 }
 
 impl PartialEq for ManifestItem {
+    #[inline]
     fn eq(&self, o: &Self) -> bool {
         self.cmp(o) == cmp::Ordering::Equal
     }
@@ -87,12 +88,14 @@ impl PartialEq for ManifestItem {
 impl Eq for ManifestItem {}
 
 impl cmp::Ord for ManifestItem {
+    #[inline]
     fn cmp(&self, o: &Self) -> cmp::Ordering {
         self.id.cmp(&o.id)
     }
 }
 
 impl cmp::PartialOrd for ManifestItem {
+    #[inline]
     fn partial_cmp(&self, o: &Self) -> Option<cmp::Ordering> {
         Some(self.cmp(o))
     }
@@ -104,6 +107,8 @@ pub struct Manifest {
     channel_items: Vec<ManifestItem>,
 }
 
+/// Retrieves the top-level manifest which contains license links as well as the
+/// link to the actual package manifest which describes all of the contents
 pub fn get_manifest(
     ctx: &Ctx,
     version: &str,
@@ -122,6 +127,7 @@ pub fn get_manifest(
     Ok(manifest)
 }
 
+/// Retrieves the package manifest specified in the input manifest
 pub fn get_package_manifest(
     ctx: &Ctx,
     manifest: &Manifest,
