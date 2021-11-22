@@ -202,16 +202,6 @@ impl Variant {
     }
 }
 
-pub fn get_pkg_manifest(
-    ctx: &Ctx,
-    version: &str,
-    channel: &str,
-    progress: indicatif::ProgressBar,
-) -> Result<manifest::PackageManifest, Error> {
-    let vs_manifest = manifest::get_manifest(ctx, version, channel, progress.clone())?;
-    manifest::get_package_manifest(ctx, &vs_manifest, progress)
-}
-
 pub enum Ops {
     Download,
     Unpack,

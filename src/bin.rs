@@ -7,7 +7,7 @@ use tracing_subscriber::filter::LevelFilter;
 fn setup_logger(json: bool, log_level: LevelFilter) -> Result<(), Error> {
     let mut env_filter = tracing_subscriber::EnvFilter::from_default_env();
 
-    // If a user specifies a log level, we assume it only pertains to cargo_fetcher,
+    // If a user specifies a log level, we assume it only pertains to xwin,
     // if they want to trace other crates they can use the RUST_LOG env approach
     env_filter = env_filter.add_directive(format!("xwin={}", log_level).parse()?);
 
@@ -117,6 +117,10 @@ pub struct Args {
     /// Defaults to `./.xwin-cache` if not specified.
     #[structopt(long)]
     cache_dir: Option<PathBuf>,
+    /// Specifies a VS manifest to use from a file, rather than downloading it
+    /// from the Microsoft site.
+    #[structopt(long, conflicts_with_all = &["version", "channel"])]
+    manifest: Option<PathBuf>,
     /// The version to retrieve, can either be a major version of 15 or 16, or
     /// a "<major>.<minor>" version.
     #[structopt(long, default_value = "16")]
@@ -169,8 +173,8 @@ fn main() -> Result<(), Error> {
     let ctx = if args.temp {
         xwin::Ctx::with_temp()?
     } else {
-        let cache_dir = match args.cache_dir {
-            Some(cd) => cd,
+        let cache_dir = match &args.cache_dir {
+            Some(cd) => cd.clone(),
             None => cwd.join(".xwin-cache"),
         };
         xwin::Ctx::with_dir(cache_dir)?
@@ -178,19 +182,7 @@ fn main() -> Result<(), Error> {
 
     let ctx = std::sync::Arc::new(ctx);
 
-    let manifest_pb = ia::ProgressBar::with_draw_target(0, ia::ProgressDrawTarget::stdout())
-        .with_style(
-        ia::ProgressStyle::default_bar()
-            .template(
-                "{spinner:.green} {prefix:.bold} [{elapsed}] {wide_bar:.green} {bytes}/{total_bytes} {msg}",
-            )
-            .progress_chars("█▇▆▅▄▃▂▁  "),
-    );
-    manifest_pb.set_prefix("Manifest");
-    manifest_pb.set_message("📥 downloading");
-    let pkg_manifest =
-        xwin::get_pkg_manifest(&ctx, &args.version, &args.channel, manifest_pb.clone())?;
-    manifest_pb.finish_with_message("📥 downloaded");
+    let pkg_manifest = load_manifest(&ctx, &args)?;
 
     let arches = args.arch.into_iter().fold(0, |acc, arch| acc | arch as u32);
     let variants = args
@@ -275,8 +267,6 @@ fn main() -> Result<(), Error> {
     let res =
         std::thread::spawn(move || ctx.execute(pkgs, work_items, arches, variants, op)).join();
 
-    //mp.join().unwrap();
-
     res.unwrap()
 }
 
@@ -329,4 +319,34 @@ fn print_packages(payloads: &[xwin::Payload]) {
         ]);
 
     let _ = cli_table::print_stdout(table);
+}
+
+fn load_manifest(ctx: &xwin::Ctx, args: &Args) -> anyhow::Result<xwin::manifest::PackageManifest> {
+    let manifest_pb = ia::ProgressBar::with_draw_target(0, ia::ProgressDrawTarget::stdout())
+            .with_style(
+            ia::ProgressStyle::default_bar()
+                .template(
+                    "{spinner:.green} {prefix:.bold} [{elapsed}] {wide_bar:.green} {bytes}/{total_bytes} {msg}",
+                )
+                .progress_chars("█▇▆▅▄▃▂▁  "),
+        );
+    manifest_pb.set_prefix("Manifest");
+    manifest_pb.set_message("📥 downloading");
+
+    let manifest = match &args.manifest {
+        Some(manifest_path) => {
+            let manifest_content = std::fs::read_to_string(manifest_path)
+                .with_context(|| format!("failed to read path '{}'", manifest_path))?;
+            serde_json::from_str(&manifest_content)
+                .with_context(|| format!("failed to deserialize manifest in '{}'", manifest_path))?
+        }
+        None => {
+            xwin::manifest::get_manifest(ctx, &args.version, &args.channel, manifest_pb.clone())?
+        }
+    };
+
+    let pkg_manifest = xwin::manifest::get_package_manifest(ctx, &manifest, manifest_pb.clone())?;
+
+    manifest_pb.finish_with_message("📥 downloaded");
+    Ok(pkg_manifest)
 }
