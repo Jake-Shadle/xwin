@@ -341,11 +341,11 @@ fn load_manifest(ctx: &xwin::Ctx, args: &Args) -> anyhow::Result<xwin::manifest:
                 .with_context(|| format!("failed to deserialize manifest in '{}'", manifest_path))?
         }
         None => {
-            xwin::manifest::get_manifest(&ctx, &args.version, &args.channel, manifest_pb.clone())?
+            xwin::manifest::get_manifest(ctx, &args.version, &args.channel, manifest_pb.clone())?
         }
     };
 
-    let pkg_manifest = xwin::manifest::get_package_manifest(&ctx, &manifest, manifest_pb.clone())?;
+    let pkg_manifest = xwin::manifest::get_package_manifest(ctx, &manifest, manifest_pb.clone())?;
 
     manifest_pb.finish_with_message("📥 downloaded");
     Ok(pkg_manifest)
