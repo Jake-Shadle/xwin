@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Added
+- [PR#17](https://github.com/Jake-Shadle/xwin/pull/17) resolved [#6](https://github.com/Jake-Shadle/xwin/issues/6) by adding the `--manifest` option so that users can specify an exact manifest to use rather than downloading the mutable one from the Microsoft CDN.
+
 ## [0.1.3] - 2021-11-17
 ### Fixed
 - [PR#15](https://github.com/Jake-Shadle/xwin/pull/15) resolved [#14](https://github.com/Jake-Shadle/xwin/issues/14) by removing the unnecessary use of `tokio::main`. Thanks [@mite-user](https://github.com/mite-user)!
