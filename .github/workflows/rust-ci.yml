@@ -31,8 +31,8 @@ jobs:
           rustup component add clippy
           cargo clippy --all-targets --all-features -- -D warnings
 
-  test:
-    name: Test
+  check_compiles:
+    name: Verify compiles
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
@@ -42,12 +42,24 @@ jobs:
           override: true
       - run: cargo fetch
       - name: cargo test build
-        # Note the use of release here means longer compile time, but much
-        # faster test execution time. If you don't have any heavy tests it
-        # might be faster to take off release and just compile in debug
         run: cargo build --tests --release
       - name: cargo test
-        run: cargo test --release
+        run: cargo test --release verify_compiles
+
+  check_deterministic:
+    name: Verify deterministic
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - run: cargo fetch
+      - name: cargo test build
+        run: cargo build --tests --release
+      - name: cargo test
+        run: cargo test --release verify_deterministic
 
   deny-check:
     name: cargo-deny
