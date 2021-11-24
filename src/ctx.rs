@@ -1,4 +1,7 @@
-use crate::{util::Sha256, Path, PathBuf, WorkItem};
+use crate::{
+    util::{ProgressTarget, Sha256},
+    Path, PathBuf, WorkItem,
+};
 use anyhow::{Context as _, Error};
 
 pub enum Unpack {
@@ -11,16 +14,15 @@ pub enum Unpack {
     Needed(PathBuf),
 }
 
-pub struct Stats {}
-
 pub struct Ctx {
     pub work_dir: PathBuf,
     pub tempdir: Option<tempfile::TempDir>,
     pub client: reqwest::blocking::Client,
+    pub draw_target: ProgressTarget,
 }
 
 impl Ctx {
-    pub fn with_temp() -> Result<Self, Error> {
+    pub fn with_temp(dt: ProgressTarget) -> Result<Self, Error> {
         let td = tempfile::TempDir::new()?;
         let client = reqwest::blocking::ClientBuilder::new().build()?;
 
@@ -30,10 +32,11 @@ impl Ctx {
             })?,
             tempdir: Some(td),
             client,
+            draw_target: dt,
         })
     }
 
-    pub fn with_dir(mut work_dir: PathBuf) -> Result<Self, Error> {
+    pub fn with_dir(mut work_dir: PathBuf, dt: ProgressTarget) -> Result<Self, Error> {
         let client = reqwest::blocking::ClientBuilder::new().build()?;
 
         work_dir.push("dl");
@@ -47,6 +50,7 @@ impl Ctx {
             work_dir,
             tempdir: None,
             client,
+            draw_target: dt,
         })
     }
 
@@ -172,26 +176,24 @@ impl Ctx {
         };
 
         let mut results = Vec::new();
-        let sdk_files =
-            std::sync::Arc::new(parking_lot::Mutex::new(std::collections::HashMap::new()));
 
         payloads
             .into_par_iter()
-            .map(|wi| -> Result<Stats, Error> {
+            .map(|wi| -> Result<Option<crate::splat::SdkHeaders>, Error> {
                 let payload_contents =
                     crate::download::download(self.clone(), packages.clone(), &wi)?;
 
                 if let crate::Ops::Download = ops {
-                    return Ok(Stats {});
+                    return Ok(None);
                 }
 
                 let ft = crate::unpack::unpack(self.clone(), &wi, payload_contents)?;
 
                 if let crate::Ops::Unpack = ops {
-                    return Ok(Stats {});
+                    return Ok(None);
                 }
 
-                if let crate::Ops::Splat(config) = &ops {
+                let sdk_headers = if let crate::Ops::Splat(config) = &ops {
                     crate::splat::splat(
                         config,
                         splat_roots.as_ref().unwrap(),
@@ -199,19 +201,21 @@ impl Ctx {
                         ft,
                         arches,
                         variants,
-                        sdk_files.clone(),
                     )
-                    .with_context(|| format!("failed to splat {}", wi.payload.filename))?;
-                }
+                    .with_context(|| format!("failed to splat {}", wi.payload.filename))?
+                } else {
+                    None
+                };
 
-                Ok(Stats {})
+                Ok(sdk_headers)
             })
             .collect_into_vec(&mut results);
 
-        results.into_iter().collect::<Result<Vec<_>, _>>()?;
+        let sdk_headers = results.into_iter().collect::<Result<Vec<_>, _>>()?;
+        let sdk_headers = sdk_headers.into_iter().flatten().collect();
 
         if let Some(roots) = splat_roots {
-            crate::splat::finalize_splat(&roots, sdk_files)?;
+            crate::splat::finalize_splat(&self, &roots, sdk_headers)?;
         }
 
         Ok(())

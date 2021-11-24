@@ -1,6 +1,23 @@
 use anyhow::Error;
 use std::fmt;
 
+#[derive(Copy, Clone)]
+pub enum ProgressTarget {
+    Stdout,
+    Stderr,
+    Hidden,
+}
+
+impl From<ProgressTarget> for indicatif::ProgressDrawTarget {
+    fn from(pt: ProgressTarget) -> Self {
+        match pt {
+            ProgressTarget::Stdout => Self::stdout(),
+            ProgressTarget::Stderr => Self::stderr(),
+            ProgressTarget::Hidden => Self::hidden(),
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Eq)]
 pub struct Sha256(pub [u8; 32]);
 
