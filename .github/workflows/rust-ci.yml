@@ -43,6 +43,8 @@ jobs:
       - run: cargo fetch
       - name: cargo test build
         run: cargo build --tests --release
+      # Add the actual target we compile for in the test
+      - run: rustup target add x86_64-pc-windows-msvc
       - name: cargo test
         run: cargo test --release verify_compiles
 
