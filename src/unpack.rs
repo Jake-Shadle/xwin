@@ -572,11 +572,10 @@ pub(crate) fn unpack(
         }
     };
 
-    std::fs::write(
-        format!("{}/tree.txt", output_dir),
-        format!("{:#?}", tree).as_bytes(),
-    )
-    .with_context(|| format!("failed to write tree.txt"))?;
+    let tree_path = format!("{}/tree.txt", output_dir);
+
+    std::fs::write(&tree_path, format!("{:#?}", tree).as_bytes())
+        .with_context(|| format!("failed to write {}", tree_path))?;
 
     item.progress.finish_with_message("unpacked");
 

@@ -66,7 +66,7 @@ fn verify_deterministic() {
         loop {
             let len = {
                 let buf = reader.fill_buf()?;
-                if buf.len() == 0 {
+                if buf.is_empty() {
                     break;
                 }
 
