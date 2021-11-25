@@ -45,16 +45,15 @@ jobs:
       - name: symlinks
         run: |
           set -eux
-          ls -l /usr/bin
-          exit 1
-          # sudo ln -s clang /usr/bin/clang-cl
-          # sudo ln -s llvm-ar /usr/bin/llvm-lib
-          # sudo ln -s lld-link /usr/bin/lld-link
-          # clang++ -v
-          # ld.lld -v
-          # llvm-lib -v
-          # clang-cl -v
-          # lld-link --version
+          sudo ln -s clang-12 /usr/bin/clang-cl
+          sudo ln -s llvm-ar-12 /usr/bin/llvm-lib
+          sudo ln -s lld-link-12 /usr/bin/lld-link
+          sudo ln -s lld-12 /usr/bin/ld.lld
+          clang++ -v
+          ld.lld -v
+          llvm-lib -v
+          clang-cl -v
+          lld-link --version
       - run: cargo fetch
       - name: cargo test build
         run: cargo build --tests --release
