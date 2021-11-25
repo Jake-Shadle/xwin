@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.1.5] - 2021-11-25
 ### Fixed
 - [PR#19](https://github.com/Jake-Shadle/xwin/pull/19) resolved [#18](https://github.com/Jake-Shadle/xwin/issues/18) by removing a source of non-determinism in the output. It also made it so that some `Store` headers are no longer splatted to disk when targeting the `Desktop` variant alone.
 
@@ -33,7 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation if downloading, unpacking, and splatting of the CRT and Windows SDK. This first pass focused on targeting x86_64 Desktop, so targeting the Windows Store or other architectures is not guaranteed to work.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.1.4...HEAD
+[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.1.5...HEAD
+[0.1.5]: https://github.com/Jake-Shadle/xwin/compare/0.1.4...0.1.5
 [0.1.4]: https://github.com/Jake-Shadle/xwin/compare/xwin-0.1.3...0.1.4
 [0.1.3]: https://github.com/Jake-Shadle/xwin/compare/xwin-0.1.2...xwin-0.1.3
 [0.1.2]: https://github.com/Jake-Shadle/xwin/compare/xwin-0.1.1...xwin-0.1.2
