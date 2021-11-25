@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#19](https://github.com/Jake-Shadle/xwin/pull/19) resolved [#18](https://github.com/Jake-Shadle/xwin/issues/18) by removing a source of non-determinism in the output. It also made it so that some `Store` headers are no longer splatted to disk when targeting the `Desktop` variant alone.
+
 ## [0.1.4] - 2021-11-22
 ### Added
 - [PR#17](https://github.com/Jake-Shadle/xwin/pull/17) resolved [#6](https://github.com/Jake-Shadle/xwin/issues/6) by adding the `--manifest` option so that users can specify an exact manifest to use rather than downloading the mutable one from the Microsoft CDN.

@@ -47,7 +47,7 @@ pub enum Command {
         #[structopt(long)]
         include_debug_libs: bool,
         /// The MSVCRT includes PDB (debug symbols) files for several of the
-        /// libraries that are genrally uninteresting to keep for most usage
+        /// libraries that are generally uninteresting to keep for most usage
         #[structopt(long)]
         include_debug_symbols: bool,
         /// By default, symlinks are added to both the CRT and WindowsSDK to
