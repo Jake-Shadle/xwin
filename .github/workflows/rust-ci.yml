@@ -44,12 +44,17 @@ jobs:
       - run: rustup target add x86_64-pc-windows-msvc
       - name: symlinks
         run: |
-          ln -s clang /usr/bin/clang-cl && ln -s llvm-ar /usr/bin/llvm-lib && ln -s lld-link /usr/bin/lld-link
-          clang++ -v
-          ld.lld -v
-          llvm-lib -v
-          clang-cl -v
-          lld-link --version
+          set -eux
+          ls -l /usr/bin
+          exit 1
+          # sudo ln -s clang /usr/bin/clang-cl
+          # sudo ln -s llvm-ar /usr/bin/llvm-lib
+          # sudo ln -s lld-link /usr/bin/lld-link
+          # clang++ -v
+          # ld.lld -v
+          # llvm-lib -v
+          # clang-cl -v
+          # lld-link --version
       - run: cargo fetch
       - name: cargo test build
         run: cargo build --tests --release
