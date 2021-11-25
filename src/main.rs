@@ -170,19 +170,21 @@ fn main() -> Result<(), Error> {
     let cwd = PathBuf::from_path_buf(std::env::current_dir().context("unable to retrieve cwd")?)
         .map_err(|pb| anyhow::anyhow!("cwd {} is not a valid utf-8 path", pb.display()))?;
 
+    let draw_target = xwin::util::ProgressTarget::Stdout;
+
     let ctx = if args.temp {
-        xwin::Ctx::with_temp()?
+        xwin::Ctx::with_temp(draw_target)?
     } else {
         let cache_dir = match &args.cache_dir {
             Some(cd) => cd.clone(),
             None => cwd.join(".xwin-cache"),
         };
-        xwin::Ctx::with_dir(cache_dir)?
+        xwin::Ctx::with_dir(cache_dir, draw_target)?
     };
 
     let ctx = std::sync::Arc::new(ctx);
 
-    let pkg_manifest = load_manifest(&ctx, &args)?;
+    let pkg_manifest = load_manifest(&ctx, &args, draw_target)?;
 
     let arches = args.arch.into_iter().fold(0, |acc, arch| acc | arch as u32);
     let variants = args
@@ -218,7 +220,7 @@ fn main() -> Result<(), Error> {
 
     let pkgs = pkg_manifest.packages;
 
-    let mp = ia::MultiProgress::with_draw_target(ia::ProgressDrawTarget::stdout());
+    let mp = ia::MultiProgress::with_draw_target(draw_target.into());
     let work_items: Vec<_> = pruned
         .into_iter()
         .map(|pay| {
@@ -249,7 +251,7 @@ fn main() -> Result<(), Error> {
             };
 
             let pb = mp.add(
-                ia::ProgressBar::new(0).with_prefix(prefix).with_style(
+                ia::ProgressBar::with_draw_target(0, draw_target.into()).with_prefix(prefix).with_style(
                     ia::ProgressStyle::default_bar()
                         .template("{spinner:.green} {prefix:.bold} [{elapsed}] {wide_bar:.green} {bytes}/{total_bytes} {msg}")
                         .progress_chars("█▇▆▅▄▃▂▁  "),
@@ -321,8 +323,12 @@ fn print_packages(payloads: &[xwin::Payload]) {
     let _ = cli_table::print_stdout(table);
 }
 
-fn load_manifest(ctx: &xwin::Ctx, args: &Args) -> anyhow::Result<xwin::manifest::PackageManifest> {
-    let manifest_pb = ia::ProgressBar::with_draw_target(0, ia::ProgressDrawTarget::stdout())
+fn load_manifest(
+    ctx: &xwin::Ctx,
+    args: &Args,
+    dt: xwin::util::ProgressTarget,
+) -> anyhow::Result<xwin::manifest::PackageManifest> {
+    let manifest_pb = ia::ProgressBar::with_draw_target(0, dt.into())
             .with_style(
             ia::ProgressStyle::default_bar()
                 .template(

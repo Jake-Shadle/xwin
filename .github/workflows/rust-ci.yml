@@ -31,8 +31,37 @@ jobs:
           rustup component add clippy
           cargo clippy --all-targets --all-features -- -D warnings
 
-  test:
-    name: Test
+  check_compiles:
+    name: Verify compiles
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      # Add the actual target we compile for in the test
+      - run: rustup target add x86_64-pc-windows-msvc
+      - name: symlinks
+        run: |
+          set -eux
+          sudo ln -s clang-12 /usr/bin/clang-cl
+          sudo ln -s llvm-ar-12 /usr/bin/llvm-lib
+          sudo ln -s lld-link-12 /usr/bin/lld-link
+          sudo ln -s lld-12 /usr/bin/ld.lld
+          clang++ -v
+          ld.lld -v
+          llvm-lib -v
+          clang-cl -v
+          lld-link --version
+      - run: cargo fetch
+      - name: cargo test build
+        run: cargo build --tests --release
+      - name: cargo test
+        run: cargo test --release verify_compiles
+
+  check_deterministic:
+    name: Verify deterministic
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
@@ -42,12 +71,9 @@ jobs:
           override: true
       - run: cargo fetch
       - name: cargo test build
-        # Note the use of release here means longer compile time, but much
-        # faster test execution time. If you don't have any heavy tests it
-        # might be faster to take off release and just compile in debug
         run: cargo build --tests --release
       - name: cargo test
-        run: cargo test --release
+        run: cargo test --release verify_deterministic
 
   deny-check:
     name: cargo-deny
@@ -71,7 +97,7 @@ jobs:
 
   release:
     name: Release
-    needs: [test, deny-check]
+    needs: [deny-check]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-20.04
     steps:

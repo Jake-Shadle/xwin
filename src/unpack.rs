@@ -30,6 +30,7 @@ impl FileTree {
 
         for comp in path.iter() {
             if comp != fname {
+                #[allow(clippy::single_match_else)]
                 match tree.dirs.iter().position(|(dir, _tree)| dir == comp) {
                     Some(t) => tree = &mut tree.dirs[t].1,
                     None => {
@@ -282,6 +283,7 @@ pub(crate) fn unpack(
                         // but this a terrible path, so we massage it to instead be
                         // `lib/um/x64`
                         fn build_dir(dirs: &[Dir], id: &str, dir: &mut PathBuf) {
+                            #[allow(clippy::single_match_else)]
                             let cur_dir = match dirs.binary_search_by(|d| d.id.as_str().cmp(id)) {
                                 Ok(i) => &dirs[i],
                                 Err(_) => {
@@ -570,11 +572,10 @@ pub(crate) fn unpack(
         }
     };
 
-    std::fs::write(
-        format!("{}/tree.txt", output_dir),
-        format!("{:#?}", tree).as_bytes(),
-    )
-    .unwrap();
+    let tree_path = format!("{}/tree.txt", output_dir);
+
+    std::fs::write(&tree_path, format!("{:#?}", tree).as_bytes())
+        .with_context(|| format!("failed to write {}", tree_path))?;
 
     item.progress.finish_with_message("unpacked");
 
