@@ -378,6 +378,17 @@ pub(crate) fn splat(
                                 if sdk_headers.inner.insert(rel_hash, tar.clone()).is_some() {
                                     anyhow::bail!("found duplicate relative path when hashed");
                                 }
+
+                                // https://github.com/zeromq/libzmq/blob/3070a4b2461ec64129062907d915ed665d2ac126/src/precompiled.hpp#L73
+                                if let Some(additional_name) = match fname_str {
+                                    "mstcpip.h" => Some("Mstcpip.h"),
+                                    _ => None,
+                                } {
+                                    tar.pop();
+                                    tar.push(additional_name);
+    
+                                    symlink(fname_str, &tar)?;
+                                }
                             }
                         }
                         PayloadKind::CrtLibs => {
