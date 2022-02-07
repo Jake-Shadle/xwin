@@ -29,7 +29,7 @@ flate2 = { version = "1.0", default-features = false, features = [
 indicatif = "0.17.0-beta.1"
 # Decoding of MSI installer packages
 msi = "0.4"
-parking_lot = "0.11"
+parking_lot = "0.12"
 # brrr
 rayon = "1.5"
 # Include scanning 
