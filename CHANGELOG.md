@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.1.6] - 2022-02-07
 ### Fixed
 - [PR#22](https://github.com/Jake-Shadle/xwin/pull/22) added a fix for zeromq using a [mixed case include](https://github.com/zeromq/libzmq/blob/3070a4b2461ec64129062907d915ed665d2ac126/src/precompiled.hpp#L73). Thanks [@Jasper-Bekkers](https://github.com/Jasper-Bekkers)!
 - [PR#23](https://github.com/Jake-Shadle/xwin/pull/23) updated dependencies, which included bumping `thread_local` to fix a [security advisory](https://rustsec.org/advisories/RUSTSEC-2022-0006).
@@ -38,7 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation if downloading, unpacking, and splatting of the CRT and Windows SDK. This first pass focused on targeting x86_64 Desktop, so targeting the Windows Store or other architectures is not guaranteed to work.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.1.5...HEAD
+[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.1.6...HEAD
+[0.1.6]: https://github.com/Jake-Shadle/xwin/compare/0.1.5...0.1.6
 [0.1.5]: https://github.com/Jake-Shadle/xwin/compare/0.1.4...0.1.5
 [0.1.4]: https://github.com/Jake-Shadle/xwin/compare/xwin-0.1.3...0.1.4
 [0.1.3]: https://github.com/Jake-Shadle/xwin/compare/xwin-0.1.2...xwin-0.1.3
