@@ -7,6 +7,8 @@ edition = "2018"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/Jake-Shadle/xwin"
 homepage = "https://github.com/Jake-Shadle/xwin"
+categories = ["development-tools", "command-line-utilities"]
+keywords = ["windows", "cross-compilation"]
 
 [dependencies]
 # Easy errors
