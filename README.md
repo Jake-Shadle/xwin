@@ -98,6 +98,10 @@ This moves all of the unpacked files which aren't pruned to their canonical loca
          └── x86_64
 ```
 
+## Container
+
+[xwin.dockerfile](xwin.dockerfile) is an example Dockerfile that can be used a container image capable of building and testing Rust crates targeting `x86_64-pc-windows-msvc`.
+
 ### Thanks
 
 Special thanks to <https://github.com/mstorsjo/msvc-wine> for the inspiration and [@mdsteele](https://github.com/mdsteele) for publishing several Rust crates around msi/cab files that were needed in this project
