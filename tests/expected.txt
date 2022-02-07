@@ -2812,6 +2812,7 @@ sdk/include/shared/GenericUsbFnIoctl.h @ fc8133a69d8e2bb9
 sdk/include/shared/Iprtrmib.h @ 27791b1af8073250
 sdk/include/shared/IssPer16.h @ 366268a53b56aff9
 sdk/include/shared/Math3DHelper.h @ e90685315c388927
+sdk/include/shared/Mstcpip.h => mstcpip.h
 sdk/include/shared/POPPACK.H => poppack.h
 sdk/include/shared/PSHPACK1.H => pshpack1.h
 sdk/include/shared/SCSISCAN.H => scsiscan.h
