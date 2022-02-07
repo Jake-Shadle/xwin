@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#22](https://github.com/Jake-Shadle/xwin/pull/22) added a fix for zeromq using a [mixed case include](https://github.com/zeromq/libzmq/blob/3070a4b2461ec64129062907d915ed665d2ac126/src/precompiled.hpp#L73). Thanks [@Jasper-Bekkers](https://github.com/Jasper-Bekkers)!
+- [PR#23](https://github.com/Jake-Shadle/xwin/pull/23) updated dependencies, which included bumping `thread_local` to fix a [security advisory](https://rustsec.org/advisories/RUSTSEC-2022-0006).
+
 ## [0.1.5] - 2021-11-25
 ### Fixed
 - [PR#19](https://github.com/Jake-Shadle/xwin/pull/19) resolved [#18](https://github.com/Jake-Shadle/xwin/issues/18) by removing a source of non-determinism in the output. It also made it so that some `Store` headers are no longer splatted to disk when targeting the `Desktop` variant alone.
