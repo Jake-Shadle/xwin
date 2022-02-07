@@ -8,6 +8,7 @@ struct Cab {
     filename: PathBuf,
     sha256: Sha256,
     url: String,
+    #[allow(dead_code)]
     size: u64,
 }
 

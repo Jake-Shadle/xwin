@@ -80,7 +80,6 @@
 )]
 // END - Embark standard lints v0.5 for Rust 1.55+
 // crate-specific exceptions:
-#![allow()]
 
 use anyhow::{Context as _, Error};
 pub use camino::{Utf8Path as Path, Utf8PathBuf as PathBuf};
