@@ -386,7 +386,7 @@ pub(crate) fn splat(
                                 } {
                                     tar.pop();
                                     tar.push(additional_name);
-    
+
                                     symlink(fname_str, &tar)?;
                                 }
                             }
