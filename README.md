@@ -21,7 +21,7 @@ See this [blog post](https://jake-shadle.github.io/xwin/) for an in depth walkth
 
 ### From source
 
-`cargo install xwin`
+`cargo install xwin --locked`
 
 ### From tarball
 
