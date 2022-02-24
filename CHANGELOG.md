@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## Fixed
+- [PR#27](https://github.com/Jake-Shadle/xwin/pull/27) added a fixup for `Iphlpapi.lib => iphlpapi.lib`. Thanks [@jelmansouri](https://github.com/jelmansouri)!
+
 ## [0.1.6] - 2022-02-07
 ### Fixed
 - [PR#22](https://github.com/Jake-Shadle/xwin/pull/22) added a fix for zeromq using a [mixed case include](https://github.com/zeromq/libzmq/blob/3070a4b2461ec64129062907d915ed665d2ac126/src/precompiled.hpp#L73). Thanks [@Jasper-Bekkers](https://github.com/Jasper-Bekkers)!
