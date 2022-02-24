@@ -425,8 +425,10 @@ pub(crate) fn splat(
                             }
 
                             // There is also this: https://github.com/time-rs/time/blob/v0.3.2/src/utc_offset.rs#L454
+                            // And this: https://github.com/webrtc-rs/util/blob/main/src/ifaces/ffi/windows/mod.rs#L33
                             if let Some(additional_name) = match fname_str {
                                 "kernel32.Lib" => Some("Kernel32.lib"),
+                                "iphlpapi.lib" => Some("Iphlpapi.lib"),
                                 _ => None,
                             } {
                                 tar.pop();
