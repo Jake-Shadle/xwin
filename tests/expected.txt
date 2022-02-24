@@ -7461,6 +7461,7 @@ sdk/lib/um/x86_64/Icm32.Lib @ 511acd696eaadde2
 sdk/lib/um/x86_64/Icmui.Lib @ fdbf94a19eb1a63b
 sdk/lib/um/x86_64/ImageHlp.Lib @ b5220c8cb77b2df8
 sdk/lib/um/x86_64/Imm32.Lib @ 86bf19ba96973c95
+sdk/lib/um/x86_64/Iphlpapi.lib => iphlpapi.lib
 sdk/lib/um/x86_64/Iprop.Lib @ 20df89455b82b906
 sdk/lib/um/x86_64/IsolatedWindowsEnvironmentUtils.lib @ d2e848be12bc7615
 sdk/lib/um/x86_64/JSRT.lib => jsrt.lib
