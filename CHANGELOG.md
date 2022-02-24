@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.1.7] - 2022-02-24
 ## Fixed
 - [PR#27](https://github.com/Jake-Shadle/xwin/pull/27) added a fixup for `Iphlpapi.lib => iphlpapi.lib`. Thanks [@jelmansouri](https://github.com/jelmansouri)!
 
@@ -42,7 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation if downloading, unpacking, and splatting of the CRT and Windows SDK. This first pass focused on targeting x86_64 Desktop, so targeting the Windows Store or other architectures is not guaranteed to work.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.1.6...HEAD
+[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.1.7...HEAD
+[0.1.7]: https://github.com/Jake-Shadle/xwin/compare/0.1.6...0.1.7
 [0.1.6]: https://github.com/Jake-Shadle/xwin/compare/0.1.5...0.1.6
 [0.1.5]: https://github.com/Jake-Shadle/xwin/compare/0.1.4...0.1.5
 [0.1.4]: https://github.com/Jake-Shadle/xwin/compare/xwin-0.1.3...0.1.4
