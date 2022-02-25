@@ -72,7 +72,7 @@ ENV CC_x86_64_pc_windows_msvc="clang-cl" \
     # Let cargo know what linker to invoke if you haven't already specified it
     # in a .cargo/config.toml file
     CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER="lld-link" \
-    RUSTFLAGS="-Lnative=/xwin/crt/lib/x86_64 -Lnative=/xwin/sdk/lib/um/x86_64 -Lnative=/xwin/sdk/lib/ucrt/x86_64"
+    CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS="-Lnative=/xwin/crt/lib/x86_64 -Lnative=/xwin/sdk/lib/um/x86_64 -Lnative=/xwin/sdk/lib/ucrt/x86_64"
 
 # These are separate since docker/podman won't transform environment variables defined in the same ENV block
 ENV CFLAGS_x86_64_pc_windows_msvc="$CL_FLAGS" \
