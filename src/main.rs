@@ -254,6 +254,7 @@ fn main() -> Result<(), Error> {
                 ia::ProgressBar::with_draw_target(0, draw_target.into()).with_prefix(prefix).with_style(
                     ia::ProgressStyle::default_bar()
                         .template("{spinner:.green} {prefix:.bold} [{elapsed}] {wide_bar:.green} {bytes}/{total_bytes} {msg}")
+                        .unwrap()
                         .progress_chars("█▇▆▅▄▃▂▁  "),
                 ),
             );
@@ -333,7 +334,7 @@ fn load_manifest(
             ia::ProgressStyle::default_bar()
                 .template(
                     "{spinner:.green} {prefix:.bold} [{elapsed}] {wide_bar:.green} {bytes}/{total_bytes} {msg}",
-                )
+                )?
                 .progress_chars("█▇▆▅▄▃▂▁  "),
         );
     manifest_pb.set_prefix("Manifest");

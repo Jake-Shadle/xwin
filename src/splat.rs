@@ -559,7 +559,7 @@ pub(crate) fn finalize_splat(
             indicatif::ProgressStyle::default_bar()
                 .template(
                     "{spinner:.green} {prefix:.bold} [{elapsed}] {wide_bar:.green} {pos}/{len}",
-                )
+                )?
                 .progress_chars("█▇▆▅▄▃▂▁  "),
         );
 
