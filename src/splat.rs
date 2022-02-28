@@ -497,10 +497,16 @@ pub(crate) fn splat(
     Ok(headers.into_iter().find_map(|headers| headers))
 }
 
+#[cfg(unix)]
 #[inline]
 fn symlink(original: &str, link: &Path) -> Result<(), Error> {
     std::os::unix::fs::symlink(original, link)
         .with_context(|| format!("unable to symlink from {} to {}", link, original))
+}
+
+#[cfg(windows)]
+fn symlink(_original: &str, _link: &Path) -> Result<(), Error> {
+    Ok(())
 }
 
 pub(crate) fn finalize_splat(
