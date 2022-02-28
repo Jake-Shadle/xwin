@@ -8,8 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#30](https://github.com/Jake-Shadle/xwin/pull/30) updated the indicatif pre-release as a workaround for `cargo install`'s [broken behavior](https://github.com/rust-lang/cargo/issues/7169). Thanks [@messense](https://github.com/messense)!
+
 ## [0.1.7] - 2022-02-24
-## Fixed
+### Fixed
 - [PR#27](https://github.com/Jake-Shadle/xwin/pull/27) added a fixup for `Iphlpapi.lib => iphlpapi.lib`. Thanks [@jelmansouri](https://github.com/jelmansouri)!
 
 ## [0.1.6] - 2022-02-07
