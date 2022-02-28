@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.1.8] - 2022-02-28
 ### Fixed
 - [PR#30](https://github.com/Jake-Shadle/xwin/pull/30) updated the indicatif pre-release as a workaround for `cargo install`'s [broken behavior](https://github.com/rust-lang/cargo/issues/7169). Thanks [@messense](https://github.com/messense)!
 
@@ -46,7 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation if downloading, unpacking, and splatting of the CRT and Windows SDK. This first pass focused on targeting x86_64 Desktop, so targeting the Windows Store or other architectures is not guaranteed to work.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.1.7...HEAD
+[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.1.8...HEAD
+[0.1.8]: https://github.com/Jake-Shadle/xwin/compare/0.1.7...0.1.8
 [0.1.7]: https://github.com/Jake-Shadle/xwin/compare/0.1.6...0.1.7
 [0.1.6]: https://github.com/Jake-Shadle/xwin/compare/0.1.5...0.1.6
 [0.1.5]: https://github.com/Jake-Shadle/xwin/compare/0.1.4...0.1.5
