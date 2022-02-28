@@ -29,7 +29,7 @@ fn verify_compiles() {
     let op = xwin::Ops::Splat(xwin::SplatConfig {
         include_debug_libs: false,
         include_debug_symbols: false,
-        disable_symlinks: false,
+        enable_symlinks: true,
         preserve_ms_arch_notation: false,
         copy: true,
         output: output_dir.clone(),

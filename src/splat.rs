@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 pub struct SplatConfig {
     pub include_debug_libs: bool,
     pub include_debug_symbols: bool,
-    pub disable_symlinks: bool,
+    pub enable_symlinks: bool,
     pub preserve_ms_arch_notation: bool,
     pub output: PathBuf,
     pub copy: bool,
@@ -358,30 +358,80 @@ pub(crate) fn splat(
                             .with_context(|| format!("failed to move {} to {}", src_path, tar))?;
                     }
 
-                    match mapping.kind {
-                        // These are all internally consistent and lowercased, so if
-                        // a library is including them with different casing that is
-                        // kind of on them
-                        //
-                        // The SDK headers are also all over the place with casing
-                        // as well as being internally inconsistent, so we scan
-                        // them all for includes and add those that are referenced
-                        // incorrectly, but we wait until after all the of headers
-                        // have been unpacked before fixing them
-                        PayloadKind::CrtHeaders | PayloadKind::Ucrt => {}
-                        PayloadKind::SdkHeaders => {
-                            if let Some(sdk_headers) = &mut sdk_headers {
-                                let rel_target_path = sdk_headers.get_relative_path(&tar)?;
+                    let kind = mapping.kind;
 
-                                let rel_hash = calc_lower_hash(rel_target_path.as_str());
+                    let mut add_symlinks = || -> Result<(), Error> {
+                        match kind {
+                            // These are all internally consistent and lowercased, so if
+                            // a library is including them with different casing that is
+                            // kind of on them
+                            //
+                            // The SDK headers are also all over the place with casing
+                            // as well as being internally inconsistent, so we scan
+                            // them all for includes and add those that are referenced
+                            // incorrectly, but we wait until after all the of headers
+                            // have been unpacked before fixing them
+                            PayloadKind::CrtHeaders | PayloadKind::Ucrt => {}
+                            PayloadKind::SdkHeaders => {
+                                if let Some(sdk_headers) = &mut sdk_headers {
+                                    let rel_target_path = sdk_headers.get_relative_path(&tar)?;
 
-                                if sdk_headers.inner.insert(rel_hash, tar.clone()).is_some() {
-                                    anyhow::bail!("found duplicate relative path when hashed");
+                                    let rel_hash = calc_lower_hash(rel_target_path.as_str());
+
+                                    if sdk_headers.inner.insert(rel_hash, tar.clone()).is_some() {
+                                        anyhow::bail!("found duplicate relative path when hashed");
+                                    }
+
+                                    // https://github.com/zeromq/libzmq/blob/3070a4b2461ec64129062907d915ed665d2ac126/src/precompiled.hpp#L73
+                                    if let Some(additional_name) = match fname_str {
+                                        "mstcpip.h" => Some("Mstcpip.h"),
+                                        _ => None,
+                                    } {
+                                        tar.pop();
+                                        tar.push(additional_name);
+
+                                        symlink(fname_str, &tar)?;
+                                    }
+                                }
+                            }
+                            PayloadKind::CrtLibs => {
+                                // While _most_ of the libs *stares at Microsoft.VisualC.STLCLR.dll* are lower case,
+                                // sometimes when they are specified as linker arguments, crates will link with
+                                // SCREAMING as if they are angry at the linker, so fix this in the few "common" cases.
+                                // This list is probably not complete, but that's what PRs are for
+                                if let Some(angry_lib) = match fname_str.strip_suffix(".lib") {
+                                    Some("libcmt") => Some("LIBCMT.lib"),
+                                    Some("msvcrt") => Some("MSVCRT.lib"),
+                                    Some("oldnames") => Some("OLDNAMES.lib"),
+                                    _ => None,
+                                } {
+                                    tar.pop();
+                                    tar.push(angry_lib);
+
+                                    symlink(fname_str, &tar)?;
+                                }
+                            }
+                            PayloadKind::SdkLibs | PayloadKind::SdkStoreLibs => {
+                                // The SDK libraries are just completely inconsistent, but
+                                // all usage I have ever seen just links them with lowercase
+                                // names, so we just fix all of them to be lowercase.
+                                // Note that we need to not only fix the name but also the
+                                // extension, as for some inexplicable reason about half of
+                                // them use an uppercase L for the extension. WTF. This also
+                                // applies to the tlb files, so at least they are consistently
+                                // inconsistent
+                                if fname_str.contains(|c: char| c.is_ascii_uppercase()) {
+                                    tar.pop();
+                                    tar.push(fname_str.to_ascii_lowercase());
+
+                                    symlink(fname_str, &tar)?;
                                 }
 
-                                // https://github.com/zeromq/libzmq/blob/3070a4b2461ec64129062907d915ed665d2ac126/src/precompiled.hpp#L73
+                                // There is also this: https://github.com/time-rs/time/blob/v0.3.2/src/utc_offset.rs#L454
+                                // And this: https://github.com/webrtc-rs/util/blob/main/src/ifaces/ffi/windows/mod.rs#L33
                                 if let Some(additional_name) = match fname_str {
-                                    "mstcpip.h" => Some("Mstcpip.h"),
+                                    "kernel32.Lib" => Some("Kernel32.lib"),
+                                    "iphlpapi.lib" => Some("Iphlpapi.lib"),
                                     _ => None,
                                 } {
                                     tar.pop();
@@ -389,64 +439,24 @@ pub(crate) fn splat(
 
                                     symlink(fname_str, &tar)?;
                                 }
+
+                                // We also need to support SCREAMING case for the library names
+                                // due to...reasons https://github.com/microsoft/windows-rs/blob/a27a74784ccf304ab362bf2416f5f44e98e5eecd/src/bindings.rs#L3772
+                                if tar.extension() == Some("lib") {
+                                    tar.pop();
+                                    tar.push(fname_str.to_ascii_uppercase());
+                                    tar.set_extension("lib");
+
+                                    symlink(fname_str, &tar)?;
+                                }
                             }
                         }
-                        PayloadKind::CrtLibs => {
-                            // While _most_ of the libs *stares at Microsoft.VisualC.STLCLR.dll* are lower case,
-                            // sometimes when they are specified as linker arguments, crates will link with
-                            // SCREAMING as if they are angry at the linker, so fix this in the few "common" cases.
-                            // This list is probably not complete, but that's what PRs are for
-                            if let Some(angry_lib) = match fname_str.strip_suffix(".lib") {
-                                Some("libcmt") => Some("LIBCMT.lib"),
-                                Some("msvcrt") => Some("MSVCRT.lib"),
-                                Some("oldnames") => Some("OLDNAMES.lib"),
-                                _ => None,
-                            } {
-                                tar.pop();
-                                tar.push(angry_lib);
 
-                                symlink(fname_str, &tar)?;
-                            }
-                        }
-                        PayloadKind::SdkLibs | PayloadKind::SdkStoreLibs => {
-                            // The SDK libraries are just completely inconsistent, but
-                            // all usage I have ever seen just links them with lowercase
-                            // names, so we just fix all of them to be lowercase.
-                            // Note that we need to not only fix the name but also the
-                            // extension, as for some inexplicable reason about half of
-                            // them use an uppercase L for the extension. WTF. This also
-                            // applies to the tlb files, so at least they are consistently
-                            // inconsistent
-                            if fname_str.contains(|c: char| c.is_ascii_uppercase()) {
-                                tar.pop();
-                                tar.push(fname_str.to_ascii_lowercase());
+                        Ok(())
+                    };
 
-                                symlink(fname_str, &tar)?;
-                            }
-
-                            // There is also this: https://github.com/time-rs/time/blob/v0.3.2/src/utc_offset.rs#L454
-                            // And this: https://github.com/webrtc-rs/util/blob/main/src/ifaces/ffi/windows/mod.rs#L33
-                            if let Some(additional_name) = match fname_str {
-                                "kernel32.Lib" => Some("Kernel32.lib"),
-                                "iphlpapi.lib" => Some("Iphlpapi.lib"),
-                                _ => None,
-                            } {
-                                tar.pop();
-                                tar.push(additional_name);
-
-                                symlink(fname_str, &tar)?;
-                            }
-
-                            // We also need to support SCREAMING case for the library names
-                            // due to...reasons https://github.com/microsoft/windows-rs/blob/a27a74784ccf304ab362bf2416f5f44e98e5eecd/src/bindings.rs#L3772
-                            if tar.extension() == Some("lib") {
-                                tar.pop();
-                                tar.push(fname_str.to_ascii_uppercase());
-                                tar.set_extension("lib");
-
-                                symlink(fname_str, &tar)?;
-                            }
-                        }
+                    if config.enable_symlinks {
+                        add_symlinks()?;
                     }
 
                     tar.pop();

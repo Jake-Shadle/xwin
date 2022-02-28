@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#32](https://github.com/Jake-Shadle/xwin/pull/32) fixed the `--disable-symlinks` flag to _actually_ not emit symlinks, which is needed if the target filesystem is case-insensitive.
+
 ## [0.1.8] - 2022-02-28
 ### Fixed
 - [PR#30](https://github.com/Jake-Shadle/xwin/pull/30) updated the indicatif pre-release as a workaround for `cargo install`'s [broken behavior](https://github.com/rust-lang/cargo/issues/7169). Thanks [@messense](https://github.com/messense)!

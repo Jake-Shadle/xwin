@@ -169,10 +169,13 @@ impl Ctx {
 
         let packages = std::sync::Arc::new(packages);
 
-        let splat_roots = if let crate::Ops::Splat(config) = &ops {
-            Some(crate::splat::prep_splat(self.clone(), config)?)
+        let (splat_roots, enable_symlinks) = if let crate::Ops::Splat(config) = &ops {
+            (
+                Some(crate::splat::prep_splat(self.clone(), config)?),
+                config.enable_symlinks,
+            )
         } else {
-            None
+            (None, false)
         };
 
         let mut results = Vec::new();
@@ -215,7 +218,9 @@ impl Ctx {
         let sdk_headers = sdk_headers.into_iter().flatten().collect();
 
         if let Some(roots) = splat_roots {
-            crate::splat::finalize_splat(&self, &roots, sdk_headers)?;
+            if enable_symlinks {
+                crate::splat::finalize_splat(&self, &roots, sdk_headers)?;
+            }
         }
 
         Ok(())
