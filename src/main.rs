@@ -211,7 +211,7 @@ fn main() -> Result<(), Error> {
         } => xwin::Ops::Splat(xwin::SplatConfig {
             include_debug_libs,
             include_debug_symbols,
-            disable_symlinks,
+            enable_symlinks: !disable_symlinks,
             preserve_ms_arch_notation,
             copy,
             output: output.unwrap_or_else(|| ctx.work_dir.join("splat")),
