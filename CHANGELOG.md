@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.1.10] - 2022-02-28
 ### Fixed
 - [PR#34](https://github.com/Jake-Shadle/xwin/pull/34) changed some code so that it is possible to compile and run for `x86_64-pc-windows-msvc`, though this target is not explicitly support. Thanks [@messense](https://github.com/messense)!
 - [PR#36](https://github.com/Jake-Shadle/xwin/pull/36) updated indicatif to `0.17.0-rc.6` and pinned it to fix [#35](https://github.com/Jake-Shadle/xwin/issues/35).
@@ -55,7 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation if downloading, unpacking, and splatting of the CRT and Windows SDK. This first pass focused on targeting x86_64 Desktop, so targeting the Windows Store or other architectures is not guaranteed to work.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.1.9...HEAD
+[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.1.10...HEAD
+[0.1.10]: https://github.com/Jake-Shadle/xwin/compare/0.1.9...0.1.10
 [0.1.9]: https://github.com/Jake-Shadle/xwin/compare/0.1.8...0.1.9
 [0.1.8]: https://github.com/Jake-Shadle/xwin/compare/0.1.7...0.1.8
 [0.1.7]: https://github.com/Jake-Shadle/xwin/compare/0.1.6...0.1.7

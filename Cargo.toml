@@ -1,6 +1,6 @@
 [package]
 name = "xwin"
-version = "0.1.9"
+version = "0.1.10"
 description = "Allows downloading and repacking the MSVC and Windows SDK for cross compilation"
 authors = ["Jake Shadle <jake.shadle@embark-studios.com>"]
 edition = "2018"
