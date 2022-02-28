@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#34](https://github.com/Jake-Shadle/xwin/pull/34) changed some code so that it is possible to compile and run for `x86_64-pc-windows-msvc`, though this target is not explicitly support. Thanks [@messense](https://github.com/messense)!
+- [PR#36](https://github.com/Jake-Shadle/xwin/pull/36) updated indicatif to `0.17.0-rc.6` and pinned it to fix [#35](https://github.com/Jake-Shadle/xwin/issues/35).
+
 ## [0.1.9] - 2022-02-28
 ### Fixed
 - [PR#32](https://github.com/Jake-Shadle/xwin/pull/32) fixed the `--disable-symlinks` flag to _actually_ not emit symlinks, which is needed if the target filesystem is case-insensitive.
