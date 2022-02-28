@@ -28,7 +28,7 @@ flate2 = { version = "1.0", default-features = false, features = [
     "rust_backend",
 ] }
 # Pretty progress bars
-indicatif = "0.17.0-rc.5"
+indicatif = "=0.17.0-rc.6"
 # Decoding of MSI installer packages
 msi = "0.4"
 parking_lot = "0.12"
