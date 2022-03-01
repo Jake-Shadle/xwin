@@ -400,7 +400,8 @@ mod test {
             .color(ColorChoice::Never)
             // override versions to not have to update test when changing versions
             .version("0.0.0")
-            .long_version("0.0.0");
+            .long_version("0.0.0")
+            .term_width(80);
 
         // don't show current env vars as that will make snapshot test output diff depending on environment run in
         let arg_names = app
