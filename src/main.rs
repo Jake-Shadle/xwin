@@ -92,6 +92,7 @@ fn parse_level(s: &str) -> Result<LevelFilter, Error> {
 }
 
 #[derive(Parser)]
+#[clap(author, version, about, long_about = None)]
 pub struct Args {
     /// Doesn't display the prompt to accept the license
     #[clap(long, env = "XWIN_ACCEPT_LICENSE")]
@@ -119,12 +120,12 @@ pub struct Args {
     cache_dir: Option<PathBuf>,
     /// Specifies a VS manifest to use from a file, rather than downloading it
     /// from the Microsoft site.
-    #[clap(long, conflicts_with_all = &["version", "channel"])]
+    #[clap(long, conflicts_with_all = &["sdk-version", "channel"])]
     manifest: Option<PathBuf>,
     /// The version to retrieve, can either be a major version of 15 or 16, or
     /// a "<major>.<minor>" version.
     #[clap(long, default_value = "16")]
-    version: String,
+    sdk_version: String,
     /// The product channel to use.
     #[clap(long, default_value = "release")]
     channel: String,
@@ -347,9 +348,12 @@ fn load_manifest(
             serde_json::from_str(&manifest_content)
                 .with_context(|| format!("failed to deserialize manifest in '{}'", manifest_path))?
         }
-        None => {
-            xwin::manifest::get_manifest(ctx, &args.version, &args.channel, manifest_pb.clone())?
-        }
+        None => xwin::manifest::get_manifest(
+            ctx,
+            &args.sdk_version,
+            &args.channel,
+            manifest_pb.clone(),
+        )?,
     };
 
     let pkg_manifest = xwin::manifest::get_package_manifest(ctx, &manifest, manifest_pb.clone())?;
