@@ -361,3 +361,87 @@ fn load_manifest(
     manifest_pb.finish_with_message("📥 downloaded");
     Ok(pkg_manifest)
 }
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn cli_help() {
+        use clap::CommandFactory;
+
+        let snapshot_path = format!("{}/tests/snapshots", env!("CARGO_MANIFEST_DIR"));
+
+        insta::with_settings!({
+            prepend_module_to_snapshot => false,
+            snapshot_path => snapshot_path,
+        }, {
+            // the tests here will force maps to sort
+            snapshot_test_cli_command(super::Args::command().name(env!("CARGO_PKG_NAME")), "xwin".to_owned(), &SnapshotTestDesc {
+                manifest_path: env!("CARGO_MANIFEST_DIR"),
+                module_path: module_path!(),
+                file: file!(),
+                line: line!(),
+            });
+        });
+    }
+
+    use clap::{ColorChoice, Command};
+
+    pub struct SnapshotTestDesc {
+        pub manifest_path: &'static str,
+        pub module_path: &'static str,
+        pub file: &'static str,
+        pub line: u32,
+    }
+
+    fn snapshot_test_cli_command(app: Command<'_>, cmd_name: String, desc: &SnapshotTestDesc) {
+        let mut app = app
+            .clone()
+            // we do not want ASCII colors in our snapshot test output
+            .color(ColorChoice::Never)
+            // override versions to not have to update test when changing versions
+            .version("0.0.0")
+            .long_version("0.0.0");
+
+        // don't show current env vars as that will make snapshot test output diff depending on environment run in
+        let arg_names = app
+            .get_arguments()
+            .map(|a| a.get_id())
+            .filter(|a| *a != "version" && *a != "help")
+            .collect::<Vec<_>>();
+        for arg_name in arg_names {
+            app = app.mut_arg(arg_name, |arg| arg.hide_env_values(true));
+        }
+
+        // get the long help text for the command
+        let mut buffer = Vec::new();
+        app.write_long_help(&mut buffer).unwrap();
+        let help_text = std::str::from_utf8(&buffer).unwrap();
+
+        // use internal `insta` function instead of the macro so we can pass in the
+        // right module information from the crate and to gather up the errors instead of panicking directly on failures
+        insta::_macro_support::assert_snapshot(
+            cmd_name.clone().into(),
+            help_text,
+            desc.manifest_path,
+            "cli-cmd",
+            desc.module_path,
+            desc.file,
+            desc.line,
+            "help_text",
+        )
+        .unwrap();
+
+        // recursively test all subcommands
+        for app in app.get_subcommands() {
+            if app.get_name() == "help" {
+                continue;
+            }
+
+            snapshot_test_cli_command(
+                app.clone(),
+                format!("{}-{}", cmd_name, app.get_name()),
+                desc,
+            );
+        }
+    }
+}

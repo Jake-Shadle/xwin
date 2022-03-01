@@ -70,5 +70,6 @@ twox-hash = "1.6"
 zip = { version = "0.5", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
+insta = "1.12"
 similar-asserts = "1.1"
 walkdir = "2.3"
