@@ -120,12 +120,12 @@ pub struct Args {
     cache_dir: Option<PathBuf>,
     /// Specifies a VS manifest to use from a file, rather than downloading it
     /// from the Microsoft site.
-    #[clap(long, conflicts_with_all = &["sdk-version", "channel"])]
+    #[clap(long, conflicts_with_all = &["manifest-version", "channel"])]
     manifest: Option<PathBuf>,
     /// The version to retrieve, can either be a major version of 15 or 16, or
     /// a "<major>.<minor>" version.
     #[clap(long, default_value = "16")]
-    sdk_version: String,
+    manifest_version: String,
     /// The product channel to use.
     #[clap(long, default_value = "release")]
     channel: String,
@@ -350,7 +350,7 @@ fn load_manifest(
         }
         None => xwin::manifest::get_manifest(
             ctx,
-            &args.sdk_version,
+            &args.manifest_version,
             &args.channel,
             manifest_pb.clone(),
         )?,
