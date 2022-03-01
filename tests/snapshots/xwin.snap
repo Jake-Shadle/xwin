@@ -1,0 +1,88 @@
+---
+source: src/main.rs
+assertion_line: 382
+expression: help_text
+
+---
+xwin 0.0.0
+Jake Shadle <jake.shadle@embark-studios.com>
+Allows downloading and repacking the MSVC CRT and Windows SDK for cross
+compilation
+
+USAGE:
+    xwin [OPTIONS] <SUBCOMMAND>
+
+OPTIONS:
+        --accept-license
+            Doesn't display the prompt to accept the license
+            
+            [env: XWIN_ACCEPT_LICENSE]
+
+        --arch <ARCH>
+            The architectures to include
+            
+            [default: x86_64]
+            [possible values: x86, x86_64, aarch, aarch64]
+
+        --cache-dir <CACHE_DIR>
+            Specifies the cache directory used to persist downloaded items to
+            disk. Defaults to `./.xwin-cache` if not specified
+
+        --channel <CHANNEL>
+            The product channel to use
+            
+            [default: release]
+
+    -h, --help
+            Print help information
+
+        --json
+            Output log messages as json
+
+    -L, --log-level <LEVEL>
+            The log level for messages, only log messages at or above the level
+            will be emitted
+            
+            [default: info]
+            [possible values: off, error, warn, info, debug, trace]
+
+        --manifest <MANIFEST>
+            Specifies a VS manifest to use from a file, rather than downloading
+            it from the Microsoft site
+
+        --manifest-version <MANIFEST_VERSION>
+            The version to retrieve, can either be a major version of 15 or 16,
+            or a "<major>.<minor>" version
+            
+            [default: 16]
+
+        --temp
+            If set, will use a temporary directory for all files used for
+            creating the archive and deleted upon exit, otherwise, all
+            downloaded files are kept in the `--cache-dir` and won't be
+            retrieved again
+
+    -V, --version
+            Print version information
+
+        --variant <VARIANT>
+            The variants to include
+            
+            [default: desktop]
+            [possible values: desktop, onecore, spectre]
+
+SUBCOMMANDS:
+    download
+            Downloads all the selected packages that aren't already present in
+            the download cache
+    help
+            Print this message or the help of the given subcommand(s)
+    list
+            Displays a summary of the packages that would be downloaded
+    splat
+            Fixes the packages to prune unneeded files and adds symlinks to
+            address file casing issues and then spalts the final artifacts into
+            directories
+    unpack
+            Unpacks all of the downloaded packages to disk
+

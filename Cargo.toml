@@ -1,7 +1,7 @@
 [package]
 name = "xwin"
 version = "0.1.10"
-description = "Allows downloading and repacking the MSVC and Windows SDK for cross compilation"
+description = "Allows downloading and repacking the MSVC CRT and Windows SDK for cross compilation"
 authors = ["Jake Shadle <jake.shadle@embark-studios.com>"]
 edition = "2018"
 license = "Apache-2.0 OR MIT"
@@ -70,5 +70,6 @@ twox-hash = "1.6"
 zip = { version = "0.5", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
+insta = "1.12"
 similar-asserts = "1.1"
 walkdir = "2.3"

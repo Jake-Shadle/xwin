@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#37](https://github.com/Jake-Shadle/xwin/pull/37) changed from structopt to clap v3 for arguments parsing. Thanks [@messense](https://github.com/messense)!
+- [PR#38](https://github.com/Jake-Shadle/xwin/pull/38) fixed up the clap arguments to include metadata to be closer to the original structopt output with eg. `xwin -V`, however this exposed a problem that clap couldn't handle the old `--version <MANIFEST_VERSION>` flag since it clashed with `-V, --version`, so the flag has been renamed to `--manifest-version`. This is unfortunately a breaking change for the CLI.
+
 ## [0.1.10] - 2022-02-28
 ### Fixed
 - [PR#34](https://github.com/Jake-Shadle/xwin/pull/34) changed some code so that it is possible to compile and run for `x86_64-pc-windows-msvc`, though this target is not explicitly support. Thanks [@messense](https://github.com/messense)!

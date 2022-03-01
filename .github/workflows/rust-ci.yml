@@ -79,6 +79,21 @@ jobs:
       - name: cargo test
         run: cargo test --release verify_deterministic
 
+  check_cli:
+    name: Verify CLI
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - run: cargo fetch
+      - name: cargo test build
+        run: cargo build --tests
+      - name: cargo test
+        run: cargo test cli_help
+
   deny-check:
     name: cargo-deny
     runs-on: ubuntu-20.04
