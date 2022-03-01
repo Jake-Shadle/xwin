@@ -1,7 +1,7 @@
 use anyhow::{Context as _, Error};
 use camino::Utf8PathBuf as PathBuf;
+use clap::{Parser, Subcommand};
 use indicatif as ia;
-use structopt::StructOpt;
 use tracing_subscriber::filter::LevelFilter;
 
 fn setup_logger(json: bool, log_level: LevelFilter) -> Result<(), Error> {
@@ -26,7 +26,7 @@ fn setup_logger(json: bool, log_level: LevelFilter) -> Result<(), Error> {
     Ok(())
 }
 
-#[derive(StructOpt)]
+#[derive(Subcommand)]
 pub enum Command {
     /// Displays a summary of the packages that would be downloaded.
     ///
@@ -44,11 +44,11 @@ pub enum Command {
     Splat {
         /// The MSVCRT includes (non-redistributable) debug versions of the
         /// various libs that are generally uninteresting to keep for most usage
-        #[structopt(long)]
+        #[clap(long)]
         include_debug_libs: bool,
         /// The MSVCRT includes PDB (debug symbols) files for several of the
         /// libraries that are generally uninteresting to keep for most usage
-        #[structopt(long)]
+        #[clap(long)]
         include_debug_symbols: bool,
         /// By default, symlinks are added to both the CRT and WindowsSDK to
         /// address casing issues in general usage. For example, if you are
@@ -57,27 +57,27 @@ pub enum Command {
         /// is `Windows.h`. This also applies even if the C/C++ you are compiling
         /// uses correct casing for all CRT/SDK includes, as the internal headers
         /// also use incorrect casing in most cases.
-        #[structopt(long)]
+        #[clap(long)]
         disable_symlinks: bool,
         /// By default, we convert the MS specific `x64`, `arm`, and `arm64`
         /// target architectures to the more canonical `x86_64`, `aarch`, and
         /// `aarch64` of LLVM etc when creating directories/names. Passing this
         /// flag will preserve the MS names for those targets.
-        #[structopt(long)]
+        #[clap(long)]
         preserve_ms_arch_notation: bool,
         /// The root output directory. Defaults to `./.xwin-cache/splat` if not
         /// specified.
-        #[structopt(long)]
+        #[clap(long)]
         output: Option<PathBuf>,
         /// Copies files from the unpack directory to the splat directory instead
         /// of moving them, which preserves the original unpack directories but
         /// increases overall time and disk usage
-        #[structopt(long)]
+        #[clap(long)]
         copy: bool,
         // Splits the CRT and SDK into architecture and variant specific
         // directories. The shared headers in the CRT and SDK are duplicated
         // for each output so that each combination is self-contained.
-        // #[structopt(long)]
+        // #[clap(long)]
         // isolated: bool,
     },
 }
@@ -91,14 +91,14 @@ fn parse_level(s: &str) -> Result<LevelFilter, Error> {
         .map_err(|_| anyhow::anyhow!("failed to parse level '{}'", s))
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub struct Args {
     /// Doesn't display the prompt to accept the license
-    #[structopt(long, env = "XWIN_ACCEPT_LICENSE")]
+    #[clap(long, env = "XWIN_ACCEPT_LICENSE")]
     accept_license: bool,
     /// The log level for messages, only log messages at or above the level will be emitted.
-    #[structopt(
-        short = "L",
+    #[clap(
+        short = 'L',
         long = "log-level",
         default_value = "info",
         parse(try_from_str = parse_level),
@@ -106,50 +106,50 @@ pub struct Args {
     )]
     level: LevelFilter,
     /// Output log messages as json
-    #[structopt(long)]
+    #[clap(long)]
     json: bool,
     /// If set, will use a temporary directory for all files used for creating
     /// the archive and deleted upon exit, otherwise, all downloaded files
     /// are kept in the `--cache-dir` and won't be retrieved again
-    #[structopt(long)]
+    #[clap(long)]
     temp: bool,
     /// Specifies the cache directory used to persist downloaded items to disk.
     /// Defaults to `./.xwin-cache` if not specified.
-    #[structopt(long)]
+    #[clap(long)]
     cache_dir: Option<PathBuf>,
     /// Specifies a VS manifest to use from a file, rather than downloading it
     /// from the Microsoft site.
-    #[structopt(long, conflicts_with_all = &["version", "channel"])]
+    #[clap(long, conflicts_with_all = &["version", "channel"])]
     manifest: Option<PathBuf>,
     /// The version to retrieve, can either be a major version of 15 or 16, or
     /// a "<major>.<minor>" version.
-    #[structopt(long, default_value = "16")]
+    #[clap(long, default_value = "16")]
     version: String,
     /// The product channel to use.
-    #[structopt(long, default_value = "release")]
+    #[clap(long, default_value = "release")]
     channel: String,
     /// The architectures to include
-    #[structopt(
+    #[clap(
         long,
         possible_values(ARCHES),
-        use_delimiter = true,
+        use_value_delimiter = true,
         default_value = "x86_64"
     )]
     arch: Vec<xwin::Arch>,
     /// The variants to include
-    #[structopt(
+    #[clap(
         long,
         possible_values(VARIANTS),
-        use_delimiter = true,
+        use_value_delimiter = true,
         default_value = "desktop"
     )]
     variant: Vec<xwin::Variant>,
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     cmd: Command,
 }
 
 fn main() -> Result<(), Error> {
-    let args = Args::from_args();
+    let args = Args::parse();
     setup_logger(args.json, args.level)?;
 
     if !args.accept_license {
