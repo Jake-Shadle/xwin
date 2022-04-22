@@ -29,13 +29,13 @@ You can download a prebuilt binary from the [Releases](https://github.com/Jake-S
 
 ## Usage
 
-- `--accept-license <accept-license>` - Doesn't display the prompt to accept the license. You can also set the `XWIN_ACCEPT_LICENSE=1` environment variable
+- `--accept-license` - Doesn't display the prompt to accept the license. You can also set the `XWIN_ACCEPT_LICENSE=1` environment variable
 - `--arch <arch>` - The architectures to include [default: x86_64]  [possible values: x86, x86_64, aarch, aarch64]. Note that I haven't fully tested aarch/64 nor x86 so there _might_ be issues with them, please file an issue if you encounter problems with them.
 - `--cache-dir <cache-dir>` - Specifies the cache directory used to persist downloaded items to disk. Defaults to `./.xwin-cache` if not specified.
 - `-L, --log-level <level>` - The log level for messages, only log messages at or above the level will be emitted [default: info] [possible values: off, error, warn, info, debug, trace].
 - `--variant <variant>...` - The variants to include [default: desktop]  [possible values: desktop, onecore, spectre]. Note that I haven't fully tested any variant except `desktop`, please file an issue if you try to use one of the others and run into issues. Note that there is another `store` variant that hasn't even been implemented due to it being weird and me not having a real project targeting it.
 - `--channel <channel>` - The product channel to use [default: release]
-- `--version <version>` - The version to retrieve, can either be a major version of 15 or 16, or a `<major>.<minor>` version [default: 16]. This is the version number of the top level manifest, it's...not really tied to the underlying content.
+- `--manifest-version <version>` - The version to retrieve, can either be a major version of 15 or 16, or a `<major>.<minor>` version [default: 16]. This is the version number of the top level manifest, it's...not really tied to the underlying content.
 - `--manifest` - Specifies a top level manifest to use, rather than downloading it from Microsoft. This can be used to ensure the output is reproducible.
 
 ### `xwin download`
