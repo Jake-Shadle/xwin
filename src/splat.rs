@@ -382,9 +382,11 @@ pub(crate) fn splat(
                                         anyhow::bail!("found duplicate relative path when hashed");
                                     }
 
-                                    // https://github.com/zeromq/libzmq/blob/3070a4b2461ec64129062907d915ed665d2ac126/src/precompiled.hpp#L73
                                     if let Some(additional_name) = match fname_str {
+                                        // https://github.com/zeromq/libzmq/blob/3070a4b2461ec64129062907d915ed665d2ac126/src/precompiled.hpp#L73
                                         "mstcpip.h" => Some("Mstcpip.h"),
+                                        // https://github.com/ponylang/ponyc/blob/8d41d6650b48b9733cd675df199588e6fccc6346/src/common/platform.h#L191
+                                        "basetsd.h" => Some("BaseTsd.h"),
                                         _ => None,
                                     } {
                                         tar.pop();
