@@ -53,10 +53,7 @@ license-files = [{ path = "COPYRIGHT", hash = 0x39f8ad31 }]
 [bans]
 multiple-versions = "deny"
 deny = [{ name = "openssl-sys" }]
-skip = [
-    # hyper depends on two versions
-    { name = "itoa", version = "=0.4.8" },
-]
+skip = []
 
 [sources]
 unknown-registry = "deny"
