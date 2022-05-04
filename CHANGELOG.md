@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#41](https://github.com/Jake-Shadle/xwin/pull/41) added a symlink for `BaseTsd.h`. Thanks [@jemc](https://github.com/jemc)!
+- [PR#42](https://github.com/Jake-Shadle/xwin/pull/42) updated dependencies, fixing a [CVE](https://rustsec.org/advisories/RUSTSEC-2022-0013).
+
 ## [0.2.0] - 2022-03-01
 ### Changed
 - [PR#37](https://github.com/Jake-Shadle/xwin/pull/37) changed from structopt to clap v3 for arguments parsing. Thanks [@messense](https://github.com/messense)!
