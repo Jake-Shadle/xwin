@@ -2806,6 +2806,7 @@ sdk/include/cppwinrt/winrt/windows.web.http.headers.h @ f3c0219b319bb572
 sdk/include/cppwinrt/winrt/windows.web.syndication.h @ fba81df833d19d76
 sdk/include/cppwinrt/winrt/windows.web.ui.h @ a6e312bf6e06a36b
 sdk/include/cppwinrt/winrt/windows.web.ui.interop.h @ 671d7b874fad4dd8
+sdk/include/shared/BaseTsd.h => basetsd.h
 sdk/include/shared/BdaTypes.h => bdatypes.h
 sdk/include/shared/DriverSpecs.h => driverspecs.h
 sdk/include/shared/GenericUsbFnIoctl.h @ fc8133a69d8e2bb9
