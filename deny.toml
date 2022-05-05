@@ -8,10 +8,6 @@ vulnerability = "deny"
 unmaintained = "deny"
 yanked = "deny"
 ignore = [
-    # chrono: transitive dep, bleh
-    "RUSTSEC-2020-0159",
-    # time: transitive dep, bleh
-    "RUSTSEC-2020-0071",
 ]
 
 [licenses]

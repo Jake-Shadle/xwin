@@ -16,11 +16,9 @@ anyhow = "1.0"
 # Network/file buffers
 bytes = "1.0"
 # CAB files are used in conjunction with MSI files for SDK packages
-cab = "0.3"
+cab = "0.4"
 # Nicer to use utf-8 paths
 camino = "1.0"
-# Timestamps
-chrono = "0.4"
 # Easy CLI tables
 cli-table = { version = "0.4", default-features = false }
 # GZIP/Deflate
@@ -67,7 +65,7 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
 # Hashing
 twox-hash = "1.6"
 # Unpacking of VSIX "packages"
-zip = { version = "0.5", default-features = false, features = ["deflate"] }
+zip = { version = "0.6", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
 insta = "1.12"
