@@ -1,6 +1,7 @@
 use crate::{Arch, Ctx, Error, Path, PathBuf, PayloadKind, Variant};
 use anyhow::Context as _;
 use rayon::prelude::*;
+use camino::Utf8Path;
 use std::collections::BTreeMap;
 
 pub struct SplatConfig {
@@ -77,6 +78,17 @@ pub(crate) fn prep_splat(
         sdk: sdk_root,
         src: src_root,
     })
+}
+
+/// Get the Windows SDK version from the .msi filename.
+fn find_sdk_version(sdk_filename: &Utf8Path) -> String {
+    sdk_filename
+        .as_str()
+        .chars()
+        .skip_while(|ch| ch != &'_')
+        .skip(1)
+        .take_while(|ch| ch != &'_')
+        .collect()
 }
 
 pub(crate) fn splat(
@@ -491,6 +503,31 @@ pub(crate) fn splat(
             Ok(sdk_headers)
         })
         .collect_into_vec(&mut results);
+
+    match item.payload.kind {
+        PayloadKind::SdkLibs => {
+            // Symlink sdk/lib/{sdkversion} -> sdk/lib, regardless of filesystem case sensitivity.
+            let sdk_version = find_sdk_version(&item.payload.filename);
+            let mut versioned_linkname = roots.sdk.clone();
+            versioned_linkname.push("lib");
+            versioned_linkname.push(sdk_version);
+            symlink(".", &versioned_linkname)?;
+        }
+        PayloadKind::SdkHeaders => {
+            // Symlink sdk/include/{sdkversion} -> sdk/include, regardless of filesystem case sensitivity.
+            let sdk_version = find_sdk_version(&item.payload.filename);
+            let mut versioned_linkname = roots.sdk.clone();
+            versioned_linkname.push("include");
+            versioned_linkname.push(sdk_version);
+
+            // Desktop and Store variants both have an include dir,
+            // but we only need to create this symlink once.
+            if !versioned_linkname.exists() {
+                symlink(".", &versioned_linkname)?;
+            }
+        }
+        _ => (),
+    };
 
     item.progress.finish_with_message("📦 splatted");
 
