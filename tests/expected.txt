@@ -422,6 +422,8 @@ crt/lib/x86_64/vccorlib.lib @ 88dff09680406ce8
 crt/lib/x86_64/vcomp.lib @ 290001f1cf8658dc
 crt/lib/x86_64/vcruntime.lib @ 13fe902a335d605f
 crt/lib/x86_64/wsetargv.obj @ 887c6f64baebe131
+sdk/Include => include
+sdk/Lib => lib
 sdk/include/10.0.20348 => .
 sdk/include/cppwinrt/LICENSE.txt @ d824dd57cab041e7
 sdk/include/cppwinrt/license.txt => LICENSE.txt

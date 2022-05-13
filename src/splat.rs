@@ -512,6 +512,15 @@ pub(crate) fn splat(
             versioned_linkname.push("lib");
             versioned_linkname.push(sdk_version);
             symlink(".", &versioned_linkname)?;
+
+            // https://github.com/llvm/llvm-project/blob/release/14.x/clang/lib/Driver/ToolChains/MSVC.cpp#L1102
+            if config.enable_symlinks {
+                let mut title_case = roots.sdk.clone();
+                title_case.push("Lib");
+                if !title_case.exists() {
+                    symlink("lib", &title_case)?;
+                }
+            }
         }
         PayloadKind::SdkHeaders => {
             // Symlink sdk/include/{sdkversion} -> sdk/include, regardless of filesystem case sensitivity.
@@ -524,6 +533,15 @@ pub(crate) fn splat(
             // but we only need to create this symlink once.
             if !versioned_linkname.exists() {
                 symlink(".", &versioned_linkname)?;
+            }
+
+            // https://github.com/llvm/llvm-project/blob/release/14.x/clang/lib/Driver/ToolChains/MSVC.cpp#L1340-L1346
+            if config.enable_symlinks {
+                let mut title_case = roots.sdk.clone();
+                title_case.push("Include");
+                if !title_case.exists() {
+                    symlink("include", &title_case)?;
+                }
             }
         }
         _ => (),
