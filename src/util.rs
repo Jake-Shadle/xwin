@@ -114,12 +114,13 @@ where
 
 impl Sha256 {
     pub fn digest(buffer: &[u8]) -> Self {
-        let content_digest = ring::digest::digest(&ring::digest::SHA256, buffer);
+        use sha2::Digest;
 
-        let mut digest = [0u8; 32];
-        digest.copy_from_slice(content_digest.as_ref());
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(buffer);
+        let digest = hasher.finalize();
 
-        Self(digest)
+        Self(digest.into())
     }
 }
 
