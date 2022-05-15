@@ -17,14 +17,28 @@ pub enum Unpack {
 pub struct Ctx {
     pub work_dir: PathBuf,
     pub tempdir: Option<tempfile::TempDir>,
-    pub client: reqwest::blocking::Client,
+    pub client: ureq::Agent,
     pub draw_target: ProgressTarget,
 }
 
 impl Ctx {
+    fn http_client() -> Result<ureq::Agent, Error> {
+        #[cfg(feature = "native-tls")]
+        {
+            use std::sync::Arc;
+            let client = ureq::builder()
+                .tls_connector(Arc::new(native_tls_crate::TlsConnector::new()?))
+                .build();
+            Ok(client)
+        }
+
+        #[cfg(not(feature = "native-tls"))]
+        Ok(ureq::agent())
+    }
+
     pub fn with_temp(dt: ProgressTarget) -> Result<Self, Error> {
         let td = tempfile::TempDir::new()?;
-        let client = reqwest::blocking::ClientBuilder::new().build()?;
+        let client = Self::http_client()?;
 
         Ok(Self {
             work_dir: PathBuf::from_path_buf(td.path().to_owned()).map_err(|pb| {
@@ -37,7 +51,7 @@ impl Ctx {
     }
 
     pub fn with_dir(mut work_dir: PathBuf, dt: ProgressTarget) -> Result<Self, Error> {
-        let client = reqwest::blocking::ClientBuilder::new().build()?;
+        let client = Self::http_client()?;
 
         work_dir.push("dl");
         std::fs::create_dir_all(&work_dir)?;
@@ -104,9 +118,12 @@ impl Ctx {
             }
         }
 
-        let mut res = self.client.get(url.as_ref()).send()?.error_for_status()?;
+        let res = self.client.get(url.as_ref()).call()?;
 
-        let content_length = res.content_length().unwrap_or_default();
+        let content_length = res
+            .header("content-length")
+            .and_then(|header| header.parse().ok())
+            .unwrap_or_default();
         progress.inc_length(content_length);
 
         let body = bytes::BytesMut::with_capacity(content_length as usize);
@@ -134,7 +151,7 @@ impl Ctx {
             inner: body.writer(),
         };
 
-        res.copy_to(&mut pc)?;
+        std::io::copy(&mut res.into_reader(), &mut pc)?;
 
         let body = pc.inner.into_inner().freeze();
 
