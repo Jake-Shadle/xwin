@@ -15,7 +15,6 @@ unlicensed = "deny"
 allow = [
     "MIT",
     "Apache-2.0",
-    "BSD-3-Clause",
     "ISC",
     # This is not really a license for source code, but the encoding* crates
     # pulled in by msi all use it for some reason
