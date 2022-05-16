@@ -422,6 +422,9 @@ crt/lib/x86_64/vccorlib.lib @ 88dff09680406ce8
 crt/lib/x86_64/vcomp.lib @ 290001f1cf8658dc
 crt/lib/x86_64/vcruntime.lib @ 13fe902a335d605f
 crt/lib/x86_64/wsetargv.obj @ 887c6f64baebe131
+sdk/Include => include
+sdk/Lib => lib
+sdk/include/10.0.20348 => .
 sdk/include/cppwinrt/LICENSE.txt @ d824dd57cab041e7
 sdk/include/cppwinrt/license.txt => LICENSE.txt
 sdk/include/cppwinrt/winrt/Windows.AI.MachineLearning.h => windows.ai.machinelearning.h
@@ -7249,6 +7252,7 @@ sdk/include/winrt/wrl/module.h @ d0a209cfdd29d5c9
 sdk/include/winrt/wrl/wrappers/corewrappers.h @ aa2b216bc669030e
 sdk/include/winrt/wrl.h @ 7f6c2dca3e863bbc
 sdk/include/winrt/wsdevlicensing.h => Wsdevlicensing.h
+sdk/lib/10.0.20348 => .
 sdk/lib/ucrt/x86_64/libucrt.lib @ bd614cab0015a4e
 sdk/lib/ucrt/x86_64/ucrt.lib @ 8140b809879bb580
 sdk/lib/um/x86_64/ACLUI.lib => AclUI.Lib
