@@ -10,6 +10,14 @@ homepage = "https://github.com/Jake-Shadle/xwin"
 categories = ["development-tools", "command-line-utilities"]
 keywords = ["windows", "cross-compilation"]
 
+[features]
+# By default we use rustls for TLS
+default = ["rustls-tls"]
+rustls-tls = ["ureq/tls"]
+# If this feature is enabled we instead use the native TLS implementation for the
+# target platform
+native-tls = ["ureq/native-tls", "native-tls-crate/vendored"]
+
 [dependencies]
 # Easy errors
 anyhow = "1.0"
@@ -69,8 +77,3 @@ zip = { version = "0.6", default-features = false, features = ["deflate"] }
 insta = "1.12"
 similar-asserts = "1.1"
 walkdir = "2.3"
-
-[features]
-default = ["rustls-tls"]
-rustls-tls = ["ureq/tls"]
-native-tls = ["ureq/native-tls", "native-tls-crate"]
