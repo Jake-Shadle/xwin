@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#45](https://github.com/Jake-Shadle/xwin/pull/45) replaced `reqwest` with `ureq` which significantly reduced dependencies. It also made `rustls` an optional (but default) TLS implementation in addition to supporting native TLS for arcane platforms that are not supported by `ring`. Thanks [@messense](https://github.com/messense)!
+- [PR#46](https://github.com/Jake-Shadle/xwin/pull/46) updated MSI to 0.5. Thanks [@messense](https://github.com/messense)!
+
+### Added
+- [PR#47](https://github.com/Jake-Shadle/xwin/pull/47) added symlinks to support the usage of the `/vctoolsdir` and `/winsdkdir` options in `clang-cl`, which allow for a more concise compiler invocation. I would point you to official docs for this but apparently there are none. Thanks [@Qyriad](https://github.com/Qyriad)!
+
 ## [0.2.1] - 2022-05-04
 ### Changed
 - [PR#41](https://github.com/Jake-Shadle/xwin/pull/41) added a symlink for `BaseTsd.h`. Thanks [@jemc](https://github.com/jemc)!
