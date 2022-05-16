@@ -52,6 +52,10 @@ fn verify_compiles() {
     )
     .unwrap();
 
+    if xwin::Path::new("tests/xwin-test/target").exists() {
+        std::fs::remove_dir_all("tests/xwin-test/target").expect("failed to remove target dir");
+    }
+
     let mut cmd = std::process::Command::new("cargo");
     cmd.args(&[
         "build",
@@ -62,6 +66,36 @@ fn verify_compiles() {
     ]);
 
     let includes = format!("-Wno-unused-command-line-argument -fuse-ld=lld-link /imsvc{0}/crt/include /imsvc{0}/sdk/include/ucrt /imsvc{0}/sdk/include/um /imsvc{0}/sdk/include/shared", output_dir);
+    let libs = format!("-C linker=lld-link -Lnative={0}/crt/lib/x86_64 -Lnative={0}/sdk/lib/um/x86_64 -Lnative={0}/sdk/lib/ucrt/x86_64", output_dir);
+
+    let cc_env = [
+        ("CC_x86_64_pc_windows_msvc", "clang-cl"),
+        ("CXX_x86_64_pc_windows_msvc", "clang-cl"),
+        ("AR_x86_64_pc_windows_msvc", "llvm-lib"),
+        ("CFLAGS_x86_64_pc_windows_msvc", &includes),
+        ("CXXFLAGS_x86_64_pc_windows_msvc", &includes),
+        ("RUSTFLAGS", &libs),
+    ];
+
+    cmd.envs(cc_env);
+
+    assert!(cmd.status().unwrap().success());
+
+    std::fs::remove_dir_all("tests/xwin-test/target").expect("failed to remove target dir");
+
+    let mut cmd = std::process::Command::new("cargo");
+    cmd.args(&[
+        "build",
+        "--target",
+        "x86_64-pc-windows-msvc",
+        "--manifest-path",
+        "tests/xwin-test/Cargo.toml",
+    ]);
+
+    let includes = format!(
+        "-Wno-unused-command-line-argument -fuse-ld=lld-link /vctoolsdir {0}/crt /winsdkdir {0}/sdk",
+        output_dir
+    );
     let libs = format!("-C linker=lld-link -Lnative={0}/crt/lib/x86_64 -Lnative={0}/sdk/lib/um/x86_64 -Lnative={0}/sdk/lib/ucrt/x86_64", output_dir);
 
     let cc_env = [
