@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#48](https://github.com/Jake-Shadle/xwin/pull/48) fixed an issue introduced in [PR#47](https://github.com/Jake-Shadle/xwin/pull/47) when using multiple architectures. Thanks [@messense](https://github.com/messense)!
+
 ## [0.2.2] - 2022-05-16
 ### Changed
 - [PR#45](https://github.com/Jake-Shadle/xwin/pull/45) replaced `reqwest` with `ureq` which significantly reduced dependencies. It also made `rustls` an optional (but default) TLS implementation in addition to supporting native TLS for arcane platforms that are not supported by `ring`. Thanks [@messense](https://github.com/messense)!
