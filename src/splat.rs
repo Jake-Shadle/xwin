@@ -511,7 +511,12 @@ pub(crate) fn splat(
             let mut versioned_linkname = roots.sdk.clone();
             versioned_linkname.push("lib");
             versioned_linkname.push(sdk_version);
-            symlink(".", &versioned_linkname)?;
+
+            // Multiple architectures both have a lib dir,
+            // but we only need to create this symlink once.
+            if !versioned_linkname.exists() {
+                symlink(".", &versioned_linkname)?;
+            }
 
             // https://github.com/llvm/llvm-project/blob/release/14.x/clang/lib/Driver/ToolChains/MSVC.cpp#L1102
             if config.enable_symlinks {
