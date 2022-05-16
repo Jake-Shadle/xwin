@@ -23,20 +23,27 @@ See this [blog post](https://jake-shadle.github.io/xwin/) for an in depth walkth
 
 `cargo install xwin --locked`
 
+#### Features
+
+`xwin` provides two feature toggles used to decide which TLS implementation to use
+
+* `rustls` (default) - Uses [`rustls`](https://github.com/rustls/rustls) for TLS
+* `native-tls` - Uses [`native-tls`](https://github.com/sfackler/rust-native-tls) for TLS. Note that on platforms where OpenSSL is used it is always built from source.
+
 ### From tarball
 
 You can download a prebuilt binary from the [Releases](https://github.com/Jake-Shadle/xwin/releases). Note that only `x86_64-unknown-linux-musl` builds are provided.
 
 ## Usage
 
-- `--accept-license` - Doesn't display the prompt to accept the license. You can also set the `XWIN_ACCEPT_LICENSE=1` environment variable
-- `--arch <arch>` - The architectures to include [default: x86_64]  [possible values: x86, x86_64, aarch, aarch64]. Note that I haven't fully tested aarch/64 nor x86 so there _might_ be issues with them, please file an issue if you encounter problems with them.
-- `--cache-dir <cache-dir>` - Specifies the cache directory used to persist downloaded items to disk. Defaults to `./.xwin-cache` if not specified.
-- `-L, --log-level <level>` - The log level for messages, only log messages at or above the level will be emitted [default: info] [possible values: off, error, warn, info, debug, trace].
-- `--variant <variant>...` - The variants to include [default: desktop]  [possible values: desktop, onecore, spectre]. Note that I haven't fully tested any variant except `desktop`, please file an issue if you try to use one of the others and run into issues. Note that there is another `store` variant that hasn't even been implemented due to it being weird and me not having a real project targeting it.
-- `--channel <channel>` - The product channel to use [default: release]
-- `--manifest-version <version>` - The version to retrieve, can either be a major version of 15 or 16, or a `<major>.<minor>` version [default: 16]. This is the version number of the top level manifest, it's...not really tied to the underlying content.
-- `--manifest` - Specifies a top level manifest to use, rather than downloading it from Microsoft. This can be used to ensure the output is reproducible.
+* `--accept-license` - Doesn't display the prompt to accept the license. You can also set the `XWIN_ACCEPT_LICENSE=1` environment variable
+* `--arch <arch>` - The architectures to include [default: x86_64]  [possible values: x86, x86_64, aarch, aarch64]. Note that I haven't fully tested aarch/64 nor x86 so there _might_ be issues with them, please file an issue if you encounter problems with them.
+* `--cache-dir <cache-dir>` - Specifies the cache directory used to persist downloaded items to disk. Defaults to `./.xwin-cache` if not specified.
+* `-L, --log-level <level>` - The log level for messages, only log messages at or above the level will be emitted [default: info] [possible values: off, error, warn, info, debug, trace].
+* `--variant <variant>...` - The variants to include [default: desktop]  [possible values: desktop, onecore, spectre]. Note that I haven't fully tested any variant except `desktop`, please file an issue if you try to use one of the others and run into issues. Note that there is another `store` variant that hasn't even been implemented due to it being weird and me not having a real project targeting it.
+* `--channel <channel>` - The product channel to use [default: release]
+* `--manifest-version <version>` - The version to retrieve, can either be a major version of 15 or 16, or a `<major>.<minor>` version [default: 16]. This is the version number of the top level manifest, it's...not really tied to the underlying content.
+* `--manifest` - Specifies a top level manifest to use, rather than downloading it from Microsoft. This can be used to ensure the output is reproducible.
 
 ### `xwin download`
 
@@ -48,11 +55,11 @@ Decompresses all of the downloaded package contents to disk. `download` is run a
 
 ### `xwin splat`
 
-- `--copy` - Copies files from the unpack directory to the splat directory instead of moving them, which preserves the original unpack directories but increases overall execution time and disk usage.
-- `--disable-symlinks` - By default, symlinks are added to both the CRT and WindowsSDK to address casing issues in general usage. For example, if you are compiling C/C++ code that does `#include <windows.h>`, it will break on a case-sensitive file system, as the actual path in the WindowsSDK is `Windows.h`. This also applies even if the C/C++ you are compiling uses correct casing for all CRT/SDK includes, as the internal headers also use incorrect casing in most cases
-- `--include-debug-libs` - The MSVCRT includes (non-redistributable) debug versions of the various libs that are generally uninteresting to keep for most usage
-- `--include-debug-symbols` - The MSVCRT includes PDB (debug symbols) files for several of the libraries that are generally uninteresting to keep for most usage
-- `--preserve-ms-arch-notation` - By default, we convert the MS specific `x64`, `arm`, and `arm64` target architectures to the more canonical `x86_64`, `aarch`, and `aarch64` of LLVM etc when creating directories/names. Passing this flag will preserve the MS names for those targets
+* `--copy` - Copies files from the unpack directory to the splat directory instead of moving them, which preserves the original unpack directories but increases overall execution time and disk usage.
+* `--disable-symlinks` - By default, symlinks are added to both the CRT and WindowsSDK to address casing issues in general usage. For example, if you are compiling C/C++ code that does `#include <windows.h>`, it will break on a case-sensitive file system, as the actual path in the WindowsSDK is `Windows.h`. This also applies even if the C/C++ you are compiling uses correct casing for all CRT/SDK includes, as the internal headers also use incorrect casing in most cases
+* `--include-debug-libs` - The MSVCRT includes (non-redistributable) debug versions of the various libs that are generally uninteresting to keep for most usage
+* `--include-debug-symbols` - The MSVCRT includes PDB (debug symbols) files for several of the libraries that are generally uninteresting to keep for most usage
+* `--preserve-ms-arch-notation` - By default, we convert the MS specific `x64`, `arm`, and `arm64` target architectures to the more canonical `x86_64`, `aarch`, and `aarch64` of LLVM etc when creating directories/names. Passing this flag will preserve the MS names for those targets
 
 This moves all of the unpacked files which aren't pruned to their canonical locations under a root directory, for example here is what an `x86_64` `Desktop` splat looks like. `unpack` is run automatically as needed.
 
@@ -110,7 +117,7 @@ Special thanks to <https://github.com/mstorsjo/msvc-wine> for the inspiration an
 
 This contribution is dual licensed under EITHER OF
 
-- Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>)
-- MIT license ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
+* Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>)
+* MIT license ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
 
 at your option.
