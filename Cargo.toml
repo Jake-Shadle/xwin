@@ -28,7 +28,7 @@ flate2 = { version = "1.0", default-features = false, features = [
 # Pretty progress bars
 indicatif = "=0.17.0-rc.6"
 # Decoding of MSI installer packages
-msi = "0.4"
+msi = "0.5"
 parking_lot = "0.12"
 # brrr
 rayon = "1.5"
