@@ -1,7 +1,7 @@
 use crate::{Arch, Ctx, Error, Path, PathBuf, PayloadKind, Variant};
 use anyhow::Context as _;
-use rayon::prelude::*;
 use camino::Utf8Path;
+use rayon::prelude::*;
 use std::collections::BTreeMap;
 
 pub struct SplatConfig {
