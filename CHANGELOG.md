@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Added
+- [PR#50](https://github.com/Jake-Shadle/xwin/pull/50) added the ability to specify an HTTPS proxy via the `https_proxy` environment variable. Thanks [@j-raccoon](https://github.com/j-raccoon)!
+
 ## [0.2.3] - 2022-05-16
 ### Fixed
 - [PR#48](https://github.com/Jake-Shadle/xwin/pull/48) fixed an issue introduced in [PR#47](https://github.com/Jake-Shadle/xwin/pull/47) when using multiple architectures. Thanks [@messense](https://github.com/messense)!
