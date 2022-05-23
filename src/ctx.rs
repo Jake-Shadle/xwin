@@ -26,14 +26,24 @@ impl Ctx {
         #[cfg(feature = "native-tls")]
         {
             use std::sync::Arc;
-            let client = ureq::builder()
-                .tls_connector(Arc::new(native_tls_crate::TlsConnector::new()?))
-                .build();
-            Ok(client)
+            let mut builder =
+                ureq::builder().tls_connector(Arc::new(native_tls_crate::TlsConnector::new()?));
+            if let Ok(proxy) = std::env::var("https_proxy") {
+                let proxy = ureq::Proxy::new(proxy)?;
+                builder = builder.proxy(proxy);
+            };
+            Ok(builder.build())
         }
 
         #[cfg(not(feature = "native-tls"))]
-        Ok(ureq::agent())
+        {
+            let mut builder = ureq::builder();
+            if let Ok(proxy) = std::env::var("https_proxy") {
+                let proxy = ureq::Proxy::new(proxy)?;
+                builder = builder.proxy(proxy);
+            };
+            Ok(builder.build())
+        }
     }
 
     pub fn with_temp(dt: ProgressTarget) -> Result<Self, Error> {
