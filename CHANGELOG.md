@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.2.4] - 2022-05-23
 ### Added
 - [PR#50](https://github.com/Jake-Shadle/xwin/pull/50) added the ability to specify an HTTPS proxy via the `https_proxy` environment variable. Thanks [@j-raccoon](https://github.com/j-raccoon)!
 
@@ -81,7 +82,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation if downloading, unpacking, and splatting of the CRT and Windows SDK. This first pass focused on targeting x86_64 Desktop, so targeting the Windows Store or other architectures is not guaranteed to work.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.2.3...HEAD
+[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.2.4...HEAD
+[0.2.4]: https://github.com/Jake-Shadle/xwin/compare/0.2.3...0.2.4
 [0.2.3]: https://github.com/Jake-Shadle/xwin/compare/0.2.2...0.2.3
 [0.2.2]: https://github.com/Jake-Shadle/xwin/compare/0.2.1...0.2.2
 [0.2.1]: https://github.com/Jake-Shadle/xwin/compare/0.2.0...0.2.1
