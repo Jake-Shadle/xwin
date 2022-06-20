@@ -1,31 +1,30 @@
 targets = [
-    { triple = "x86_64-unknown-linux-musl" },
-    { triple = "x86_64-unknown-linux-gnu" },
+  { triple = "x86_64-unknown-linux-musl" },
+  { triple = "x86_64-unknown-linux-gnu" },
 ]
 
 [advisories]
 vulnerability = "deny"
 unmaintained = "deny"
 yanked = "deny"
-ignore = [
-]
+ignore = []
 
 [licenses]
 unlicensed = "deny"
 allow = [
-    "MIT",
-    "Apache-2.0",
-    "ISC",
-    # This is not really a license for source code, but the encoding* crates
-    # pulled in by msi all use it for some reason
-    "CC0-1.0",
+  "MIT",
+  "Apache-2.0",
+  "ISC",
+  # This is not really a license for source code, but the encoding* crates
+  # pulled in by msi all use it for some reason
+  "CC0-1.0",
 ]
 copyleft = "deny"
 exceptions = [
-    { allow = ["MPL-2.0"], name = "webpki-roots" },
-    # ring uses code from multiple libraries but all with permissive licenses
-    # https://tldrlegal.com/license/openssl-license-(openssl)
-    { allow = ["ISC", "MIT", "OpenSSL"], name = "ring" },
+  { allow = ["MPL-2.0"], name = "webpki-roots" },
+  # ring uses code from multiple libraries but all with permissive licenses
+  # https://tldrlegal.com/license/openssl-license-(openssl)
+  { allow = ["ISC", "MIT", "OpenSSL"], name = "ring" },
 ]
 
 [[licenses.clarify]]
@@ -47,7 +46,7 @@ license-files = [{ path = "COPYRIGHT", hash = 0x39f8ad31 }]
 
 [bans]
 multiple-versions = "deny"
-deny = [{ name = "openssl-sys" }]
+deny = []
 skip = []
 
 [sources]
