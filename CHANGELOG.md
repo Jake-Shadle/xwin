@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#52](https://github.com/Jake-Shadle/xwin/pull/52) updated dependencies, including openssl-src to fix various issues raised by Github security advisories.
+
 ## [0.2.4] - 2022-05-23
 ### Added
 - [PR#50](https://github.com/Jake-Shadle/xwin/pull/50) added the ability to specify an HTTPS proxy via the `https_proxy` environment variable. Thanks [@j-raccoon](https://github.com/j-raccoon)!
