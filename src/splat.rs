@@ -110,7 +110,7 @@ pub(crate) fn splat(
     let mut src = roots.src.join(&item.payload.filename);
 
     // If we're moving files from the unpack directory, invalidate it immediately
-    // so it is recreated in a future run if anyhing goes wrong
+    // so it is recreated in a future run if anything goes wrong
     if !config.copy {
         src.push(".unpack");
         if let Err(e) = std::fs::remove_file(&src) {
@@ -478,7 +478,7 @@ pub(crate) fn splat(
 
                 // Due to some libs from the CRT Store libs variant being needed
                 // by the regular Desktop variant, if we are not actually
-                // targetting the Store we can avoid adding the additional
+                // targeting the Store we can avoid adding the additional
                 // uwp and store subdirectories
                 if mapping.variant == Some(Variant::Store) && filter_store {
                     if mapping.kind == PayloadKind::CrtLibs {
