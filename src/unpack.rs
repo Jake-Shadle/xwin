@@ -307,7 +307,7 @@ pub(crate) fn unpack(
                                     if let Some(other) = other {
                                         // Ignore the SDK version directory between
                                         // Lib/Include and the actual subdirs we care about
-                                        if !other.starts_with(|c: char| c.is_digit(10)) {
+                                        if !other.starts_with(|c: char| c.is_ascii_digit()) {
                                             dir.push(other);
                                         }
                                     }

@@ -348,7 +348,7 @@ pub(crate) fn splat(
                                 if stripped.ends_with('d')
                                     || stripped.ends_with("d_netcore")
                                     || stripped
-                                        .strip_suffix(|c: char| c.is_digit(10))
+                                        .strip_suffix(|c: char| c.is_ascii_digit())
                                         .map_or(false, |fname| fname.ends_with('d'))
                                 {
                                     tracing::debug!("skipping {}", fname);
