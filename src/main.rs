@@ -252,7 +252,7 @@ fn main() -> Result<(), Error> {
             };
 
             let pb = mp.add(
-                ia::ProgressBar::with_draw_target(0, draw_target.into()).with_prefix(prefix).with_style(
+                ia::ProgressBar::with_draw_target(Some(0), draw_target.into()).with_prefix(prefix).with_style(
                     ia::ProgressStyle::default_bar()
                         .template("{spinner:.green} {prefix:.bold} [{elapsed}] {wide_bar:.green} {bytes}/{total_bytes} {msg}")
                         .unwrap()
@@ -330,7 +330,7 @@ fn load_manifest(
     args: &Args,
     dt: xwin::util::ProgressTarget,
 ) -> anyhow::Result<xwin::manifest::PackageManifest> {
-    let manifest_pb = ia::ProgressBar::with_draw_target(0, dt.into())
+    let manifest_pb = ia::ProgressBar::with_draw_target(Some(0), dt.into())
             .with_style(
             ia::ProgressStyle::default_bar()
                 .template(

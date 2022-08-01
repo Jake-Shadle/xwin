@@ -348,7 +348,7 @@ pub(crate) fn splat(
                                 if stripped.ends_with('d')
                                     || stripped.ends_with("d_netcore")
                                     || stripped
-                                        .strip_suffix(|c: char| c.is_digit(10))
+                                        .strip_suffix(|c: char| c.is_ascii_digit())
                                         .map_or(false, |fname| fname.ends_with('d'))
                                 {
                                     tracing::debug!("skipping {}", fname);
@@ -632,14 +632,15 @@ pub(crate) fn finalize_splat(
 
     let regex = regex::bytes::Regex::new(r#"#include\s+(?:"|<)([^">]+)(?:"|>)?"#).unwrap();
 
-    let pb = indicatif::ProgressBar::with_draw_target(files.len() as u64, ctx.draw_target.into())
-        .with_style(
-            indicatif::ProgressStyle::default_bar()
-                .template(
-                    "{spinner:.green} {prefix:.bold} [{elapsed}] {wide_bar:.green} {pos}/{len}",
-                )?
-                .progress_chars("█▇▆▅▄▃▂▁  "),
-        );
+    let pb =
+        indicatif::ProgressBar::with_draw_target(Some(files.len() as u64), ctx.draw_target.into())
+            .with_style(
+                indicatif::ProgressStyle::default_bar()
+                    .template(
+                        "{spinner:.green} {prefix:.bold} [{elapsed}] {wide_bar:.green} {pos}/{len}",
+                    )?
+                    .progress_chars("█▇▆▅▄▃▂▁  "),
+            );
 
     pb.set_prefix("symlinks");
     pb.set_message("🔍 includes");
