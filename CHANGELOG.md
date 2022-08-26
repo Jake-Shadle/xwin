@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- Updated dependencies, notably `indicatif` and `insta`.
+
 ## [0.2.5] - 2022-06-21
 ### Changed
 - [PR#52](https://github.com/Jake-Shadle/xwin/pull/52) updated dependencies, including openssl-src to fix various issues raised by Github security advisories.
