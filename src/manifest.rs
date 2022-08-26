@@ -13,7 +13,7 @@ pub struct Payload {
     pub url: String,
 }
 
-#[derive(Copy, Clone, Deserialize, PartialEq, Debug)]
+#[derive(Copy, Clone, Deserialize, PartialEq, Eq, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Chip {
     X86,
@@ -23,7 +23,7 @@ pub enum Chip {
     Neutral,
 }
 
-#[derive(Copy, Clone, Deserialize, PartialEq, Debug)]
+#[derive(Copy, Clone, Deserialize, PartialEq, Eq, Debug)]
 pub enum ItemKind {
     /// Unused.
     Bootstrapper,

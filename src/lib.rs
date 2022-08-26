@@ -247,7 +247,7 @@ pub struct Payload {
     pub variant: Option<Variant>,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum PayloadKind {
     CrtHeaders,
     CrtLibs,
