@@ -3,3 +3,6 @@
 .xwin-cache
 tests/xwin-test/target
 tests/xwin-test/Cargo.lock
+
+# IntelliJ cache
+.idea

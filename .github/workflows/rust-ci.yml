@@ -117,45 +117,42 @@ jobs:
       - name: cargo publish check
         run: cargo publish --dry-run
 
-  release:
-    name: Release
+  linux:
+    name: Linux Build
     needs: [deny-check]
     if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v2
+      - uses: ./.github/actions/build
         with:
-          toolchain: stable
-          override: true
           target: x86_64-unknown-linux-musl
-      - name: Install musl tools
-        run: sudo apt-get install -y musl-tools
-      - name: Checkout
-        uses: actions/checkout@v2
-      - run: cargo fetch --target x86_64-unknown-linux-musl
-      - name: Release build
-        shell: bash
-        run: |
-          cargo build --release --target x86_64-unknown-linux-musl
-      - name: Package
-        shell: bash
-        run: |
-          name=xwin
-          tag=$(git describe --tags --abbrev=0)
-          target="x86_64-unknown-linux-musl"
-          release_name="$name-$tag-$target"
-          release_tar="${release_name}.tar.gz"
-          mkdir "$release_name"
 
-          strip "target/$target/release/$name"
+  macos:
+    name: MacOS Build
+    needs: [deny-check]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: macos-12
+    strategy:
+      matrix:
+        platform:
+          - target: x86_64-apple-darwin
+          - target: aarch64-apple-darwin
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ./.github/actions/build
+        with:
+          target: ${{ matrix.platform.target }}
 
-          cp "target/$target/release/$name" "$release_name/"
-          cp README.md LICENSE-APACHE LICENSE-MIT "$release_name/"
-          tar czvf "$release_tar" "$release_name"
-
-          rm -r "$release_name"
-          echo -n "$(shasum -ba 256 "${release_tar}" | cut -d " " -f 1)" > "${release_tar}.sha256"
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    if: "startsWith(github.ref, 'refs/tags/')"
+    needs: [ macos, linux ]
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: wheels
       - name: Publish
         uses: softprops/action-gh-release@v1
         with:

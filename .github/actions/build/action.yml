@@ -1,0 +1,56 @@
+name: "Build xwin"
+
+inputs:
+  target:
+    required: true
+    type: string
+
+runs:
+  using: composite
+  steps:
+    - name: Install stable toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        target: ${{ inputs.target }}
+    - name: Install musl toos
+      if: runner.os == 'Linux'
+      run: sudo apt-get install -y musl-tools
+      shell: bash
+    - name: Checkout
+      uses: actions/checkout@v2
+    - run: cargo fetch --target ${{ inputs.target }}
+      shell: bash
+    - name: Release build
+      shell: bash
+      run: |
+        cargo build --release --target ${{ inputs.target }}
+    - name: Package
+      shell: bash
+      run: |
+        name=xwin
+        tag=$(git describe --tags --abbrev=0)
+        target="${{ inputs.target }}"
+        release_name="$name-$tag-$target"
+        release_tar="${release_name}.tar.gz"
+        mkdir "$release_name"
+
+        strip "target/$target/release/$name"
+
+        cp "target/$target/release/$name" "$release_name/"
+        cp README.md LICENSE-APACHE LICENSE-MIT "$release_name/"
+        tar czvf "$release_tar" "$release_name"
+
+        rm -r "$release_name"
+        echo -n "$(shasum -ba 256 "${release_tar}" | cut -d " " -f 1)" > "${release_tar}.sha256"
+        echo "release_tar=$release_tar" >> $GITHUB_ENV
+        ls -al
+        pwd
+    - name: Upload wheels
+      uses: actions/upload-artifact@v2
+      with:
+        name: wheels
+        path: |
+          ${{env.release_tar}}
+          ${{env.release_tar}}.sha256
