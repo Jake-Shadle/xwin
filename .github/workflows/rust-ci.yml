@@ -14,13 +14,15 @@ name: CI
 jobs:
   lint:
     name: Lint
-    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-22.04
+          - os: macos-12
+    runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
 
       # make sure all code has been formatted with rustfmt
       - name: check rustfmt
@@ -37,13 +39,10 @@ jobs:
 
   check_compiles:
     name: Verify compiles
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
       # Add the actual target we compile for in the test
       - run: rustup target add x86_64-pc-windows-msvc
       - name: symlinks
@@ -66,13 +65,10 @@ jobs:
 
   check_deterministic:
     name: Verify deterministic
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
       - run: cargo fetch
       - name: cargo test build
         run: cargo build --tests --release
@@ -81,13 +77,10 @@ jobs:
 
   check_cli:
     name: Verify CLI
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
       - run: cargo fetch
       - name: cargo test build
         run: cargo build --tests
@@ -96,9 +89,9 @@ jobs:
 
   deny-check:
     name: cargo-deny
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check
@@ -106,13 +99,10 @@ jobs:
 
   publish-check:
     name: Publish Check
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
       - run: cargo fetch
       - name: cargo publish check
         run: cargo publish --dry-run
@@ -121,29 +111,34 @@ jobs:
     name: Release
     needs: [deny-check]
     if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-musl
+          - os: macos-12
+            target: x86_64-apple-darwin
+          - os: macos-12
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.os }}
     steps:
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          target: x86_64-unknown-linux-musl
+      - uses: dtolnay/rust-toolchain@stable
       - name: Install musl tools
+        if: matrix.os == 'ubuntu-22.04'
         run: sudo apt-get install -y musl-tools
       - name: Checkout
         uses: actions/checkout@v2
-      - run: cargo fetch --target x86_64-unknown-linux-musl
+      - run: cargo fetch --target ${{ matrix.target }}
       - name: Release build
         shell: bash
         run: |
-          cargo build --release --target x86_64-unknown-linux-musl
+          cargo build --release --target ${{ matrix.target }}
       - name: Package
         shell: bash
         run: |
           name=xwin
           tag=$(git describe --tags --abbrev=0)
-          target="x86_64-unknown-linux-musl"
+          target="${{ matrix.target }}"
           release_name="$name-$tag-$target"
           release_tar="${release_name}.tar.gz"
           mkdir "$release_name"
