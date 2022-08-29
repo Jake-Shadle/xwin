@@ -32,7 +32,11 @@ See this [blog post](https://jake-shadle.github.io/xwin/) for an in depth walk-t
 
 ### From tarball
 
-You can download a prebuilt binary from the [Releases](https://github.com/Jake-Shadle/xwin/releases). Note that only `x86_64-unknown-linux-musl` builds are provided.
+You can download a prebuilt binary from the [Releases](https://github.com/Jake-Shadle/xwin/releases).
+
+* `x86_64-unknown-linux-musl`
+* `x86_64-apple-darwin`
+* `aarch64-apple-darwin`
 
 ## Usage
 

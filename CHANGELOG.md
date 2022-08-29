@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Added
+- No changes in xwin itself, but now prebuilt binaries for `apple-darwin` are supplied.
+
 ## [0.2.6] - 2022-08-26
 ### Changed
 - Updated dependencies, notably `indicatif` and `insta`.
