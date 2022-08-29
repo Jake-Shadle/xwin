@@ -123,6 +123,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
       - name: Install musl tools
         if: matrix.os == 'ubuntu-22.04'
         run: sudo apt-get install -y musl-tools
