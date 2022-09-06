@@ -101,7 +101,7 @@ impl cmp::PartialOrd for ManifestItem {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct Manifest {
     #[serde(rename = "channelItems")]
     channel_items: Vec<ManifestItem>,
@@ -157,7 +157,7 @@ pub fn get_package_manifest(
         progress,
     )?;
 
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Debug)]
     struct PkgManifest {
         packages: Vec<ManifestItem>,
     }

@@ -135,7 +135,7 @@ pub(crate) fn splat(
     };
 
     let mappings = match item.payload.kind {
-        PayloadKind::CrtHeaders => {
+        PayloadKind::CrtHeaders | PayloadKind::AtlHeaders => {
             src.push("include");
             let tree = get_tree(&src)?;
 
@@ -147,6 +147,40 @@ pub(crate) fn splat(
                 variant,
             }]
         }
+        PayloadKind::AtlLibs => {
+            src.push("lib");
+            let mut target = roots.crt.join("lib");
+
+            let spectre = (variants & Variant::Spectre as u32) != 0;
+            if spectre {
+                src.push("spectre");
+                target.push("spectre");
+            }
+
+            {
+                let arch = item
+                    .payload
+                    .target_arch
+                    .context("ATL libs didn't specify an architecture")?;
+                src.push(arch.as_ms_str());
+                target.push(if config.preserve_ms_arch_notation {
+                    arch.as_ms_str()
+                } else {
+                    arch.as_str()
+                });
+            }
+
+            let tree = get_tree(&src)?;
+
+            vec![Mapping {
+                src,
+                target,
+                tree,
+                kind,
+                variant,
+            }]
+        }
+
         PayloadKind::CrtLibs => {
             src.push("lib");
             let mut target = roots.crt.join("lib");
@@ -383,7 +417,11 @@ pub(crate) fn splat(
                             // them all for includes and add those that are referenced
                             // incorrectly, but we wait until after all the of headers
                             // have been unpacked before fixing them
-                            PayloadKind::CrtHeaders | PayloadKind::Ucrt => {}
+                            PayloadKind::CrtHeaders
+                            | PayloadKind::AtlHeaders
+                            | PayloadKind::Ucrt
+                            | PayloadKind::AtlLibs => {}
+
                             PayloadKind::SdkHeaders => {
                                 if let Some(sdk_headers) = &mut sdk_headers {
                                     let rel_target_path = sdk_headers.get_relative_path(&tar)?;
