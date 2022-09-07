@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.2.8] - 2022-09-07
 ### Added
 - [PR#59](https://github.com/Jake-Shadle/xwin/pull/59) added support for installing the Active Template Library (ATL). Thanks [@pascalkuthe](https://github.com/pascalkuthe)!
 
@@ -97,7 +98,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation if downloading, unpacking, and splatting of the CRT and Windows SDK. This first pass focused on targeting x86_64 Desktop, so targeting the Windows Store or other architectures is not guaranteed to work.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.2.7...HEAD
+[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.2.8...HEAD
+[0.2.8]: https://github.com/Jake-Shadle/xwin/compare/0.2.7...0.2.8
 [0.2.7]: https://github.com/Jake-Shadle/xwin/compare/0.2.6...0.2.7
 [0.2.6]: https://github.com/Jake-Shadle/xwin/compare/0.2.5...0.2.6
 [0.2.5]: https://github.com/Jake-Shadle/xwin/compare/0.2.4...0.2.5
