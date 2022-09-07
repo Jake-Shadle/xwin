@@ -129,11 +129,9 @@ pub struct Args {
     /// The product channel to use.
     #[clap(long, default_value = "release")]
     channel: String,
-
-    /// Weheter to include the microsoft Active Template Library (ATL) in the installation
+    /// Whether to include the Active Template Library (ATL) in the installation
     #[clap(long)]
     include_atl: bool,
-
     /// The architectures to include
     #[clap(
         long,

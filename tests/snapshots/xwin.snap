@@ -35,8 +35,8 @@ OPTIONS:
             Print help information
 
         --include-atl
-            Weheter to include the microsoft Active Template Library (ATL) in
-            the installation
+            Whether to include the Active Template Library (ATL) in the
+            installation
 
         --json
             Output log messages as json
