@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Added
+- [PR#59](https://github.com/Jake-Shadle/xwin/pull/59) added support for installing the Active Template Library (ATL). Thanks [@pascalkuthe](https://github.com/pascalkuthe)!
+
 ## [0.2.7] - 2022-08-29
 ### Added
 - No changes in xwin itself, but now prebuilt binaries for `apple-darwin` are supplied.
