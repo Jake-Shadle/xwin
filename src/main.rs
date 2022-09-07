@@ -129,6 +129,11 @@ pub struct Args {
     /// The product channel to use.
     #[clap(long, default_value = "release")]
     channel: String,
+
+    /// Weheter to include the microsoft Active Template Library (ATL) in the installation
+    #[clap(long)]
+    include_atl: bool,
+
     /// The architectures to include
     #[clap(
         long,
@@ -193,7 +198,7 @@ fn main() -> Result<(), Error> {
         .into_iter()
         .fold(0, |acc, var| acc | var as u32);
 
-    let pruned = xwin::prune_pkg_list(&pkg_manifest, arches, variants)?;
+    let pruned = xwin::prune_pkg_list(&pkg_manifest, arches, variants, args.include_atl)?;
 
     let op = match args.cmd {
         Command::List => {
@@ -227,6 +232,8 @@ fn main() -> Result<(), Error> {
         .map(|pay| {
             let prefix = match pay.kind {
                 xwin::PayloadKind::CrtHeaders => "CRT.headers".to_owned(),
+                xwin::PayloadKind::AtlHeaders => "ATL.headers".to_owned(),
+
                 xwin::PayloadKind::CrtLibs => {
                     format!(
                         "CRT.libs.{}.{}",
@@ -234,6 +241,13 @@ fn main() -> Result<(), Error> {
                         pay.variant.map(|v| v.as_str()).unwrap_or("none")
                     )
                 }
+                xwin::PayloadKind::AtlLibs => {
+                    format!(
+                        "ATL.libs.{}",
+                        pay.target_arch.map(|ta| ta.as_str()).unwrap_or("all"),
+                    )
+                }
+
                 xwin::PayloadKind::SdkHeaders => {
                     format!(
                         "SDK.headers.{}.{}",

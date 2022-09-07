@@ -18,6 +18,7 @@ fn verify_compiles() {
         &pkg_manifest,
         xwin::Arch::X86_64 as u32,
         xwin::Variant::Desktop as u32,
+        false,
     )
     .unwrap();
 

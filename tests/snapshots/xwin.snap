@@ -1,8 +1,6 @@
 ---
 source: src/main.rs
-assertion_line: 382
 expression: help_text
-
 ---
 xwin 0.0.0
 Jake Shadle <jake.shadle@embark-studios.com>
@@ -35,6 +33,10 @@ OPTIONS:
 
     -h, --help
             Print help information
+
+        --include-atl
+            Weheter to include the microsoft Active Template Library (ATL) in
+            the installation
 
         --json
             Output log messages as json

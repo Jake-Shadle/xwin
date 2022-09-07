@@ -249,6 +249,8 @@ pub struct Payload {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum PayloadKind {
+    AtlHeaders,
+    AtlLibs,
     CrtHeaders,
     CrtLibs,
     SdkHeaders,
@@ -262,13 +264,14 @@ pub fn prune_pkg_list(
     pkg_manifest: &manifest::PackageManifest,
     arches: u32,
     variants: u32,
+    include_atl: bool,
 ) -> Result<Vec<Payload>, Error> {
     // We only really need 2 core pieces from the manifest, the CRT (headers + libs)
     // and the Windows SDK
     let pkgs = &pkg_manifest.packages;
     let mut pruned = Vec::new();
 
-    get_crt(pkgs, arches, variants, &mut pruned)?;
+    get_crt(pkgs, arches, variants, &mut pruned, include_atl)?;
     get_sdk(pkgs, arches, &mut pruned)?;
 
     Ok(pruned)
@@ -279,6 +282,7 @@ fn get_crt(
     arches: u32,
     variants: u32,
     pruned: &mut Vec<Payload>,
+    include_atl: bool,
 ) -> Result<(), Error> {
     fn to_payload(mi: &manifest::ManifestItem, payload: &manifest::Payload) -> Payload {
         // These are really the only two we care about
@@ -393,6 +397,107 @@ fn get_crt(
                     } else {
                         ""
                     }
+                )
+                .unwrap();
+
+                match pkgs.get(&crt_lib_id) {
+                    Some(crt_libs) => {
+                        pruned.push(to_payload(crt_libs, &crt_libs.payloads[0]));
+                    }
+                    None => {
+                        tracing::warn!("Unable to locate '{}'", crt_lib_id);
+                    }
+                }
+            }
+        }
+        if include_atl {
+            get_atl(pkgs, arches, spectre, pruned, crt_version)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn get_atl(
+    pkgs: &BTreeMap<String, manifest::ManifestItem>,
+    arches: u32,
+    spectre: bool,
+    pruned: &mut Vec<Payload>,
+    crt_version: &str,
+) -> Result<(), Error> {
+    fn to_payload(mi: &manifest::ManifestItem, payload: &manifest::Payload) -> Payload {
+        // These are really the only two we care about
+        let kind = if mi.id.contains("Headers") {
+            PayloadKind::AtlHeaders
+        } else {
+            PayloadKind::AtlLibs
+        };
+
+        let filename = payload.file_name.to_lowercase();
+
+        // The "chip" in the manifest means "host architecture" but we never need
+        // to care about that since we only care about host agnostic artifacts, but
+        // we do need to check the name of the payload in case it targets a specific
+        // architecture only (eg libs)
+        let target_arch = [
+            ("x64", Arch::X86_64),
+            // Put this one first otherwise "arm" will match it
+            ("arm64", Arch::Aarch64),
+            ("arm", Arch::Aarch),
+            // Put this last as many names also include the host architecture :p
+            ("x86", Arch::X86),
+        ]
+        .iter()
+        .find_map(|(s, arch)| filename.contains(s).then(|| *arch));
+
+        Payload {
+            filename: if let Some(Arch::Aarch64) = target_arch {
+                payload.file_name.replace("ARM", "arm").into()
+            } else {
+                payload.file_name.clone().into()
+            },
+            sha256: payload.sha256.clone(),
+            url: payload.url.clone(),
+            size: payload.size,
+            kind,
+            target_arch,
+            variant: None,
+            install_size: (mi.payloads.len() == 1)
+                .then(|| mi)
+                .and_then(|mi| mi.install_sizes.as_ref().and_then(|is| is.target_drive)),
+        }
+    }
+
+    // The ATL headers are in the "base" package
+    // `Microsoft.VC.<ridiculous_version_numbers>.ATL.Headers.base`
+    {
+        let header_key = format!("Microsoft.VC.{}.ATL.Headers.base", crt_version);
+
+        let atl_headers = pkgs
+            .get(&header_key)
+            .with_context(|| format!("unable to find ATL headers item '{}'", header_key))?;
+
+        pruned.push(to_payload(atl_headers, &atl_headers.payloads[0]));
+    }
+
+    {
+        use std::fmt::Write;
+
+        let mut crt_lib_id = String::new();
+        for variant_spectre in [false, true] {
+            if variant_spectre && !spectre {
+                continue;
+            }
+
+            for arch in Arch::iter(arches) {
+                crt_lib_id.clear();
+
+                write!(
+                    &mut crt_lib_id,
+                    "Microsoft.VC.{}.ATL.{}{}.base",
+                    crt_version,
+                    arch.as_ms_str().to_uppercase(), // ATL is uppercased for some reason
+                    if variant_spectre { ".spectre" } else { "" }
                 )
                 .unwrap();
 
