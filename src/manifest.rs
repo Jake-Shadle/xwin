@@ -116,8 +116,8 @@ pub fn get_manifest(
     progress: indicatif::ProgressBar,
 ) -> Result<Manifest, anyhow::Error> {
     let manifest_bytes = ctx.get_and_validate(
-        format!("https://aka.ms/vs/{}/{}/channel", version, channel),
-        &format!("manifest_{}.json", version),
+        format!("https://aka.ms/vs/{version}/{channel}/channel"),
+        &format!("manifest_{version}.json"),
         None,
         progress,
     )?;

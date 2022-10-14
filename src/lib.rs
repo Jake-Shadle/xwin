@@ -181,7 +181,7 @@ impl std::str::FromStr for Variant {
             "onecore" => Self::OneCore,
             //"store" => Self::Store,
             "spectre" => Self::Spectre,
-            o => anyhow::bail!("unknown variant '{}'", o),
+            o => anyhow::bail!("unknown variant '{o}'"),
         })
     }
 }
@@ -352,11 +352,11 @@ fn get_crt(
     // The CRT headers are in the "base" package
     // `Microsoft.VC.<ridiculous_version_numbers>.CRT.Headers.base`
     {
-        let header_key = format!("Microsoft.VC.{}.CRT.Headers.base", crt_version);
+        let header_key = format!("Microsoft.VC.{crt_version}.CRT.Headers.base");
 
         let crt_headers = pkgs
             .get(&header_key)
-            .with_context(|| format!("unable to find CRT headers item '{}'", header_key))?;
+            .with_context(|| format!("unable to find CRT headers item '{header_key}'"))?;
 
         pruned.push(to_payload(crt_headers, &crt_headers.payloads[0]));
     }
@@ -380,8 +380,7 @@ fn get_crt(
 
                 write!(
                     &mut crt_lib_id,
-                    "Microsoft.VC.{}.CRT.{}.{}{}.base",
-                    crt_version,
+                    "Microsoft.VC.{crt_version}.CRT.{}.{variant}{}.base",
                     // In keeping with MS's arbitrary casing all across the VS
                     // suite, arm64 is uppercased, but only in the ids of the
                     // CRT libs because...?
@@ -390,7 +389,6 @@ fn get_crt(
                     } else {
                         arch.as_ms_str()
                     },
-                    variant,
                     // The Store variant doesn't have a spectre version
                     if spectre && variant != "Store" {
                         ".spectre"
@@ -405,7 +403,7 @@ fn get_crt(
                         pruned.push(to_payload(crt_libs, &crt_libs.payloads[0]));
                     }
                     None => {
-                        tracing::warn!("Unable to locate '{}'", crt_lib_id);
+                        tracing::warn!("Unable to locate '{crt_lib_id}'");
                     }
                 }
             }
@@ -471,11 +469,11 @@ fn get_atl(
     // The ATL headers are in the "base" package
     // `Microsoft.VC.<ridiculous_version_numbers>.ATL.Headers.base`
     {
-        let header_key = format!("Microsoft.VC.{}.ATL.Headers.base", crt_version);
+        let header_key = format!("Microsoft.VC.{crt_version}.ATL.Headers.base");
 
         let atl_headers = pkgs
             .get(&header_key)
-            .with_context(|| format!("unable to find ATL headers item '{}'", header_key))?;
+            .with_context(|| format!("unable to find ATL headers item '{header_key}'"))?;
 
         pruned.push(to_payload(atl_headers, &atl_headers.payloads[0]));
     }
