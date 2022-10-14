@@ -72,7 +72,7 @@ pub(crate) fn download(
             download_cabs(ctx, &cabs, item, contents)
         }
         Some("vsix") => Ok(PayloadContents::Vsix(contents)),
-        ext => anyhow::bail!("unknown extension {:?}", ext),
+        ext => anyhow::bail!("unknown extension {ext:?}"),
     };
 
     item.progress.finish_with_message("downloaded");
@@ -121,9 +121,8 @@ fn download_cabs(
                             (payload.filename == cab_name).then(|| {
                                 (
                                     PathBuf::from(format!(
-                                        "{}/{}",
+                                        "{}/{cab_name}",
                                         msi_filename.file_stem().unwrap(),
-                                        cab_name
                                     )),
                                     payload.sha256.clone(),
                                     payload.url.clone(),

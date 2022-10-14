@@ -170,9 +170,7 @@ impl Ctx {
 
             anyhow::ensure!(
                 chksum == expected,
-                "checksum mismatch, expected {} != actual {}",
-                expected,
-                chksum
+                "checksum mismatch, expected {expected} != actual {chksum}"
             );
         }
 
@@ -284,11 +282,11 @@ impl Ctx {
         // that might be leftover from a failed unpack
         if unpack_dir.exists() {
             std::fs::remove_dir_all(&unpack_dir)
-                .with_context(|| format!("unable to remove invalid unpack dir '{}'", unpack_dir))?;
+                .with_context(|| format!("unable to remove invalid unpack dir '{unpack_dir}'"))?;
         }
 
         std::fs::create_dir_all(&unpack_dir)
-            .with_context(|| format!("unable to create unpack dir '{}'", unpack_dir))?;
+            .with_context(|| format!("unable to create unpack dir '{unpack_dir}'"))?;
 
         Ok(Unpack::Needed(unpack_dir))
     }
@@ -303,7 +301,7 @@ impl Ctx {
         let um = serde_json::to_vec(&um)?;
 
         std::fs::write(&unpack_dir, &um)
-            .with_context(|| format!("unable to write {}", unpack_dir))?;
+            .with_context(|| format!("unable to write {unpack_dir}"))?;
         Ok(())
     }
 }

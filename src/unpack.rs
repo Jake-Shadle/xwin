@@ -75,8 +75,8 @@ fn read_unpack_dir(root: PathBuf) -> Result<FileTree, Error> {
     let mut root_tree = FileTree::new();
 
     fn read(src: PathBuf, tree: &mut FileTree) -> Result<(), Error> {
-        for entry in std::fs::read_dir(&src).with_context(|| format!("unable to read {}", src))? {
-            let entry = entry.with_context(|| format!("unable to read entry from {}", src))?;
+        for entry in std::fs::read_dir(&src).with_context(|| format!("unable to read {src}"))? {
+            let entry = entry.with_context(|| format!("unable to read entry from {src}"))?;
 
             let src_name = PathBuf::from_path_buf(entry.file_name().into()).map_err(|_pb| {
                 anyhow::anyhow!(
@@ -140,7 +140,7 @@ pub(crate) fn unpack(
             let mut tree = FileTree::new();
 
             let mut zip = zip::ZipArchive::new(std::io::Cursor::new(vsix))
-                .with_context(|| format!("invalid zip {}", pkg))?;
+                .with_context(|| format!("invalid zip {pkg}"))?;
 
             // VSIX files are just a "specially" formatted zip file, all
             // of the actual files we want are under "Contents"
@@ -179,25 +179,21 @@ pub(crate) fn unpack(
                 if let Some(parent) = fs_path.parent() {
                     if !parent.exists() {
                         std::fs::create_dir_all(parent)
-                            .with_context(|| format!("unable to create unpack dir '{}'", parent))?;
+                            .with_context(|| format!("unable to create unpack dir '{parent}'"))?;
                     }
                 }
 
                 let mut dest = std::fs::File::create(&fs_path).with_context(|| {
                     format!(
-                        "unable to create {} to decompress {} from {}",
-                        fs_path,
+                        "unable to create {fs_path} to decompress {} from {pkg}",
                         file.name(),
-                        pkg,
                     )
                 })?;
 
                 let decompressed = std::io::copy(&mut file, &mut dest).with_context(|| {
                     format!(
-                        "unable to decompress {} from {} to {}",
+                        "unable to decompress {} from {pkg} to {fs_path}",
                         file.name(),
-                        pkg,
-                        fs_path
                     )
                 })?;
 
@@ -213,7 +209,7 @@ pub(crate) fn unpack(
         }
         PayloadContents::Msi { msi, cabs } => {
             let mut msi = msi::Package::open(std::io::Cursor::new(msi))
-                .with_context(|| format!("unable to read MSI from {}", pkg))?;
+                .with_context(|| format!("unable to read MSI from {pkg}"))?;
 
             // Open source ftw https://gitlab.gnome.org/GNOME/msitools/-/blob/master/tools/msiextract.vala
 
@@ -263,13 +259,13 @@ pub(crate) fn unpack(
                         })
                     })
                     .collect::<Result<_, _>>()
-                    .with_context(|| format!("unable to read directories for {}", pkg))?;
+                    .with_context(|| format!("unable to read directories for {pkg}"))?;
 
                 directories.sort_by(|a, b| a.id.cmp(&b.id));
 
                 let components: std::collections::BTreeMap<_, _> = msi
                     .select_rows(msi::Select::table("Component"))
-                    .with_context(|| format!("MSI {} has no 'Directory' table", pkg))?
+                    .with_context(|| format!("MSI {pkg} has no 'Directory' table"))?
                     .map(|row| -> Result<_, _> {
                         // Columns:
                         // 0 - Component (name, really, id)
@@ -287,7 +283,7 @@ pub(crate) fn unpack(
                             let cur_dir = match dirs.binary_search_by(|d| d.id.as_str().cmp(id)) {
                                 Ok(i) => &dirs[i],
                                 Err(_) => {
-                                    tracing::warn!("unable to find directory {}", id);
+                                    tracing::warn!("unable to find directory {id}");
                                     return;
                                 }
                             };
@@ -332,7 +328,7 @@ pub(crate) fn unpack(
                         Ok((component_id, dir))
                     })
                     .collect::<Result<_, _>>()
-                    .with_context(|| format!("unable to read components for {}", pkg))?;
+                    .with_context(|| format!("unable to read components for {pkg}"))?;
 
                 components
             };
@@ -437,7 +433,7 @@ pub(crate) fn unpack(
                         Some(Ok(cf))
                     })
                     .collect::<Result<Vec<_>, Error>>()
-                    .with_context(|| format!("unable to read 'File' metadata for {}", pkg))?;
+                    .with_context(|| format!("unable to read 'File' metadata for {pkg}"))?;
 
                 files.sort_by(|a, b| a.sequence.cmp(&b.sequence));
 
@@ -523,7 +519,7 @@ pub(crate) fn unpack(
                         let mut cab_file = match cab.read_file(file.id.as_str()) {
                             Ok(cf) => cf,
                             Err(e) => Err(e).with_context(|| {
-                                format!("unable to read '{}' from {}", file.name, cab_path,)
+                                format!("unable to read '{}' from {cab_path}", file.name)
                             })?,
                         };
 
@@ -572,10 +568,10 @@ pub(crate) fn unpack(
         }
     };
 
-    let tree_path = format!("{}/tree.txt", output_dir);
+    let tree_path = format!("{output_dir}/tree.txt");
 
-    std::fs::write(&tree_path, format!("{:#?}", tree).as_bytes())
-        .with_context(|| format!("failed to write {}", tree_path))?;
+    std::fs::write(&tree_path, format!("{tree:#?}").as_bytes())
+        .with_context(|| format!("failed to write {tree_path}"))?;
 
     item.progress.finish_with_message("unpacked");
 

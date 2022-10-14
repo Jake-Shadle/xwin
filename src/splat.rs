@@ -58,18 +58,18 @@ pub(crate) fn prep_splat(
 
     if crt_root.exists() {
         std::fs::remove_dir_all(&crt_root)
-            .with_context(|| format!("unable to delete existing CRT directory {}", crt_root))?;
+            .with_context(|| format!("unable to delete existing CRT directory {crt_root}"))?;
     }
 
     if sdk_root.exists() {
         std::fs::remove_dir_all(&sdk_root)
-            .with_context(|| format!("unable to delete existing SDK directory {}", sdk_root))?;
+            .with_context(|| format!("unable to delete existing SDK directory {sdk_root}"))?;
     }
 
     std::fs::create_dir_all(&crt_root)
-        .with_context(|| format!("unable to create CRT directory {}", crt_root))?;
+        .with_context(|| format!("unable to create CRT directory {crt_root}"))?;
     std::fs::create_dir_all(&sdk_root)
-        .with_context(|| format!("unable to create SDK directory {}", sdk_root))?;
+        .with_context(|| format!("unable to create SDK directory {sdk_root}"))?;
 
     let src_root = ctx.work_dir.join("unpack");
 
@@ -114,7 +114,7 @@ pub(crate) fn splat(
     if !config.copy {
         src.push(".unpack");
         if let Err(e) = std::fs::remove_file(&src) {
-            tracing::warn!("Failed to remove {}: {}", src, e);
+            tracing::warn!("Failed to remove {src}: {e}");
         }
         src.pop();
     }
@@ -131,7 +131,7 @@ pub(crate) fn splat(
             .context("incorrect src subdir")?;
 
         tree.subtree(src_path)
-            .with_context(|| format!("missing expected subtree '{}'", src_path))
+            .with_context(|| format!("missing expected subtree '{src_path}'"))
     };
 
     let mappings = match item.payload.kind {
@@ -362,8 +362,7 @@ pub(crate) fn splat(
             }];
 
             while let Some(Dir { src, mut tar, tree }) = dir_stack.pop() {
-                std::fs::create_dir_all(&tar)
-                    .with_context(|| format!("unable to create {}", tar))?;
+                std::fs::create_dir_all(&tar).with_context(|| format!("unable to create {tar}"))?;
 
                 for (fname, size) in &tree.files {
                     // Even if we don't splat 100% of the source files, we still
@@ -373,7 +372,7 @@ pub(crate) fn splat(
                     let fname_str = fname.as_str();
                     if mapping.kind == PayloadKind::CrtLibs || mapping.kind == PayloadKind::Ucrt {
                         if !include_debug_symbols && fname.ends_with(".pdb") {
-                            tracing::debug!("skipping {}", fname);
+                            tracing::debug!("skipping {fname}");
                             continue;
                         }
 
@@ -385,7 +384,7 @@ pub(crate) fn splat(
                                         .strip_suffix(|c: char| c.is_ascii_digit())
                                         .map_or(false, |fname| fname.ends_with('d'))
                                 {
-                                    tracing::debug!("skipping {}", fname);
+                                    tracing::debug!("skipping {fname}");
                                     continue;
                                 }
                             }
@@ -398,10 +397,10 @@ pub(crate) fn splat(
 
                     if config.copy {
                         std::fs::copy(&src_path, &tar)
-                            .with_context(|| format!("failed to copy {} to {}", src_path, tar))?;
+                            .with_context(|| format!("failed to copy {src_path} to {tar}"))?;
                     } else {
                         std::fs::rename(&src_path, &tar)
-                            .with_context(|| format!("failed to move {} to {}", src_path, tar))?;
+                            .with_context(|| format!("failed to move {src_path} to {tar}"))?;
                     }
 
                     let kind = mapping.kind;
@@ -601,7 +600,7 @@ pub(crate) fn splat(
 #[inline]
 fn symlink(original: &str, link: &Path) -> Result<(), Error> {
     std::os::unix::fs::symlink(original, link)
-        .with_context(|| format!("unable to symlink from {} to {}", link, original))
+        .with_context(|| format!("unable to symlink from {link} to {original}"))
 }
 
 #[cfg(windows)]
@@ -636,7 +635,7 @@ pub(crate) fn finalize_splat(
             );
 
             if let Some(existing) = existing {
-                panic!("already have {} matching {}", existing.path, v);
+                panic!("already have {} matching {v}", existing.path);
             }
         }
     }
