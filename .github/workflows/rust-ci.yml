@@ -120,16 +120,18 @@ jobs:
             target: x86_64-apple-darwin
           - os: macos-12
             target: aarch64-apple-darwin
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
     steps:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
       - name: Install musl tools
-        if: matrix.os == 'ubuntu-22.04'
+        if: matrix.target == 'x86_64-unknown-linux-musl'
         run: sudo apt-get install -y musl-tools
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - run: cargo fetch --target ${{ matrix.target }}
       - name: Release build
         shell: bash
@@ -145,14 +147,21 @@ jobs:
           release_tar="${release_name}.tar.gz"
           mkdir "$release_name"
 
-          strip "target/$target/release/$name"
+          if [ "${{ matrix.target }}" != "x86_64-pc-windows-msvc" ]; then
+            strip "target/$target/release/$name"
+          fi
 
           cp "target/$target/release/$name" "$release_name/"
           cp README.md LICENSE-APACHE LICENSE-MIT "$release_name/"
           tar czvf "$release_tar" "$release_name"
 
           rm -r "$release_name"
-          echo -n "$(shasum -ba 256 "${release_tar}" | cut -d " " -f 1)" > "${release_tar}.sha256"
+
+          if [ "${{ matrix.target }}" == "x86_64-pc-windows-msvc" ]; then
+            echo "(Get-FileHash \"${release_tar}\" -Algorithm SHA256).Hash | Out-File -Encoding ASCII -NoNewline \"${release_tar}.sha256\"" | pwsh -c -
+          else
+            echo -n "$(shasum -ba 256 "${release_tar}" | cut -d " " -f 1)" > "${release_tar}.sha256"
+          fi
       - name: Publish
         uses: softprops/action-gh-release@v1
         with:
