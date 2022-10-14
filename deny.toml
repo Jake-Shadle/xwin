@@ -25,7 +25,7 @@ exceptions = [
   # ring uses code from multiple libraries but all with permissive licenses
   # https://tldrlegal.com/license/openssl-license-(openssl)
   { allow = ["ISC", "MIT", "OpenSSL"], name = "ring" },
-  { allow = ["Unicode-DFS-2016"], name = "unicode-ident" }
+  { allow = ["Unicode-DFS-2016"], name = "unicode-ident" },
 ]
 
 [[licenses.clarify]]
@@ -48,7 +48,7 @@ license-files = [{ path = "COPYRIGHT", hash = 0x39f8ad31 }]
 [bans]
 multiple-versions = "deny"
 deny = []
-skip = []
+skip = [{ name = "terminal_size", version = "=0.1.17" }]
 
 [sources]
 unknown-registry = "deny"
