@@ -407,7 +407,6 @@ mod test {
 
     fn snapshot_test_cli_command(app: Command, cmd_name: String, desc: &SnapshotTestDesc) {
         let mut app = app
-            .clone()
             // we do not want ASCII colors in our snapshot test output
             .color(ColorChoice::Never)
             // override versions to not have to update test when changing versions
