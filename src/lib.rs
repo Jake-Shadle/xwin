@@ -299,7 +299,7 @@ fn get_crt(
             ("Store", Variant::Store),
         ]
         .iter()
-        .find_map(|(s, var)| payload.file_name.contains(s).then(|| *var));
+        .find_map(|(s, var)| payload.file_name.contains(s).then_some(*var));
 
         // The "chip" in the manifest means "host architecture" but we never need
         // to care about that since we only care about host agnostic artifacts, but
@@ -315,7 +315,7 @@ fn get_crt(
             ("x86", Arch::X86),
         ]
         .iter()
-        .find_map(|(s, arch)| payload.file_name.contains(s).then(|| *arch));
+        .find_map(|(s, arch)| payload.file_name.contains(s).then_some(*arch));
 
         Payload {
             filename: if let Some(Arch::Aarch64) = target_arch {
@@ -330,7 +330,7 @@ fn get_crt(
             target_arch,
             variant,
             install_size: (mi.payloads.len() == 1)
-                .then(|| mi)
+                .then_some(mi)
                 .and_then(|mi| mi.install_sizes.as_ref().and_then(|is| is.target_drive)),
         }
     }
@@ -448,7 +448,7 @@ fn get_atl(
             ("x86", Arch::X86),
         ]
         .iter()
-        .find_map(|(s, arch)| filename.contains(s).then(|| *arch));
+        .find_map(|(s, arch)| filename.contains(s).then_some(*arch));
 
         Payload {
             filename: if let Some(Arch::Aarch64) = target_arch {
@@ -463,7 +463,7 @@ fn get_atl(
             target_arch,
             variant: None,
             install_size: (mi.payloads.len() == 1)
-                .then(|| mi)
+                .then_some(mi)
                 .and_then(|mi| mi.install_sizes.as_ref().and_then(|is| is.target_drive)),
         }
     }

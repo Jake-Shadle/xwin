@@ -52,7 +52,7 @@ serde = { version = "1.0", features = ["derive"] }
 # JSON deserialization
 serde_json = "1.0"
 # Argument parsing
-clap = { version = "3.1", features = ["derive", "env", "wrap_help"] }
+clap = { version = "4.0", features = ["derive", "env", "wrap_help"] }
 # Easy management of temp files
 tempfile = "3.1"
 # Tracing logs
