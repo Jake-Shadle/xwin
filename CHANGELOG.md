@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Added
+- [PR#62](https://github.com/Jake-Shadle/xwin/pull/62) added release builds for Windows, closing [#58](https://github.com/Jake-Shadle/xwin/issues/58).
+
+### Changed
+- [PR#61](https://github.com/Jake-Shadle/xwin/pull/61) updated clap to 4.0. Thanks [@messense](https://github.com/messense)!
+
 ## [0.2.8] - 2022-09-07
 ### Added
 - [PR#59](https://github.com/Jake-Shadle/xwin/pull/59) added support for installing the Active Template Library (ATL). Thanks [@pascalkuthe](https://github.com/pascalkuthe)!
