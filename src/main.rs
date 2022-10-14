@@ -1,5 +1,6 @@
 use anyhow::{Context as _, Error};
 use camino::Utf8PathBuf as PathBuf;
+use clap::builder::{PossibleValuesParser, TypedValueParser as _};
 use clap::{Parser, Subcommand};
 use indicatif as ia;
 use tracing_subscriber::filter::LevelFilter;
@@ -44,11 +45,11 @@ pub enum Command {
     Splat {
         /// The MSVCRT includes (non-redistributable) debug versions of the
         /// various libs that are generally uninteresting to keep for most usage
-        #[clap(long)]
+        #[arg(long)]
         include_debug_libs: bool,
         /// The MSVCRT includes PDB (debug symbols) files for several of the
         /// libraries that are generally uninteresting to keep for most usage
-        #[clap(long)]
+        #[arg(long)]
         include_debug_symbols: bool,
         /// By default, symlinks are added to both the CRT and WindowsSDK to
         /// address casing issues in general usage. For example, if you are
@@ -57,27 +58,27 @@ pub enum Command {
         /// is `Windows.h`. This also applies even if the C/C++ you are compiling
         /// uses correct casing for all CRT/SDK includes, as the internal headers
         /// also use incorrect casing in most cases.
-        #[clap(long)]
+        #[arg(long)]
         disable_symlinks: bool,
         /// By default, we convert the MS specific `x64`, `arm`, and `arm64`
         /// target architectures to the more canonical `x86_64`, `aarch`, and
         /// `aarch64` of LLVM etc when creating directories/names. Passing this
         /// flag will preserve the MS names for those targets.
-        #[clap(long)]
+        #[arg(long)]
         preserve_ms_arch_notation: bool,
         /// The root output directory. Defaults to `./.xwin-cache/splat` if not
         /// specified.
-        #[clap(long)]
+        #[arg(long)]
         output: Option<PathBuf>,
         /// Copies files from the unpack directory to the splat directory instead
         /// of moving them, which preserves the original unpack directories but
         /// increases overall time and disk usage
-        #[clap(long)]
+        #[arg(long)]
         copy: bool,
         // Splits the CRT and SDK into architecture and variant specific
         // directories. The shared headers in the CRT and SDK are duplicated
         // for each output so that each combination is self-contained.
-        // #[clap(long)]
+        // #[arg(long)]
         // isolated: bool,
     },
 }
@@ -92,63 +93,62 @@ fn parse_level(s: &str) -> Result<LevelFilter, Error> {
 }
 
 #[derive(Parser)]
-#[clap(author, version, about, long_about = None)]
+#[command(author, version, about, long_about = None)]
 pub struct Args {
     /// Doesn't display the prompt to accept the license
-    #[clap(long, env = "XWIN_ACCEPT_LICENSE")]
+    #[arg(long, env = "XWIN_ACCEPT_LICENSE")]
     accept_license: bool,
     /// The log level for messages, only log messages at or above the level will be emitted.
-    #[clap(
+    #[arg(
         short = 'L',
         long = "log-level",
         default_value = "info",
-        parse(try_from_str = parse_level),
-        possible_values(LOG_LEVELS),
+        value_parser = PossibleValuesParser::new(LOG_LEVELS).map(|l| parse_level(&l).unwrap()),
     )]
     level: LevelFilter,
     /// Output log messages as json
-    #[clap(long)]
+    #[arg(long)]
     json: bool,
     /// If set, will use a temporary directory for all files used for creating
     /// the archive and deleted upon exit, otherwise, all downloaded files
     /// are kept in the `--cache-dir` and won't be retrieved again
-    #[clap(long)]
+    #[arg(long)]
     temp: bool,
     /// Specifies the cache directory used to persist downloaded items to disk.
     /// Defaults to `./.xwin-cache` if not specified.
-    #[clap(long)]
+    #[arg(long)]
     cache_dir: Option<PathBuf>,
     /// Specifies a VS manifest to use from a file, rather than downloading it
     /// from the Microsoft site.
-    #[clap(long, conflicts_with_all = &["manifest-version", "channel"])]
+    #[arg(long, conflicts_with_all = &["manifest-version", "channel"])]
     manifest: Option<PathBuf>,
     /// The version to retrieve, can either be a major version of 15 or 16, or
     /// a "<major>.<minor>" version.
-    #[clap(long, default_value = "16")]
+    #[arg(long, default_value = "16")]
     manifest_version: String,
     /// The product channel to use.
-    #[clap(long, default_value = "release")]
+    #[arg(long, default_value = "release")]
     channel: String,
     /// Whether to include the Active Template Library (ATL) in the installation
-    #[clap(long)]
+    #[arg(long)]
     include_atl: bool,
     /// The architectures to include
-    #[clap(
+    #[arg(
         long,
-        possible_values(ARCHES),
-        use_value_delimiter = true,
-        default_value = "x86_64"
+        value_parser = PossibleValuesParser::new(ARCHES).map(|s| s.parse::<xwin::Arch>().unwrap()),
+        value_delimiter = ',',
+        default_values_t = vec![xwin::Arch::X86_64],
     )]
     arch: Vec<xwin::Arch>,
     /// The variants to include
-    #[clap(
+    #[arg(
         long,
-        possible_values(VARIANTS),
-        use_value_delimiter = true,
-        default_value = "desktop"
+        value_parser = PossibleValuesParser::new(VARIANTS).map(|s| s.parse::<xwin::Variant>().unwrap()),
+        value_delimiter = ',',
+        default_values_t = vec![xwin::Variant::Desktop],
     )]
     variant: Vec<xwin::Variant>,
-    #[clap(subcommand)]
+    #[command(subcommand)]
     cmd: Command,
 }
 
@@ -405,7 +405,7 @@ mod test {
         pub line: u32,
     }
 
-    fn snapshot_test_cli_command(app: Command<'_>, cmd_name: String, desc: &SnapshotTestDesc) {
+    fn snapshot_test_cli_command(app: Command, cmd_name: String, desc: &SnapshotTestDesc) {
         let mut app = app
             .clone()
             // we do not want ASCII colors in our snapshot test output
@@ -418,7 +418,7 @@ mod test {
         // don't show current env vars as that will make snapshot test output diff depending on environment run in
         let arg_names = app
             .get_arguments()
-            .map(|a| a.get_id())
+            .map(|a| a.get_id().clone())
             .filter(|a| *a != "version" && *a != "help")
             .collect::<Vec<_>>();
         for arg_name in arg_names {
