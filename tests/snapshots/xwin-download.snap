@@ -1,20 +1,16 @@
 ---
 source: src/main.rs
-assertion_line: 382
 expression: help_text
-
 ---
-download 0.0.0
 Downloads all the selected packages that aren't already present in the download
 cache
 
-USAGE:
-    download
+Usage: download
 
-OPTIONS:
-    -h, --help
-            Print help information
+Options:
+  -h, --help
+          Print help information
 
-    -V, --version
-            Print version information
+  -V, --version
+          Print version information
 

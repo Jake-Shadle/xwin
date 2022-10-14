@@ -120,7 +120,7 @@ pub struct Args {
     cache_dir: Option<PathBuf>,
     /// Specifies a VS manifest to use from a file, rather than downloading it
     /// from the Microsoft site.
-    #[arg(long, conflicts_with_all = &["manifest-version", "channel"])]
+    #[arg(long, conflicts_with_all = &["manifest_version", "channel"])]
     manifest: Option<PathBuf>,
     /// The version to retrieve, can either be a major version of 15 or 16, or
     /// a "<major>.<minor>" version.

@@ -1,23 +1,19 @@
 ---
 source: src/main.rs
-assertion_line: 382
 expression: help_text
-
 ---
-list 0.0.0
 Displays a summary of the packages that would be downloaded.
 
 Note that this is not a full list as the SDK uses MSI files for many packages,
 so they would need to be downloaded and inspected to determine which CAB files
 must also be downloaded to get the content needed.
 
-USAGE:
-    list
+Usage: list
 
-OPTIONS:
-    -h, --help
-            Print help information
+Options:
+  -h, --help
+          Print help information (use `-h` for a summary)
 
-    -V, --version
-            Print version information
+  -V, --version
+          Print version information
 
