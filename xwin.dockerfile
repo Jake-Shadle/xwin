@@ -47,12 +47,12 @@ RUN set -eux; \
 RUN rustup target add x86_64-pc-windows-msvc
 
 RUN set -eux; \
-    xwin_version="0.1.6"; \
+    xwin_version="0.2.9"; \
     xwin_prefix="xwin-$xwin_version-x86_64-unknown-linux-musl"; \
     # Install xwin to cargo/bin via github release. Note you could also just use `cargo install xwin`.
     curl --fail -L https://github.com/Jake-Shadle/xwin/releases/download/$xwin_version/$xwin_prefix.tar.gz | tar -xzv -C /usr/local/cargo/bin --strip-components=1 $xwin_prefix/xwin; \
     # Splat the CRT and SDK files to /xwin/crt and /xwin/sdk respectively
-    xwin --accept-license 1 splat --output /xwin; \
+    xwin --accept-license splat --output /xwin; \
     # Remove unneeded files to reduce image size
     rm -rf .xwin-cache /usr/local/cargo/bin/xwin;
 
