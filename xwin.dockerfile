@@ -36,9 +36,10 @@ RUN set -eux; \
     llvm-lib -v; \
     clang-cl -v; \
     lld-link --version; \
-    # Use clang instead of gcc when compiling binaries targeting the host (eg proc macros, build files)
+    # Use clang instead of gcc when compiling and linking binaries targeting the host (eg proc macros, build files)
     update-alternatives --install /usr/bin/cc cc /usr/bin/clang 100; \
     update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++ 100; \
+    update-alternatives --install /usr/bin/ld ld /usr/bin/ld.lld 100; \
     apt-get remove -y --auto-remove; \
     rm -rf /var/lib/apt/lists/*;
 
