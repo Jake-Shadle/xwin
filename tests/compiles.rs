@@ -58,7 +58,7 @@ fn verify_compiles() {
     }
 
     let mut cmd = std::process::Command::new("cargo");
-    cmd.args(&[
+    cmd.args([
         "build",
         "--target",
         "x86_64-pc-windows-msvc",
@@ -92,7 +92,7 @@ fn verify_compiles() {
     std::fs::remove_dir_all("tests/xwin-test/target").expect("failed to remove target dir");
 
     let mut cmd = std::process::Command::new("cargo");
-    cmd.args(&[
+    cmd.args([
         "build",
         "--target",
         "x86_64-pc-windows-msvc",
