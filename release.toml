@@ -7,4 +7,5 @@ pre-release-replacements = [
   { file = "CHANGELOG.md", search = "ReleaseDate", replace = "{{date}}" },
   { file = "CHANGELOG.md", search = "<!-- next-header -->", replace = "<!-- next-header -->\n## [Unreleased] - ReleaseDate" },
   { file = "CHANGELOG.md", search = "<!-- next-url -->", replace = "<!-- next-url -->\n[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/{{tag_name}}...HEAD" },
+  { file = "xwin.dockerfile", search = "xwin_version=\"\\d+\\.\\d+\\.\\d+\";", replace = "xwin_version=\"{{version}}\";" },
 ]
