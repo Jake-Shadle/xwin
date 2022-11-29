@@ -339,15 +339,17 @@ fn get_crt(
         .get("Microsoft.VisualStudio.Product.BuildTools")
         .context("unable to find root BuildTools item")?;
 
-    let crt_version = build_tools
+    let crt_version_rs_versions = build_tools
         .dependencies
         .keys()
         .filter_map(|key| {
             key.strip_prefix("Microsoft.VisualStudio.Component.VC.")
                 .and_then(|s| s.strip_suffix(".x86.x64"))
+                .and_then(versions::Version::new)
         })
-        .last()
+        .max()
         .context("unable to find latest CRT version")?;
+    let crt_version = &crt_version_rs_versions.to_string();
 
     // The CRT headers are in the "base" package
     // `Microsoft.VC.<ridiculous_version_numbers>.CRT.Headers.base`
@@ -519,11 +521,17 @@ fn get_sdk(
     arches: u32,
     pruned: &mut Vec<Payload>,
 ) -> Result<(), Error> {
-    let sdk = pkgs
-        .values()
-        .filter(|mi| mi.id.starts_with("Win10SDK_10."))
+    let sdk_version_rs_versions = pkgs
+        .keys()
+        .filter_map(|key| {
+            key.strip_prefix("Win10SDK_")
+                .and_then(versions::Version::new)
+        })
         .max()
         .context("unable to find latest Win10SDK version")?;
+    let sdk = pkgs
+        .get(&format!("Win10SDK_{sdk_version_rs_versions}"))
+        .unwrap();
 
     // So. There are multiple SDK Desktop Headers, one per architecture. However,
     // all of the non-x86 ones include either 0 or few files, with x86 containing
