@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.2.10] - 2022-11-30
 ### Fixed
 - [PR#67](https://github.com/Jake-Shadle/xwin/pull/67) fixed an issue where incorrect packages could be selected due to using string ordering on strings that could both be version strings and regular non-version strings. Thanks [@mite-user](https://github.com/mite-user)!
 
@@ -108,7 +109,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation if downloading, unpacking, and splatting of the CRT and Windows SDK. This first pass focused on targeting x86_64 Desktop, so targeting the Windows Store or other architectures is not guaranteed to work.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.2.9...HEAD
+[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.2.10...HEAD
+[0.2.10]: https://github.com/Jake-Shadle/xwin/compare/0.2.9...0.2.10
 [0.2.9]: https://github.com/Jake-Shadle/xwin/compare/0.2.8...0.2.9
 [0.2.8]: https://github.com/Jake-Shadle/xwin/compare/0.2.7...0.2.8
 [0.2.7]: https://github.com/Jake-Shadle/xwin/compare/0.2.6...0.2.7
