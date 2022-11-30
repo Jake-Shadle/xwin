@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#67](https://github.com/Jake-Shadle/xwin/pull/67) fixed an issue where incorrect packages could be selected due to using string ordering on strings that could both be version strings and regular non-version strings. Thanks [@mite-user](https://github.com/mite-user)!
+
 ## [0.2.9] - 2022-10-14
 ### Added
 - [PR#62](https://github.com/Jake-Shadle/xwin/pull/62) added release builds for Windows, closing [#58](https://github.com/Jake-Shadle/xwin/issues/58).
