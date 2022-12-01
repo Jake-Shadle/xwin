@@ -122,8 +122,7 @@ pub struct Args {
     /// from the Microsoft site.
     #[arg(long, conflicts_with_all = &["manifest_version", "channel"])]
     manifest: Option<PathBuf>,
-    /// The version to retrieve, can either be a major version of 15 or 16, or
-    /// a "<major>.<minor>" version.
+    /// The manifest version to retrieve
     #[arg(long, default_value = "16")]
     manifest_version: String,
     /// The product channel to use.
