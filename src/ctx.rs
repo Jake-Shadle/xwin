@@ -1,4 +1,5 @@
 use crate::{
+    splat::SdkHeaders,
     util::{ProgressTarget, Sha256},
     Path, PathBuf, WorkItem,
 };
@@ -204,10 +205,12 @@ impl Ctx {
         };
 
         let mut results = Vec::new();
+        let crt_ft = parking_lot::Mutex::new(None);
+        let atl_ft = parking_lot::Mutex::new(None);
 
         payloads
             .into_par_iter()
-            .map(|wi| -> Result<Option<crate::splat::SdkHeaders>, Error> {
+            .map(|wi| -> Result<Option<SdkHeaders>, Error> {
                 let payload_contents =
                     crate::download::download(self.clone(), packages.clone(), &wi)?;
 
@@ -226,7 +229,7 @@ impl Ctx {
                         config,
                         splat_roots.as_ref().unwrap(),
                         &wi,
-                        ft,
+                        &ft,
                         arches,
                         variants,
                     )
@@ -234,6 +237,12 @@ impl Ctx {
                 } else {
                     None
                 };
+
+                match wi.payload.kind {
+                    crate::PayloadKind::CrtHeaders => *crt_ft.lock() = Some(ft),
+                    crate::PayloadKind::AtlHeaders => *atl_ft.lock() = Some(ft),
+                    _ => {}
+                }
 
                 Ok(sdk_headers)
             })
@@ -244,7 +253,10 @@ impl Ctx {
 
         if let Some(roots) = splat_roots {
             if enable_symlinks {
-                crate::splat::finalize_splat(&self, &roots, sdk_headers)?;
+                let crt_ft = crt_ft.lock().take();
+                let atl_ft = atl_ft.lock().take();
+
+                crate::splat::finalize_splat(&self, &roots, sdk_headers, crt_ft, atl_ft)?;
             }
         }
 
