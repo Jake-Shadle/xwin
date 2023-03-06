@@ -375,18 +375,19 @@ pub(crate) fn splat(
                     }
 
                     let fname_str = fname.as_str();
-                    if mapping.kind == PayloadKind::CrtLibs || mapping.kind == PayloadKind::Ucrt {
-                        if !include_debug_libs {
-                            if let Some(stripped) = fname_str.strip_suffix(".lib") {
-                                if stripped.ends_with('d')
-                                    || stripped.ends_with("d_netcore")
-                                    || stripped
-                                        .strip_suffix(|c: char| c.is_ascii_digit())
-                                        .map_or(false, |fname| fname.ends_with('d'))
-                                {
-                                    tracing::debug!("skipping {fname}");
-                                    continue;
-                                }
+                    if !include_debug_libs
+                        && (mapping.kind == PayloadKind::CrtLibs
+                            || mapping.kind == PayloadKind::Ucrt)
+                    {
+                        if let Some(stripped) = fname_str.strip_suffix(".lib") {
+                            if stripped.ends_with('d')
+                                || stripped.ends_with("d_netcore")
+                                || stripped
+                                    .strip_suffix(|c: char| c.is_ascii_digit())
+                                    .map_or(false, |fname| fname.ends_with('d'))
+                            {
+                                tracing::debug!("skipping {fname}");
+                                continue;
                             }
                         }
                     }

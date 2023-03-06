@@ -312,8 +312,7 @@ impl Ctx {
         unpack_dir.push(".unpack");
         let um = serde_json::to_vec(&um)?;
 
-        std::fs::write(&unpack_dir, &um)
-            .with_context(|| format!("unable to write {unpack_dir}"))?;
+        std::fs::write(&unpack_dir, um).with_context(|| format!("unable to write {unpack_dir}"))?;
         Ok(())
     }
 }

@@ -142,7 +142,7 @@ fn download_cabs(
         .map(
             |(cab_name, chksum, url, sequence)| -> Result<CabContents, Error> {
                 let cab_contents =
-                    ctx.get_and_validate(&url, &cab_name, Some(chksum), msi.progress.clone())?;
+                    ctx.get_and_validate(url, &cab_name, Some(chksum), msi.progress.clone())?;
                 Ok(CabContents {
                     path: cab_name,
                     content: cab_contents,
