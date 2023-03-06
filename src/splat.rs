@@ -369,13 +369,13 @@ pub(crate) fn splat(
                     // want to show that we processed them all
                     item.progress.inc(*size);
 
+                    if !include_debug_symbols && fname.extension() == Some("pdb") {
+                        tracing::debug!("skipping {fname}");
+                        continue;
+                    }
+
                     let fname_str = fname.as_str();
                     if mapping.kind == PayloadKind::CrtLibs || mapping.kind == PayloadKind::Ucrt {
-                        if !include_debug_symbols && fname.ends_with(".pdb") {
-                            tracing::debug!("skipping {fname}");
-                            continue;
-                        }
-
                         if !include_debug_libs {
                             if let Some(stripped) = fname_str.strip_suffix(".lib") {
                                 if stripped.ends_with('d')
