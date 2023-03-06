@@ -11,14 +11,7 @@ ignore = []
 
 [licenses]
 unlicensed = "deny"
-allow = [
-  "MIT",
-  "Apache-2.0",
-  "ISC",
-  # This is not really a license for source code, but the encoding* crates
-  # pulled in by msi all use it for some reason
-  "CC0-1.0",
-]
+allow = ["MIT", "Apache-2.0", "BSD-3-Clause", "ISC"]
 copyleft = "deny"
 exceptions = [
   { allow = ["MPL-2.0"], name = "webpki-roots" },
@@ -40,15 +33,10 @@ name = "ring"
 expression = "ISC AND MIT AND OpenSSL"
 license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
 
-[[licenses.clarify]]
-name = "encoding_rs"
-expression = "(Apache-2.0 OR MIT) AND BSD-3-Clause"
-license-files = [{ path = "COPYRIGHT", hash = 0x39f8ad31 }]
-
 [bans]
 multiple-versions = "deny"
 deny = []
-skip = [{ name = "terminal_size", version = "=0.1.17" }]
+skip = []
 
 [sources]
 unknown-registry = "deny"
