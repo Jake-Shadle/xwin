@@ -95,7 +95,7 @@ pub(crate) fn splat(
     config: &SplatConfig,
     roots: &SplatRoots,
     item: &crate::WorkItem,
-    tree: crate::unpack::FileTree,
+    tree: &crate::unpack::FileTree,
     arches: u32,
     variants: u32,
 ) -> Result<Option<SdkHeaders>, Error> {
@@ -369,24 +369,25 @@ pub(crate) fn splat(
                     // want to show that we processed them all
                     item.progress.inc(*size);
 
-                    let fname_str = fname.as_str();
-                    if mapping.kind == PayloadKind::CrtLibs || mapping.kind == PayloadKind::Ucrt {
-                        if !include_debug_symbols && fname.ends_with(".pdb") {
-                            tracing::debug!("skipping {fname}");
-                            continue;
-                        }
+                    if !include_debug_symbols && fname.extension() == Some("pdb") {
+                        tracing::debug!("skipping {fname}");
+                        continue;
+                    }
 
-                        if !include_debug_libs {
-                            if let Some(stripped) = fname_str.strip_suffix(".lib") {
-                                if stripped.ends_with('d')
-                                    || stripped.ends_with("d_netcore")
-                                    || stripped
-                                        .strip_suffix(|c: char| c.is_ascii_digit())
-                                        .map_or(false, |fname| fname.ends_with('d'))
-                                {
-                                    tracing::debug!("skipping {fname}");
-                                    continue;
-                                }
+                    let fname_str = fname.as_str();
+                    if !include_debug_libs
+                        && (mapping.kind == PayloadKind::CrtLibs
+                            || mapping.kind == PayloadKind::Ucrt)
+                    {
+                        if let Some(stripped) = fname_str.strip_suffix(".lib") {
+                            if stripped.ends_with('d')
+                                || stripped.ends_with("d_netcore")
+                                || stripped
+                                    .strip_suffix(|c: char| c.is_ascii_digit())
+                                    .map_or(false, |fname| fname.ends_with('d'))
+                            {
+                                tracing::debug!("skipping {fname}");
+                                continue;
                             }
                         }
                     }
@@ -612,6 +613,8 @@ pub(crate) fn finalize_splat(
     ctx: &Ctx,
     roots: &SplatRoots,
     sdk_headers: Vec<SdkHeaders>,
+    crt_headers: Option<crate::unpack::FileTree>,
+    atl_headers: Option<crate::unpack::FileTree>,
 ) -> Result<(), Error> {
     let mut files: std::collections::HashMap<
         _,
@@ -640,7 +643,8 @@ pub(crate) fn finalize_splat(
         }
     }
 
-    let mut includes: std::collections::HashSet<
+    let mut includes: std::collections::HashMap<
+        _,
         _,
         std::hash::BuildHasherDefault<twox_hash::XxHash64>,
     > = Default::default();
@@ -663,7 +667,7 @@ pub(crate) fn finalize_splat(
                 }
 
                 rp.contains(|c: char| c.is_ascii_uppercase())
-                    .then(|| PathBuf::from(rp.to_ascii_lowercase()))
+                    .then(|| (PathBuf::from(rp.to_ascii_lowercase()), true))
             })
     }));
 
@@ -680,7 +684,7 @@ pub(crate) fn finalize_splat(
             );
 
     pb.set_prefix("symlinks");
-    pb.set_message("🔍 includes");
+    pb.set_message("🔍 SDK includes");
 
     // Scan all of the files in the include directory for includes so that
     // we can add symlinks to at least make the SDK headers internally consistent
@@ -701,17 +705,71 @@ pub(crate) fn finalize_splat(
             // use incorrect `\` path separators, this is hopefully not an issue
             // since no one cares about that target? But if it is a problem
             // we'll need to actually modify the include to fix the path. :-/
-            if !includes.contains(Path::new(rel_path)) {
-                includes.insert(PathBuf::from(rel_path));
+            if !includes.contains_key(Path::new(rel_path)) {
+                includes.insert(PathBuf::from(rel_path), true);
             }
         }
 
         pb.inc(1);
     }
 
+    if let Some(crt) = crt_headers
+        .as_ref()
+        .and_then(|crt| crt.subtree(Path::new("include")))
+    {
+        pb.set_message("🔍 CRT includes");
+        let cr = roots.crt.join("include");
+
+        for (path, _) in &crt.files {
+            // Of course, there are files with non-utf8 encoding :p
+            let path = cr.join(path);
+            let contents =
+                std::fs::read(&path).with_context(|| format!("unable to read CRT {path}"))?;
+
+            for caps in regex.captures_iter(&contents) {
+                let rel_path = std::str::from_utf8(&caps[1]).with_context(|| {
+                    format!("{path} contained an include with non-utf8 characters")
+                })?;
+
+                if !includes.contains_key(Path::new(rel_path)) {
+                    includes.insert(PathBuf::from(rel_path), false);
+                }
+            }
+
+            pb.inc(1);
+        }
+    }
+
+    if let Some(atl) = atl_headers
+        .as_ref()
+        .and_then(|atl| atl.subtree(Path::new("include")))
+    {
+        pb.set_message("🔍 ATL includes");
+        let cr = roots.crt.join("include");
+
+        for (path, _) in &atl.files {
+            // Of course, there are files with non-utf8 encoding :p
+            let path = cr.join(path);
+            let contents =
+                std::fs::read(&path).with_context(|| format!("unable to read ATL {path}"))?;
+
+            for caps in regex.captures_iter(&contents) {
+                let rel_path = std::str::from_utf8(&caps[1]).with_context(|| {
+                    format!("{path} contained an include with non-utf8 characters")
+                })?;
+
+                if !includes.contains_key(Path::new(rel_path)) {
+                    includes.insert(PathBuf::from(rel_path), false);
+                }
+            }
+
+            pb.inc(1);
+        }
+    }
+
     pb.finish();
 
-    for include in includes {
+    for (include, is_sdk) in includes {
         let lower_hash = calc_lower_hash(include.as_str());
 
         match files.get(&lower_hash) {
@@ -725,10 +783,9 @@ pub(crate) fn finalize_splat(
                 _ => {}
             },
             None => {
-                tracing::debug!(
-                    "SDK include for '{}' was not found in the SDK headers",
-                    include
-                );
+                if is_sdk {
+                    tracing::debug!("SDK include for '{include}' was not found in the SDK headers");
+                }
             }
         }
     }

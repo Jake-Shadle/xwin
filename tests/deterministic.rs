@@ -22,7 +22,7 @@ fn verify_deterministic() {
         &pkg_manifest,
         xwin::Arch::X86_64 as u32,
         xwin::Variant::Desktop as u32,
-        false,
+        true,
     )
     .unwrap();
 
@@ -150,6 +150,6 @@ fn verify_deterministic() {
         let expected =
             std::fs::read_to_string("tests/expected.txt").expect("failed to read expected.txt");
 
-        similar_asserts::assert_eq!(actual, expected);
+        similar_asserts::assert_eq!(expected, actual);
     }
 }

@@ -41,8 +41,8 @@ Options:
           increases overall time and disk usage
 
   -h, --help
-          Print help information
+          Print help
 
   -V, --version
-          Print version information
+          Print version
 
