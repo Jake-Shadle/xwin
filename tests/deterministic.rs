@@ -150,6 +150,6 @@ fn verify_deterministic() {
         let expected =
             std::fs::read_to_string("tests/expected.txt").expect("failed to read expected.txt");
 
-        similar_asserts::assert_eq!(actual, expected);
+        similar_asserts::assert_eq!(expected, actual);
     }
 }
