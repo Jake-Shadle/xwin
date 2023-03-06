@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#74](https://github.com/Jake-Shadle/xwin/pull/74) resolved [#70](https://github.com/Jake-Shadle/xwin/issues/70) by creating symlinks for SDK headers that are included by the CRT and ATL headers.
+- [PR#74](https://github.com/Jake-Shadle/xwin/pull/74) fixed an issue where debug symbols were splatted to disk even when not requested.
+
 ## [0.2.10] - 2022-11-30
 ### Fixed
 - [PR#67](https://github.com/Jake-Shadle/xwin/pull/67) fixed an issue where incorrect packages could be selected due to using string ordering on strings that could both be version strings and regular non-version strings. Thanks [@mite-user](https://github.com/mite-user)!
