@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.2.11] - 2023-03-06
 ### Fixed
 - [PR#74](https://github.com/Jake-Shadle/xwin/pull/74) resolved [#70](https://github.com/Jake-Shadle/xwin/issues/70) by creating symlinks for SDK headers that are included by the CRT and ATL headers.
 - [PR#74](https://github.com/Jake-Shadle/xwin/pull/74) fixed an issue where debug symbols were splatted to disk even when not requested.
@@ -113,7 +114,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation if downloading, unpacking, and splatting of the CRT and Windows SDK. This first pass focused on targeting x86_64 Desktop, so targeting the Windows Store or other architectures is not guaranteed to work.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.2.10...HEAD
+[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.2.11...HEAD
+[0.2.11]: https://github.com/Jake-Shadle/xwin/compare/0.2.10...0.2.11
 [0.2.10]: https://github.com/Jake-Shadle/xwin/compare/0.2.9...0.2.10
 [0.2.9]: https://github.com/Jake-Shadle/xwin/compare/0.2.8...0.2.9
 [0.2.8]: https://github.com/Jake-Shadle/xwin/compare/0.2.7...0.2.8
