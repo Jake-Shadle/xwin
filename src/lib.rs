@@ -516,22 +516,66 @@ fn get_atl(
     Ok(())
 }
 
+fn get_latest_sdk_version<'keys>(keys: impl Iterator<Item = &'keys String>) -> Option<String> {
+    // Normally I would consider regex overkill for this, but we already use
+    // it for include scanning so...meh, this is only called once so there is
+    // no need to do one time initialization or the like (except in tests where it doesn't matter)
+    let regex = regex::Regex::new(r#"^Win(\d+)SDK_(.+)"#).ok()?;
+    let (major, full) = keys
+        .filter_map(|key| {
+            let caps = regex.captures(&key)?;
+            // So the SDK versions are, as usual for Microsoft, fucking stupid.
+            // A Win11 SDK still (currently) have a 10.* version...so we can't just
+            // assume that they will actually be ordered above a Win10 SDK? (though
+            // probably...but better to NOT assume, never trust Microsoft versions numbers)
+            let sdk_major: u8 = caps[1].parse().ok()?;
+            let version = versions::Version::new(&caps[2])?;
+            Some((sdk_major, version))
+        })
+        .max()?;
+
+    Some(format!("Win{major}SDK_{full}"))
+}
+
+#[cfg(test)]
+mod test {
+    use super::get_latest_sdk_version as glsv;
+
+    #[test]
+    fn sdk_versions() {
+        let just_10 = [
+            "Win10SDK_10.0.1629".to_owned(),
+            "Win10SDK_10.0.17763".to_owned(),
+            "Win10SDK_10.0.17134".to_owned(),
+        ];
+
+        assert_eq!(just_10[1], glsv(just_10.iter()).unwrap());
+
+        let just_11 = [
+            "Win11SDK_10.0.22001".to_owned(),
+            "Win11SDK_10.0.22000".to_owned(),
+        ];
+
+        assert_eq!(just_11[0], glsv(just_11.iter()).unwrap());
+
+        assert_eq!(
+            just_11[0],
+            glsv(just_11.iter().chain(just_10.iter())).unwrap()
+        );
+    }
+}
+
 fn get_sdk(
     pkgs: &BTreeMap<String, manifest::ManifestItem>,
     arches: u32,
     pruned: &mut Vec<Payload>,
 ) -> Result<(), Error> {
-    let sdk_version_rs_versions = pkgs
-        .keys()
-        .filter_map(|key| {
-            key.strip_prefix("Win10SDK_")
-                .and_then(versions::Version::new)
-        })
-        .max()
-        .context("unable to find latest Win10SDK version")?;
+    let latest =
+        get_latest_sdk_version(pkgs.keys()).context("unable to find latest WinSDK version")?;
+
     let sdk = pkgs
-        .get(&format!("Win10SDK_{sdk_version_rs_versions}"))
-        .unwrap();
+        .get(&latest)
+        .with_context(|| format!("unable to locate SDK {latest}"))?;
 
     // So. There are multiple SDK Desktop Headers, one per architecture. However,
     // all of the non-x86 ones include either 0 or few files, with x86 containing
