@@ -36,7 +36,15 @@ license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
 [bans]
 multiple-versions = "deny"
 deny = []
-skip = []
+skip = [
+  # several crates still use non-2.0 syn
+  { name = "syn", version = "1.0" },
+]
+skip-tree = [
+  # clap_builder is annoyingly depending on two different versions transitively
+  # and it itself has duplicated deps
+  { name = "rustix", version = "=0.36.11" },
+]
 
 [sources]
 unknown-registry = "deny"
