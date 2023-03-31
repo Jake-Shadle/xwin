@@ -523,7 +523,7 @@ fn get_latest_sdk_version<'keys>(keys: impl Iterator<Item = &'keys String>) -> O
     let regex = regex::Regex::new(r#"^Win(\d+)SDK_(.+)"#).ok()?;
     let (major, full) = keys
         .filter_map(|key| {
-            let caps = regex.captures(&key)?;
+            let caps = regex.captures(key)?;
             // So the SDK versions are, as usual for Microsoft, fucking stupid.
             // A Win11 SDK still (currently) have a 10.* version...so we can't just
             // assume that they will actually be ordered above a Win10 SDK? (though
