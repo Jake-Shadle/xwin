@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#77](https://github.com/Jake-Shadle/xwin/pull/77) resolved [#76](https://github.com/Jake-Shadle/xwin/issues/76) by correctly handling the retrieval of the latest SDK version, regardless of whether it is for the Windows 10 or 11 SDK.
+
 ## [0.2.11] - 2023-03-06
 ### Fixed
 - [PR#74](https://github.com/Jake-Shadle/xwin/pull/74) resolved [#70](https://github.com/Jake-Shadle/xwin/issues/70) by creating symlinks for SDK headers that are included by the CRT and ATL headers.
