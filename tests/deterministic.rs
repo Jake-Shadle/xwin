@@ -143,13 +143,5 @@ fn verify_deterministic() {
         actual.push('\n');
     }
 
-    if std::env::var("XWIN_UPDATE_DETERMINISTIC").is_ok() {
-        assert!(std::env::var("CI").is_err(), "updated of test denied on CI");
-        std::fs::write("tests/expected.txt", actual).expect("failed to update expected.txt");
-    } else {
-        let expected =
-            std::fs::read_to_string("tests/expected.txt").expect("failed to read expected.txt");
-
-        similar_asserts::assert_eq!(expected, actual);
-    }
+    insta::assert_snapshot!(actual);
 }
