@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.2.12] - 2023-03-31
 ### Fixed
 - [PR#77](https://github.com/Jake-Shadle/xwin/pull/77) resolved [#76](https://github.com/Jake-Shadle/xwin/issues/76) by correctly handling the retrieval of the latest SDK version, regardless of whether it is for the Windows 10 or 11 SDK.
 
@@ -117,7 +118,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation if downloading, unpacking, and splatting of the CRT and Windows SDK. This first pass focused on targeting x86_64 Desktop, so targeting the Windows Store or other architectures is not guaranteed to work.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.2.11...HEAD
+[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.2.12...HEAD
+[0.2.12]: https://github.com/Jake-Shadle/xwin/compare/0.2.11...0.2.12
 [0.2.11]: https://github.com/Jake-Shadle/xwin/compare/0.2.10...0.2.11
 [0.2.10]: https://github.com/Jake-Shadle/xwin/compare/0.2.9...0.2.10
 [0.2.9]: https://github.com/Jake-Shadle/xwin/compare/0.2.8...0.2.9
