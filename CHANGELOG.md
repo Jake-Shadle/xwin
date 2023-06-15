@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#88](https://github.com/Jake-Shadle/xwin/pull/88) updated dependencies.
+
+### Added
+- [PR#87](https://github.com/Jake-Shadle/xwin/pull/87) added binaries for `aarch64-unknown-linux-musl`
+
 ## [0.2.12] - 2023-03-31
 ### Fixed
 - [PR#77](https://github.com/Jake-Shadle/xwin/pull/77) resolved [#76](https://github.com/Jake-Shadle/xwin/issues/76) by correctly handling the retrieval of the latest SDK version, regardless of whether it is for the Windows 10 or 11 SDK.
