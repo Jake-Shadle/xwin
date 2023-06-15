@@ -104,6 +104,10 @@ jobs:
             - target: x86_64-unknown-linux-musl
             - target: aarch64-unknown-linux-musl
     runs-on: ubuntu-22.04
+    env:
+      CC_aarch64_unknown_linux_musl: clang
+      AR_aarch64_unknown_linux_musl: llvm-ar
+      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-Clink-self-contained=yes -Clinker=rust-lld"
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
@@ -134,6 +138,10 @@ jobs:
           - os: windows-2022
             target: x86_64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
+    env:
+      CC_aarch64_unknown_linux_musl: clang
+      AR_aarch64_unknown_linux_musl: llvm-ar
+      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-Clink-self-contained=yes -Clinker=rust-lld"
     steps:
       - uses: dtolnay/rust-toolchain@stable
         with:
