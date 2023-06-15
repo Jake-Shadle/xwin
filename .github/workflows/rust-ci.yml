@@ -98,13 +98,27 @@ jobs:
 
   publish-check:
     name: Publish Check
+    strategy:
+        matrix:
+          include:
+            - target: x86_64-unknown-linux-musl
+            - target: aarch64-unknown-linux-musl
     runs-on: ubuntu-22.04
+    env:
+      CC_aarch64_unknown_linux_musl: clang
+      AR_aarch64_unknown_linux_musl: llvm-ar
+      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-Clink-self-contained=yes -Clinker=rust-lld"
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo fetch
+        with:
+          target: ${{ matrix.target }}
+      - run: cargo fetch --target ${{ matrix.target }}
+      - name: Install musl tools
+        if: endsWith(matrix.target, '-linux-musl')
+        run: sudo apt-get install -y musl-tools llvm
       - name: cargo publish check
-        run: cargo publish --dry-run
+        run: cargo publish --dry-run --target ${{ matrix.target }}
 
   release:
     name: Release
@@ -124,13 +138,17 @@ jobs:
           - os: windows-2022
             target: x86_64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
+    env:
+      CC_aarch64_unknown_linux_musl: clang
+      AR_aarch64_unknown_linux_musl: llvm-ar
+      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-Clink-self-contained=yes -Clinker=rust-lld"
     steps:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
       - name: Install musl tools
-        if: matrix.target == 'x86_64-unknown-linux-musl' || matrix.target == 'aarch64-unknown-linux-musl'
-        run: sudo apt-get install -y musl-tools
+        if: endsWith(matrix.target, '-linux-musl')
+        run: sudo apt-get install -y musl-tools llvm
       - name: Checkout
         uses: actions/checkout@v3
       - run: cargo fetch --target ${{ matrix.target }}

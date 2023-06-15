@@ -8,19 +8,14 @@ compilation
 Usage: xwin [OPTIONS] <COMMAND>
 
 Commands:
-  list
-          Displays a summary of the packages that would be downloaded
-  download
-          Downloads all the selected packages that aren't already present in the
-          download cache
-  unpack
-          Unpacks all of the downloaded packages to disk
-  splat
-          Fixes the packages to prune unneeded files and adds symlinks to
-          address file casing issues and then spalts the final artifacts into
-          directories
-  help
-          Print this message or the help of the given subcommand(s)
+  list      Displays a summary of the packages that would be downloaded
+  download  Downloads all the selected packages that aren't already present
+                in the download cache
+  unpack    Unpacks all of the downloaded packages to disk
+  splat     Fixes the packages to prune unneeded files and adds symlinks to
+                address file casing issues and then spalts the final artifacts
+                into directories
+  help      Print this message or the help of the given subcommand(s)
 
 Options:
       --accept-license

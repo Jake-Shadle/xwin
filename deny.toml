@@ -37,14 +37,10 @@ license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
 multiple-versions = "deny"
 deny = []
 skip = [
-  # several crates still use non-2.0 syn
-  { name = "syn", version = "1.0" },
+  # tracing-subscriber depends on 2 different versions :(
+  { name = "regex-syntax", version = "=0.6.29" },
 ]
-skip-tree = [
-  # clap_builder is annoyingly depending on two different versions transitively
-  # and it itself has duplicated deps
-  { name = "rustix", version = "=0.36.11" },
-]
+skip-tree = []
 
 [sources]
 unknown-registry = "deny"
