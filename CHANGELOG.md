@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#90](https://github.com/Jake-Shadle/xwin/pull/90) fixed a problem caused by [PR#87](https://github.com/Jake-Shadle/xwin/pull/87).
+
 ## [0.2.13] - 2023-06-15
 ### Changed
 - [PR#88](https://github.com/Jake-Shadle/xwin/pull/88) updated dependencies.
