@@ -160,7 +160,7 @@ jobs:
         shell: bash
         run: |
           name=xwin
-          tag=$(git describe --tags --abbrev=0)
+          tag=$(git describe --tags --abbrev=0 --always)
           target="${{ matrix.target }}"
           release_name="$name-$tag-$target"
           release_tar="${release_name}.tar.gz"
