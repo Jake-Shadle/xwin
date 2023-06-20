@@ -166,7 +166,7 @@ jobs:
           release_tar="${release_name}.tar.gz"
           mkdir "$release_name"
 
-          if [ "${{ matrix.target }}" != "x86_64-pc-windows-msvc" ]; then
+          if [ "${{ matrix.target }}" != "x86_64-pc-windows-msvc" || "${{ matrix.target }}" != "aarch64-unknown-linux-musl" ]; then
             strip "target/$target/release/$name"
           fi
 
