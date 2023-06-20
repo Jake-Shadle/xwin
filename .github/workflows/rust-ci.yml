@@ -129,14 +129,19 @@ jobs:
         include:
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-musl
+            strip: llvm-strip
           - os: ubuntu-22.04
             target: aarch64-unknown-linux-musl
+            strip: llvm-strip
           - os: macos-12
             target: x86_64-apple-darwin
+            strip: strip
           - os: macos-12
             target: aarch64-apple-darwin
+            strip: strip
           - os: windows-2022
             target: x86_64-pc-windows-msvc
+            strip: ""
     runs-on: ${{ matrix.os }}
     env:
       CC_aarch64_unknown_linux_musl: clang
@@ -166,8 +171,8 @@ jobs:
           release_tar="${release_name}.tar.gz"
           mkdir "$release_name"
 
-          if [ "${{ matrix.target }}" != "x86_64-pc-windows-msvc" ]; then
-            strip "target/$target/release/$name"
+          if [ ! -z "${{ matrix.strip }}" ]; then
+            ${{ matrix.strip }} "target/$target/release/$name"
           fi
 
           cp "target/$target/release/$name" "$release_name/"
