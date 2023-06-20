@@ -167,7 +167,7 @@ jobs:
           mkdir "$release_name"
 
           if [ "${{ matrix.target }}" != "x86_64-pc-windows-msvc" ]; then
-            strip "target/$target/release/$name"
+            llvm-strip "target/$target/release/$name"
           fi
 
           cp "target/$target/release/$name" "$release_name/"
