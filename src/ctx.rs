@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::{
     splat::SdkHeaders,
     util::{ProgressTarget, Sha256},
@@ -29,6 +31,8 @@ impl Ctx {
             use std::sync::Arc;
             let mut builder =
                 ureq::builder().tls_connector(Arc::new(native_tls_crate::TlsConnector::new()?));
+            // Have socket reads time out after a minute to catch stalled connections
+            builder = builder.timeout_read(Duration::from_secs(60));
             if let Ok(proxy) = std::env::var("https_proxy") {
                 let proxy = ureq::Proxy::new(proxy)?;
                 builder = builder.proxy(proxy);
@@ -39,6 +43,8 @@ impl Ctx {
         #[cfg(not(feature = "native-tls"))]
         {
             let mut builder = ureq::builder();
+            // Have socket reads time out after a minute to catch stalled connections
+            builder = builder.timeout_read(Duration::from_secs(60));
             if let Ok(proxy) = std::env::var("https_proxy") {
                 let proxy = ureq::Proxy::new(proxy)?;
                 builder = builder.proxy(proxy);
