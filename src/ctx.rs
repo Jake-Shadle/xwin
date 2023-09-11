@@ -35,10 +35,10 @@ impl Ctx {
         }
 
         // Allow user to specify timeout values in the case of bad/slow proxies
-        // or MS itself being terrible
-        if let Some(timeout) = read_timeout {
-            builder = builder.timeout_read(timeout);
-        }
+        // or MS itself being terrible, but default to a minute, which is _far_
+        // more than it should take in normal situations, as by default ureq
+        // sets no timeout on the response
+        builder = builder.timeout_read(read_timeout.unwrap_or(Duration::from_secs(60)));
 
         if let Ok(proxy) = std::env::var("https_proxy") {
             let proxy = ureq::Proxy::new(proxy)?;

@@ -155,7 +155,7 @@ pub struct Args {
     /// Whether to include the Active Template Library (ATL) in the installation
     #[arg(long)]
     include_atl: bool,
-    /// Specifies a timeout for how long a single download is allowed to take. The default is no timeout.
+    /// Specifies a timeout for how long a single download is allowed to take. The default is 60s.
     #[arg(short, long, value_parser = parse_duration)]
     timeout: Option<Duration>,
     /// The architectures to include
