@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#93](https://github.com/Jake-Shadle/xwin/pull/93) added the ability to specify a download timeout for each individual download, and changed the default from infinite to 60 seconds, so that xwin will error if the remote HTTP server is slow/unresponsive. Thanks [@dragonmux](https://github.com/dragonmux)!
+
 ## [0.2.14] - 2023-06-20
 ### Fixed
 - [PR#90](https://github.com/Jake-Shadle/xwin/pull/90) fixed a problem caused by [PR#87](https://github.com/Jake-Shadle/xwin/pull/87).
