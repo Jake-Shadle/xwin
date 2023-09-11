@@ -520,7 +520,7 @@ fn get_latest_sdk_version<'keys>(keys: impl Iterator<Item = &'keys String>) -> O
     // Normally I would consider regex overkill for this, but we already use
     // it for include scanning so...meh, this is only called once so there is
     // no need to do one time initialization or the like (except in tests where it doesn't matter)
-    let regex = regex::Regex::new(r#"^Win(\d+)SDK_(.+)"#).ok()?;
+    let regex = regex::Regex::new(r"^Win(\d+)SDK_(.+)").ok()?;
     let (major, full) = keys
         .filter_map(|key| {
             let caps = regex.captures(key)?;
@@ -535,34 +535,6 @@ fn get_latest_sdk_version<'keys>(keys: impl Iterator<Item = &'keys String>) -> O
         .max()?;
 
     Some(format!("Win{major}SDK_{full}"))
-}
-
-#[cfg(test)]
-mod test {
-    use super::get_latest_sdk_version as glsv;
-
-    #[test]
-    fn sdk_versions() {
-        let just_10 = [
-            "Win10SDK_10.0.1629".to_owned(),
-            "Win10SDK_10.0.17763".to_owned(),
-            "Win10SDK_10.0.17134".to_owned(),
-        ];
-
-        assert_eq!(just_10[1], glsv(just_10.iter()).unwrap());
-
-        let just_11 = [
-            "Win11SDK_10.0.22001".to_owned(),
-            "Win11SDK_10.0.22000".to_owned(),
-        ];
-
-        assert_eq!(just_11[0], glsv(just_11.iter()).unwrap());
-
-        assert_eq!(
-            just_11[0],
-            glsv(just_11.iter().chain(just_10.iter())).unwrap()
-        );
-    }
 }
 
 fn get_sdk(
@@ -739,4 +711,32 @@ fn get_sdk(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::get_latest_sdk_version as glsv;
+
+    #[test]
+    fn sdk_versions() {
+        let just_10 = [
+            "Win10SDK_10.0.1629".to_owned(),
+            "Win10SDK_10.0.17763".to_owned(),
+            "Win10SDK_10.0.17134".to_owned(),
+        ];
+
+        assert_eq!(just_10[1], glsv(just_10.iter()).unwrap());
+
+        let just_11 = [
+            "Win11SDK_10.0.22001".to_owned(),
+            "Win11SDK_10.0.22000".to_owned(),
+        ];
+
+        assert_eq!(just_11[0], glsv(just_11.iter()).unwrap());
+
+        assert_eq!(
+            just_11[0],
+            glsv(just_11.iter().chain(just_10.iter())).unwrap()
+        );
+    }
 }
