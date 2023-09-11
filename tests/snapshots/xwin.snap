@@ -60,6 +60,10 @@ Options:
           Whether to include the Active Template Library (ATL) in the
           installation
 
+  -t, --timeout <TIMEOUT>
+          Specifies a timeout for how long a single download is allowed to take.
+          The default is no timeout
+
       --arch <ARCH>
           The architectures to include
           

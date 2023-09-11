@@ -3,6 +3,7 @@ use camino::Utf8PathBuf as PathBuf;
 use clap::builder::{PossibleValuesParser, TypedValueParser as _};
 use clap::{Parser, Subcommand};
 use indicatif as ia;
+use std::time::Duration;
 use tracing_subscriber::filter::LevelFilter;
 
 fn setup_logger(json: bool, log_level: LevelFilter) -> Result<(), Error> {
@@ -89,7 +90,30 @@ const LOG_LEVELS: &[&str] = &["off", "error", "warn", "info", "debug", "trace"];
 
 fn parse_level(s: &str) -> Result<LevelFilter, Error> {
     s.parse::<LevelFilter>()
-        .map_err(|_| anyhow::anyhow!("failed to parse level '{}'", s))
+        .map_err(|_| anyhow::anyhow!("failed to parse level '{s}'"))
+}
+
+#[allow(clippy::indexing_slicing)]
+fn parse_duration(src: &str) -> anyhow::Result<Duration> {
+    let suffix_pos = src.find(char::is_alphabetic).unwrap_or(src.len());
+
+    let num: u64 = src[..suffix_pos].parse()?;
+    let suffix = if suffix_pos == src.len() {
+        "s"
+    } else {
+        &src[suffix_pos..]
+    };
+
+    let duration = match suffix {
+        "ms" => Duration::from_millis(num),
+        "s" | "S" => Duration::from_secs(num),
+        "m" | "M" => Duration::from_secs(num * 60),
+        "h" | "H" => Duration::from_secs(num * 60 * 60),
+        "d" | "D" => Duration::from_secs(num * 60 * 60 * 24),
+        s => anyhow::bail!("unknown duration suffix '{s}'"),
+    };
+
+    Ok(duration)
 }
 
 #[derive(Parser)]
@@ -131,6 +155,9 @@ pub struct Args {
     /// Whether to include the Active Template Library (ATL) in the installation
     #[arg(long)]
     include_atl: bool,
+    /// Specifies a timeout for how long a single download is allowed to take. The default is no timeout.
+    #[arg(short, long, value_parser = parse_duration)]
+    timeout: Option<Duration>,
     /// The architectures to include
     #[arg(
         long,
@@ -176,13 +203,13 @@ fn main() -> Result<(), Error> {
     let draw_target = xwin::util::ProgressTarget::Stdout;
 
     let ctx = if args.temp {
-        xwin::Ctx::with_temp(draw_target)?
+        xwin::Ctx::with_temp(draw_target, args.timeout)?
     } else {
         let cache_dir = match &args.cache_dir {
             Some(cd) => cd.clone(),
             None => cwd.join(".xwin-cache"),
         };
-        xwin::Ctx::with_dir(cache_dir, draw_target)?
+        xwin::Ctx::with_dir(cache_dir, draw_target, args.timeout)?
     };
 
     let ctx = std::sync::Arc::new(ctx);

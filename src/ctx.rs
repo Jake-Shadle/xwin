@@ -25,37 +25,31 @@ pub struct Ctx {
 }
 
 impl Ctx {
-    fn http_client() -> Result<ureq::Agent, Error> {
+    fn http_client(read_timeout: Option<Duration>) -> Result<ureq::Agent, Error> {
+        let mut builder = ureq::builder();
+
         #[cfg(feature = "native-tls")]
         {
             use std::sync::Arc;
-            let mut builder =
-                ureq::builder().tls_connector(Arc::new(native_tls_crate::TlsConnector::new()?));
-            // Have socket reads time out after a minute to catch stalled connections
-            builder = builder.timeout_read(Duration::from_secs(60));
-            if let Ok(proxy) = std::env::var("https_proxy") {
-                let proxy = ureq::Proxy::new(proxy)?;
-                builder = builder.proxy(proxy);
-            };
-            Ok(builder.build())
+            builder = builder.tls_connector(Arc::new(native_tls_crate::TlsConnector::new()?));
         }
 
-        #[cfg(not(feature = "native-tls"))]
-        {
-            let mut builder = ureq::builder();
-            // Have socket reads time out after a minute to catch stalled connections
-            builder = builder.timeout_read(Duration::from_secs(60));
-            if let Ok(proxy) = std::env::var("https_proxy") {
-                let proxy = ureq::Proxy::new(proxy)?;
-                builder = builder.proxy(proxy);
-            };
-            Ok(builder.build())
+        // Allow user to specify timeout values in the case of bad/slow proxies
+        // or MS itself being terrible
+        if let Some(timeout) = read_timeout {
+            builder = builder.timeout_read(timeout);
         }
+
+        if let Ok(proxy) = std::env::var("https_proxy") {
+            let proxy = ureq::Proxy::new(proxy)?;
+            builder = builder.proxy(proxy);
+        }
+        Ok(builder.build())
     }
 
-    pub fn with_temp(dt: ProgressTarget) -> Result<Self, Error> {
+    pub fn with_temp(dt: ProgressTarget, read_timeout: Option<Duration>) -> Result<Self, Error> {
         let td = tempfile::TempDir::new()?;
-        let client = Self::http_client()?;
+        let client = Self::http_client(read_timeout)?;
 
         Ok(Self {
             work_dir: PathBuf::from_path_buf(td.path().to_owned()).map_err(|pb| {
@@ -67,8 +61,12 @@ impl Ctx {
         })
     }
 
-    pub fn with_dir(mut work_dir: PathBuf, dt: ProgressTarget) -> Result<Self, Error> {
-        let client = Self::http_client()?;
+    pub fn with_dir(
+        mut work_dir: PathBuf,
+        dt: ProgressTarget,
+        read_timeout: Option<Duration>,
+    ) -> Result<Self, Error> {
+        let client = Self::http_client(read_timeout)?;
 
         work_dir.push("dl");
         std::fs::create_dir_all(&work_dir)?;
