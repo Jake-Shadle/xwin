@@ -76,3 +76,12 @@ zip = { version = "0.6", default-features = false, features = ["deflate"] }
 [dev-dependencies]
 insta = "1.12"
 walkdir = "2.3"
+
+[profile.dev.package.insta]
+opt-level = 3
+
+[profile.dev.package.similar]
+opt-level = 3
+
+[profile.dev.package.sha2]
+opt-level = 3
