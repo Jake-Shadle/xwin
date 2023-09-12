@@ -11,7 +11,7 @@ fn verify_compiles() {
 
     let hidden = indicatif::ProgressBar::hidden();
 
-    let manifest = xwin::manifest::get_manifest(&ctx, "16", "release", hidden.clone()).unwrap();
+    let manifest = xwin::manifest::get_manifest(&ctx, "17", "release", hidden.clone()).unwrap();
     let pkg_manifest =
         xwin::manifest::get_package_manifest(&ctx, &manifest, hidden.clone()).unwrap();
 

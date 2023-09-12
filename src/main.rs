@@ -147,7 +147,7 @@ pub struct Args {
     #[arg(long, conflicts_with_all = &["manifest_version", "channel"])]
     manifest: Option<PathBuf>,
     /// The manifest version to retrieve
-    #[arg(long, default_value = "16")]
+    #[arg(long, default_value = "17")]
     manifest_version: String,
     /// The product channel to use.
     #[arg(long, default_value = "release")]

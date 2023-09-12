@@ -49,7 +49,7 @@ Options:
       --manifest-version <MANIFEST_VERSION>
           The manifest version to retrieve
           
-          [default: 16]
+          [default: 17]
 
       --channel <CHANNEL>
           The product channel to use
