@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.3.0] - 2023-09-12
 ### Changed
 - [PR#93](https://github.com/Jake-Shadle/xwin/pull/93) added the ability to specify a download timeout for each individual download, and changed the default from infinite to 60 seconds, so that xwin will error if the remote HTTP server is slow/unresponsive. Thanks [@dragonmux](https://github.com/dragonmux)!
 
@@ -136,7 +137,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation if downloading, unpacking, and splatting of the CRT and Windows SDK. This first pass focused on targeting x86_64 Desktop, so targeting the Windows Store or other architectures is not guaranteed to work.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.2.15...HEAD
+[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.3.0...HEAD
+[0.3.0]: https://github.com/Jake-Shadle/xwin/compare/0.2.15...0.3.0
 [0.2.15]: https://github.com/Jake-Shadle/xwin/compare/0.2.14...0.2.15
 [0.2.14]: https://github.com/Jake-Shadle/xwin/compare/0.2.13...0.2.14
 [0.2.13]: https://github.com/Jake-Shadle/xwin/compare/0.2.12...0.2.13
