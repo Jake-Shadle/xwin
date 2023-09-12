@@ -618,7 +618,7 @@ pub(crate) fn finalize_splat(
 ) -> Result<(), Error> {
     let mut files: std::collections::HashMap<
         _,
-        _,
+        Header<'_>,
         std::hash::BuildHasherDefault<twox_hash::XxHash64>,
     > = Default::default();
 
@@ -627,18 +627,15 @@ pub(crate) fn finalize_splat(
         path: PathBuf,
     }
 
-    fn compare_hashes(existing: &Header<'_>, new: (&SdkHeaders, &Path)) -> anyhow::Result<()> {
+    fn compare_hashes(existing: &Path, new: &PathBuf) -> anyhow::Result<()> {
         use crate::util::Sha256;
 
-        let existing_path = &existing.path;
-        let new_path = new.1;
-
-        let existing_hash = Sha256::digest(&std::fs::read(existing_path)?);
-        let new_hash = Sha256::digest(&std::fs::read(new_path)?);
+        let existing_hash = Sha256::digest(&std::fs::read(existing)?);
+        let new_hash = Sha256::digest(&std::fs::read(new)?);
 
         anyhow::ensure!(
             existing_hash == new_hash,
-            "2 files with same relative path were not equal: '{existing_path}' != '{new_path}'"
+            "2 files with same relative path were not equal: '{existing}' != '{new}'"
         );
 
         Ok(())
@@ -649,7 +646,7 @@ pub(crate) fn finalize_splat(
             if let Some(existing) = files.get(k) {
                 // We already have a file with the same path, if they're the same
                 // as each other it's fine, but if they differ we have an issue
-                compare_hashes(existing, (&hdrs, v))?;
+                compare_hashes(&existing.path, v)?;
                 tracing::debug!("skipped {v}, a matching path already exists");
             } else {
                 files.insert(
