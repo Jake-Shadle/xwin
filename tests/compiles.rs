@@ -11,7 +11,17 @@ fn verify_compiles() {
 
     let hidden = indicatif::ProgressBar::hidden();
 
-    let manifest = xwin::manifest::get_manifest(&ctx, "17", "release", hidden.clone()).unwrap();
+    // TODO: Bump to CI to 17 once github actions isn't using an ancient version,
+    // we could install in the action run, but not really worth it since I can
+    // test locally
+    let manifest_version = if std::env::var_os("CI").is_some() {
+        "16"
+    } else {
+        "17"
+    };
+
+    let manifest =
+        xwin::manifest::get_manifest(&ctx, manifest_version, "release", hidden.clone()).unwrap();
     let pkg_manifest =
         xwin::manifest::get_package_manifest(&ctx, &manifest, hidden.clone()).unwrap();
 
