@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#99](https://github.com/Jake-Shadle/xwin/pull/99) changed the default VS manifest version from 16 -> 17. You can preserve the old behavior by passing `--manifest-version 16` on the cmd line.
+
+### Fixed
+- [PR#99](https://github.com/Jake-Shadle/xwin/pull/99) resolved [#92](https://github.com/Jake-Shadle/xwin/issues/92) by only failing if matching relative paths didn't have the same contents. This currently only applies to one file, `appnotify.h`, which is present in the SDK headers and Store headers.
+
 ## [0.3.0] - 2023-09-12
 ### Changed
 - [PR#93](https://github.com/Jake-Shadle/xwin/pull/93) added the ability to specify a download timeout for each individual download, and changed the default from infinite to 60 seconds, so that xwin will error if the remote HTTP server is slow/unresponsive. Thanks [@dragonmux](https://github.com/dragonmux)!
