@@ -702,8 +702,13 @@ fn symlink(original: &str, link: &Path) -> Result<(), Error> {
 }
 
 #[cfg(windows)]
-fn symlink(_original: &str, _link: &Path) -> Result<(), Error> {
-    Ok(())
+fn symlink(original: &str, link: &Path) -> Result<(), Error> {
+    if std::fs::metadata(original)?.is_dir() {
+        std::os::windows::fs::symlink_dir(original, link)
+    } else {
+        std::os::windows::fs::symlink_file(original, link)
+    }
+    .with_context(|| format!("unable to symlink from {link} to {original}"))
 }
 
 #[cfg(test)]
