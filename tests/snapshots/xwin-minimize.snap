@@ -60,6 +60,10 @@ Options:
           The path of the manifest to compile. Defaults to Cargo.toml if not
           specified
 
+      --preserve-strace
+          If supplied, the strace output is persisted to disk rather than being
+          deleted once the compilation has finished
+
   -h, --help
           Print help (see a summary with '-h')
 
