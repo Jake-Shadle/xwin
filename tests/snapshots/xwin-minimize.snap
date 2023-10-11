@@ -2,10 +2,16 @@
 source: src/main.rs
 expression: help_text
 ---
-Fixes the packages to prune unneeded files and adds symlinks to address file
-casing issues and then spalts the final artifacts into directories
+Runs the specified build command, detecting all of the headers and libraries
+used by the build, and generating a file that can be used to filter future splat
+operations, and optionally move only the user files to a new directory
 
-Usage: splat [OPTIONS]
+This command is only intended to work with cargo builds
+
+This command requires that `strace`, `clang-cl` and `lld-link` are installed and
+_probably_ only works on Linux.
+
+Usage: minimize [OPTIONS]
 
 Options:
       --include-debug-libs
@@ -31,21 +37,35 @@ Options:
           `aarch64` of LLVM etc when creating directories/names. Passing this
           flag will preserve the MS names for those targets
 
-      --output <OUTPUT>
+      --map <MAP>
+          The path of the filter file that is generated. Defaults to
+          ./.xwin-cache/xwin-map.toml
+
+      --splat-output <SPLAT_OUTPUT>
           The root output directory. Defaults to `./.xwin-cache/splat` if not
           specified
 
-      --map <MAP>
-          If specified, a toml file that can be used to create additional
-          symlinks or skip files entirely
+      --output <OUTPUT>
+          The root output directory
 
       --copy
-          Copies files from the unpack directory to the splat directory instead
-          of moving them, which preserves the original unpack directories but
-          increases overall time and disk usage
+          Copies files from the splat directory rather than moving them. Only
+          used if --output is specified
+
+      --target <TARGET>
+          The cargo build triple to compile for. Defaults to
+          `x86_64-pc-windows-msvc` if not specified
+
+      --manifest-path <MANIFEST_PATH>
+          The path of the manifest to compile. Defaults to Cargo.toml if not
+          specified
+
+      --preserve-strace
+          If supplied, the strace output is persisted to disk rather than being
+          deleted once the compilation has finished
 
   -h, --help
-          Print help
+          Print help (see a summary with '-h')
 
   -V, --version
           Print version

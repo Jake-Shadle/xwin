@@ -1,85 +1,4 @@
 #![doc = include_str!("../README.md")]
-// BEGIN - Embark standard lints v5 for Rust 1.55+
-// do not change or add/remove here, but one can add exceptions after this section
-// for more info see: <https://github.com/EmbarkStudios/rust-ecosystem/issues/59>
-#![deny(unsafe_code)]
-#![warn(
-    clippy::all,
-    clippy::await_holding_lock,
-    clippy::char_lit_as_u8,
-    clippy::checked_conversions,
-    clippy::dbg_macro,
-    clippy::debug_assert_with_mut_call,
-    clippy::disallowed_methods,
-    clippy::disallowed_types,
-    clippy::doc_markdown,
-    clippy::empty_enum,
-    clippy::enum_glob_use,
-    clippy::exit,
-    clippy::expl_impl_clone_on_copy,
-    clippy::explicit_deref_methods,
-    clippy::explicit_into_iter_loop,
-    clippy::fallible_impl_from,
-    clippy::filter_map_next,
-    clippy::flat_map_option,
-    clippy::float_cmp_const,
-    clippy::fn_params_excessive_bools,
-    clippy::from_iter_instead_of_collect,
-    clippy::if_let_mutex,
-    clippy::implicit_clone,
-    clippy::imprecise_flops,
-    clippy::inefficient_to_string,
-    clippy::invalid_upcast_comparisons,
-    clippy::large_digit_groups,
-    clippy::large_stack_arrays,
-    clippy::large_types_passed_by_value,
-    clippy::let_unit_value,
-    clippy::linkedlist,
-    clippy::lossy_float_literal,
-    clippy::macro_use_imports,
-    clippy::manual_ok_or,
-    clippy::map_err_ignore,
-    clippy::map_flatten,
-    clippy::map_unwrap_or,
-    clippy::match_on_vec_items,
-    clippy::match_same_arms,
-    clippy::match_wild_err_arm,
-    clippy::match_wildcard_for_single_variants,
-    clippy::mem_forget,
-    clippy::mismatched_target_os,
-    clippy::missing_enforced_import_renames,
-    clippy::mut_mut,
-    clippy::mutex_integer,
-    clippy::needless_borrow,
-    clippy::needless_continue,
-    clippy::needless_for_each,
-    clippy::option_option,
-    clippy::path_buf_push_overwrite,
-    clippy::ptr_as_ptr,
-    clippy::rc_mutex,
-    clippy::ref_option_ref,
-    clippy::rest_pat_in_fully_bound_structs,
-    clippy::same_functions_in_if_condition,
-    clippy::semicolon_if_nothing_returned,
-    clippy::single_match_else,
-    clippy::string_add_assign,
-    clippy::string_add,
-    clippy::string_lit_as_bytes,
-    clippy::string_to_string,
-    clippy::todo,
-    clippy::trait_duplication_in_bounds,
-    clippy::unimplemented,
-    clippy::unnested_or_patterns,
-    clippy::unused_self,
-    clippy::useless_transmute,
-    clippy::verbose_file_reads,
-    clippy::zero_sized_map_values,
-    future_incompatible,
-    nonstandard_style,
-    rust_2018_idioms
-)]
-// END - Embark standard lints v0.5 for Rust 1.55+
-// crate-specific exceptions:
 
 use anyhow::{Context as _, Error};
 pub use camino::{Utf8Path as Path, Utf8PathBuf as PathBuf};
@@ -88,11 +7,13 @@ use std::{collections::BTreeMap, fmt};
 mod ctx;
 mod download;
 pub mod manifest;
+mod minimize;
 mod splat;
 mod unpack;
 pub mod util;
 
 pub use ctx::Ctx;
+pub use minimize::MinimizeConfig;
 pub use splat::SplatConfig;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -217,7 +138,8 @@ impl Variant {
 pub enum Ops {
     Download,
     Unpack,
-    Splat(crate::splat::SplatConfig),
+    Splat(SplatConfig),
+    Minimize(MinimizeConfig),
 }
 
 #[derive(Clone)]
@@ -259,22 +181,39 @@ pub enum PayloadKind {
     Ucrt,
 }
 
+pub struct PrunedPackageList {
+    pub sdk_version: String,
+    pub payloads: Vec<Payload>,
+}
+
 /// Returns the list of packages that are actually needed for cross compilation
 pub fn prune_pkg_list(
     pkg_manifest: &manifest::PackageManifest,
     arches: u32,
     variants: u32,
     include_atl: bool,
-) -> Result<Vec<Payload>, Error> {
+    sdk_version: Option<String>,
+    crt_version: Option<String>,
+) -> Result<PrunedPackageList, Error> {
     // We only really need 2 core pieces from the manifest, the CRT (headers + libs)
     // and the Windows SDK
     let pkgs = &pkg_manifest.packages;
-    let mut pruned = Vec::new();
+    let mut payloads = Vec::new();
 
-    get_crt(pkgs, arches, variants, &mut pruned, include_atl)?;
-    get_sdk(pkgs, arches, &mut pruned)?;
+    get_crt(
+        pkgs,
+        arches,
+        variants,
+        &mut payloads,
+        include_atl,
+        crt_version,
+    )?;
+    let sdk_version = get_sdk(pkgs, arches, sdk_version, &mut payloads)?;
 
-    Ok(pruned)
+    Ok(PrunedPackageList {
+        sdk_version,
+        payloads,
+    })
 }
 
 fn get_crt(
@@ -283,6 +222,7 @@ fn get_crt(
     variants: u32,
     pruned: &mut Vec<Payload>,
     include_atl: bool,
+    crt_version: Option<String>,
 ) -> Result<(), Error> {
     fn to_payload(mi: &manifest::ManifestItem, payload: &manifest::Payload) -> Payload {
         // These are really the only two we care about
@@ -339,17 +279,33 @@ fn get_crt(
         .get("Microsoft.VisualStudio.Product.BuildTools")
         .context("unable to find root BuildTools item")?;
 
-    let crt_version_rs_versions = build_tools
-        .dependencies
-        .keys()
-        .filter_map(|key| {
-            key.strip_prefix("Microsoft.VisualStudio.Component.VC.")
-                .and_then(|s| s.strip_suffix(".x86.x64"))
-                .and_then(versions::Version::new)
-        })
-        .max()
-        .context("unable to find latest CRT version")?;
-    let crt_version = &crt_version_rs_versions.to_string();
+    let crt_version = if let Some(user) = crt_version {
+        // Ensure it is a valid version and that it actually exists in the manifest
+        versions::Version::new(&user)
+            .with_context(|| format!("invalid CRT version '{user}' specified"))?;
+
+        build_tools
+            .dependencies
+            .get(&format!(
+                "Microsoft.VisualStudio.Component.VC.{user}.x86.x64"
+            ))
+            .with_context(|| format!("CRT version '{user}' does not exist in the manifest"))?;
+
+        user
+    } else {
+        let crt_version_rs_versions = build_tools
+            .dependencies
+            .keys()
+            .filter_map(|key| {
+                key.strip_prefix("Microsoft.VisualStudio.Component.VC.")
+                    .and_then(|s| s.strip_suffix(".x86.x64"))
+                    .and_then(versions::Version::new)
+            })
+            .max()
+            .context("unable to find latest CRT version")?;
+
+        crt_version_rs_versions.to_string()
+    };
 
     // The CRT headers are in the "base" package
     // `Microsoft.VC.<ridiculous_version_numbers>.CRT.Headers.base`
@@ -411,7 +367,7 @@ fn get_crt(
             }
         }
         if include_atl {
-            get_atl(pkgs, arches, spectre, pruned, crt_version)?;
+            get_atl(pkgs, arches, spectre, pruned, &crt_version)?;
         }
     }
 
@@ -516,7 +472,9 @@ fn get_atl(
     Ok(())
 }
 
-fn get_latest_sdk_version<'keys>(keys: impl Iterator<Item = &'keys String>) -> Option<String> {
+fn get_latest_sdk_version<'keys>(
+    keys: impl Iterator<Item = &'keys String>,
+) -> Option<(String, versions::Version)> {
     // Normally I would consider regex overkill for this, but we already use
     // it for include scanning so...meh, this is only called once so there is
     // no need to do one time initialization or the like (except in tests where it doesn't matter)
@@ -534,20 +492,35 @@ fn get_latest_sdk_version<'keys>(keys: impl Iterator<Item = &'keys String>) -> O
         })
         .max()?;
 
-    Some(format!("Win{major}SDK_{full}"))
+    Some((format!("Win{major}SDK_{full}"), full))
 }
 
 fn get_sdk(
     pkgs: &BTreeMap<String, manifest::ManifestItem>,
     arches: u32,
+    sdk_version: Option<String>,
     pruned: &mut Vec<Payload>,
-) -> Result<(), Error> {
-    let latest =
-        get_latest_sdk_version(pkgs.keys()).context("unable to find latest WinSDK version")?;
+) -> Result<String, Error> {
+    let (sdk, sdk_version) = if let Some(sdk_version) = sdk_version {
+        let sv = versions::Version::new(&sdk_version)
+            .with_context(|| format!("invalid SDK version '{sdk_version}'"))?;
 
-    let sdk = pkgs
-        .get(&latest)
-        .with_context(|| format!("unable to locate SDK {latest}"))?;
+        let (_, mi) = pkgs
+            .iter()
+            .find(|(key, _)| key.ends_with(&sdk_version))
+            .with_context(|| "unable to locate SDK '{sdk_version}'")?;
+
+        (mi, sv)
+    } else {
+        let (full, sdk_version) =
+            get_latest_sdk_version(pkgs.keys()).context("unable to find latest WinSDK version")?;
+
+        let sdk = pkgs
+            .get(&full)
+            .with_context(|| format!("unable to locate SDK {sdk_version}"))?;
+
+        (sdk, sdk_version)
+    };
 
     // So. There are multiple SDK Desktop Headers, one per architecture. However,
     // all of the non-x86 ones include either 0 or few files, with x86 containing
@@ -710,6 +683,26 @@ fn get_sdk(
         });
     }
 
+    Ok(sdk_version.to_string())
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Default)]
+pub struct Map {
+    #[serde(default)]
+    pub filter: std::collections::BTreeSet<String>,
+    #[serde(default)]
+    pub symlinks: std::collections::BTreeMap<String, Vec<String>>,
+}
+
+#[cfg(unix)]
+#[inline]
+fn symlink(original: &str, link: &Path) -> Result<(), Error> {
+    std::os::unix::fs::symlink(original, link)
+        .with_context(|| format!("unable to symlink from {link} to {original}"))
+}
+
+#[cfg(windows)]
+fn symlink(_original: &str, _link: &Path) -> Result<(), Error> {
     Ok(())
 }
 
@@ -725,18 +718,21 @@ mod test {
             "Win10SDK_10.0.17134".to_owned(),
         ];
 
-        assert_eq!(just_10[1], glsv(just_10.iter()).unwrap());
+        let (full, vers) = glsv(just_10.iter()).unwrap();
+
+        assert_eq!(just_10[1], full);
+        assert_eq!("10.0.17763", vers.to_string());
 
         let just_11 = [
             "Win11SDK_10.0.22001".to_owned(),
             "Win11SDK_10.0.22000".to_owned(),
         ];
 
-        assert_eq!(just_11[0], glsv(just_11.iter()).unwrap());
+        assert_eq!(just_11[0], glsv(just_11.iter()).unwrap().0);
 
         assert_eq!(
             just_11[0],
-            glsv(just_11.iter().chain(just_10.iter())).unwrap()
+            glsv(just_11.iter().chain(just_10.iter())).unwrap().0
         );
     }
 }

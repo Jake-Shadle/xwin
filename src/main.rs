@@ -28,6 +28,33 @@ fn setup_logger(json: bool, log_level: LevelFilter) -> Result<(), Error> {
     Ok(())
 }
 
+#[derive(Parser)]
+pub struct SplatOptions {
+    /// The MSVCRT includes (non-redistributable) debug versions of the
+    /// various libs that are generally uninteresting to keep for most usage
+    #[arg(long)]
+    include_debug_libs: bool,
+    /// The MSVCRT includes PDB (debug symbols) files for several of the
+    /// libraries that are generally uninteresting to keep for most usage
+    #[arg(long)]
+    include_debug_symbols: bool,
+    /// By default, symlinks are added to both the CRT and WindowsSDK to
+    /// address casing issues in general usage. For example, if you are
+    /// compiling C/C++ code that does `#include <windows.h>`, it will break
+    /// on a case-sensitive file system, as the actual path in the WindowsSDK
+    /// is `Windows.h`. This also applies even if the C/C++ you are compiling
+    /// uses correct casing for all CRT/SDK includes, as the internal headers
+    /// also use incorrect casing in most cases.
+    #[arg(long)]
+    disable_symlinks: bool,
+    /// By default, we convert the MS specific `x64`, `arm`, and `arm64`
+    /// target architectures to the more canonical `x86_64`, `aarch`, and
+    /// `aarch64` of LLVM etc when creating directories/names. Passing this
+    /// flag will preserve the MS names for those targets.
+    #[arg(long)]
+    preserve_ms_arch_notation: bool,
+}
+
 #[derive(Subcommand)]
 pub enum Command {
     /// Displays a summary of the packages that would be downloaded.
@@ -44,33 +71,16 @@ pub enum Command {
     /// Fixes the packages to prune unneeded files and adds symlinks to address
     /// file casing issues and then spalts the final artifacts into directories
     Splat {
-        /// The MSVCRT includes (non-redistributable) debug versions of the
-        /// various libs that are generally uninteresting to keep for most usage
-        #[arg(long)]
-        include_debug_libs: bool,
-        /// The MSVCRT includes PDB (debug symbols) files for several of the
-        /// libraries that are generally uninteresting to keep for most usage
-        #[arg(long)]
-        include_debug_symbols: bool,
-        /// By default, symlinks are added to both the CRT and WindowsSDK to
-        /// address casing issues in general usage. For example, if you are
-        /// compiling C/C++ code that does `#include <windows.h>`, it will break
-        /// on a case-sensitive file system, as the actual path in the WindowsSDK
-        /// is `Windows.h`. This also applies even if the C/C++ you are compiling
-        /// uses correct casing for all CRT/SDK includes, as the internal headers
-        /// also use incorrect casing in most cases.
-        #[arg(long)]
-        disable_symlinks: bool,
-        /// By default, we convert the MS specific `x64`, `arm`, and `arm64`
-        /// target architectures to the more canonical `x86_64`, `aarch`, and
-        /// `aarch64` of LLVM etc when creating directories/names. Passing this
-        /// flag will preserve the MS names for those targets.
-        #[arg(long)]
-        preserve_ms_arch_notation: bool,
+        #[command(flatten)]
+        options: SplatOptions,
         /// The root output directory. Defaults to `./.xwin-cache/splat` if not
         /// specified.
         #[arg(long)]
         output: Option<PathBuf>,
+        /// If specified, a toml file that can be used to create additional symlinks
+        /// or skip files entirely
+        #[arg(long)]
+        map: Option<PathBuf>,
         /// Copies files from the unpack directory to the splat directory instead
         /// of moving them, which preserves the original unpack directories but
         /// increases overall time and disk usage
@@ -82,6 +92,43 @@ pub enum Command {
         // #[arg(long)]
         // isolated: bool,
     },
+    /// Runs the specified build command, detecting all of the headers and libraries
+    /// used by the build, and generating a file that can be used to filter future
+    /// splat operations, and optionally move only the user files to a new directory
+    ///
+    /// This command is only intended to work with cargo builds
+    ///
+    /// This command requires that `strace`, `clang-cl` and `lld-link` are installed
+    /// and _probably_ only works on Linux.
+    Minimize {
+        #[command(flatten)]
+        options: SplatOptions,
+        /// The path of the filter file that is generated. Defaults to ./.xwin-cache/xwin-map.toml
+        #[arg(long)]
+        map: Option<PathBuf>,
+        /// The root output directory. Defaults to `./.xwin-cache/splat` if not
+        /// specified.
+        #[arg(long)]
+        splat_output: Option<PathBuf>,
+        /// The root output directory.
+        #[arg(long)]
+        output: Option<PathBuf>,
+        /// Copies files from the splat directory rather than moving them. Only
+        /// used if --output is specified.
+        #[arg(long)]
+        copy: bool,
+        /// The cargo build triple to compile for. Defaults to `x86_64-pc-windows-msvc`
+        /// if not specified
+        #[arg(long)]
+        target: Option<String>,
+        /// The path of the manifest to compile. Defaults to Cargo.toml if not specified
+        #[arg(long)]
+        manifest_path: Option<PathBuf>,
+        /// If supplied, the strace output is persisted to disk rather than being
+        /// deleted once the compilation has finished
+        #[arg(long)]
+        preserve_strace: bool,
+    },
 }
 
 const ARCHES: &[&str] = &["x86", "x86_64", "aarch", "aarch64"];
@@ -90,7 +137,7 @@ const LOG_LEVELS: &[&str] = &["off", "error", "warn", "info", "debug", "trace"];
 
 fn parse_level(s: &str) -> Result<LevelFilter, Error> {
     s.parse::<LevelFilter>()
-        .map_err(|_| anyhow::anyhow!("failed to parse level '{s}'"))
+        .map_err(|_e| anyhow::anyhow!("failed to parse level '{s}'"))
 }
 
 #[allow(clippy::indexing_slicing)]
@@ -152,6 +199,14 @@ pub struct Args {
     /// The product channel to use.
     #[arg(long, default_value = "release")]
     channel: String,
+    /// If specified, this is the version of the SDK that the user wishes to use
+    /// instead of defaulting to the latest SDK available in the the manifest
+    #[arg(long)]
+    sdk_version: Option<String>,
+    /// If specified, this is the version of the MSVCRT that the user wishes to use
+    /// instead of defaulting to the latest MSVCRT available in the the manifest
+    #[arg(long)]
+    crt_version: Option<String>,
     /// Whether to include the Active Template Library (ATL) in the installation
     #[arg(long)]
     include_atl: bool,
@@ -193,7 +248,7 @@ fn main() -> Result<(), Error> {
         match accept.trim() {
             "yes" => println!("license accepted!"),
             "no" => anyhow::bail!("license not accepted"),
-            other => anyhow::bail!("unknown response to license request {}", other),
+            other => anyhow::bail!("unknown response to license request {other}"),
         }
     }
 
@@ -222,29 +277,57 @@ fn main() -> Result<(), Error> {
         .into_iter()
         .fold(0, |acc, var| acc | var as u32);
 
-    let pruned = xwin::prune_pkg_list(&pkg_manifest, arches, variants, args.include_atl)?;
+    let pruned = xwin::prune_pkg_list(
+        &pkg_manifest,
+        arches,
+        variants,
+        args.include_atl,
+        args.sdk_version,
+        args.crt_version,
+    )?;
 
     let op = match args.cmd {
         Command::List => {
-            print_packages(&pruned);
+            print_packages(&pruned.payloads);
             return Ok(());
         }
         Command::Download => xwin::Ops::Download,
         Command::Unpack => xwin::Ops::Unpack,
         Command::Splat {
-            include_debug_libs,
-            include_debug_symbols,
-            disable_symlinks,
-            preserve_ms_arch_notation,
+            options,
             copy,
+            map,
             output,
         } => xwin::Ops::Splat(xwin::SplatConfig {
-            include_debug_libs,
-            include_debug_symbols,
-            enable_symlinks: !disable_symlinks,
-            preserve_ms_arch_notation,
+            include_debug_libs: options.include_debug_libs,
+            include_debug_symbols: options.include_debug_symbols,
+            enable_symlinks: !options.disable_symlinks,
+            preserve_ms_arch_notation: options.preserve_ms_arch_notation,
             copy,
+            map,
             output: output.unwrap_or_else(|| ctx.work_dir.join("splat")),
+        }),
+        Command::Minimize {
+            map,
+            output,
+            copy,
+            splat_output,
+            options,
+            target,
+            manifest_path,
+            preserve_strace,
+        } => xwin::Ops::Minimize(xwin::MinimizeConfig {
+            include_debug_libs: options.include_debug_libs,
+            include_debug_symbols: options.include_debug_symbols,
+            enable_symlinks: !options.disable_symlinks,
+            preserve_ms_arch_notation: options.preserve_ms_arch_notation,
+            splat_output: splat_output.unwrap_or_else(|| ctx.work_dir.join("splat")),
+            copy,
+            output,
+            map: map.unwrap_or_else(|| ctx.work_dir.join("xwin-map.toml")),
+            target: target.unwrap_or("x86_64-pc-windows-msvc".to_owned()),
+            manifest_path: manifest_path.unwrap_or("Cargo.toml".into()),
+            preserve_strace,
         }),
     };
 
@@ -252,41 +335,42 @@ fn main() -> Result<(), Error> {
 
     let mp = ia::MultiProgress::with_draw_target(draw_target.into());
     let work_items: Vec<_> = pruned
+        .payloads
         .into_iter()
         .map(|pay| {
-            let prefix = match pay.kind {
-                xwin::PayloadKind::CrtHeaders => "CRT.headers".to_owned(),
-                xwin::PayloadKind::AtlHeaders => "ATL.headers".to_owned(),
+            use xwin::PayloadKind;
 
-                xwin::PayloadKind::CrtLibs => {
+            let prefix = match pay.kind {
+                PayloadKind::CrtHeaders => "CRT.headers".to_owned(),
+                PayloadKind::AtlHeaders => "ATL.headers".to_owned(),
+                PayloadKind::CrtLibs => {
                     format!(
                         "CRT.libs.{}.{}",
-                        pay.target_arch.map(|ta| ta.as_str()).unwrap_or("all"),
-                        pay.variant.map(|v| v.as_str()).unwrap_or("none")
+                        pay.target_arch.map_or("all", |ta| ta.as_str()),
+                        pay.variant.map_or("none", |v| v.as_str())
                     )
                 }
-                xwin::PayloadKind::AtlLibs => {
+                PayloadKind::AtlLibs => {
                     format!(
                         "ATL.libs.{}",
-                        pay.target_arch.map(|ta| ta.as_str()).unwrap_or("all"),
+                        pay.target_arch.map_or("all", |ta| ta.as_str()),
                     )
                 }
-
-                xwin::PayloadKind::SdkHeaders => {
+                PayloadKind::SdkHeaders => {
                     format!(
                         "SDK.headers.{}.{}",
-                        pay.target_arch.map(|v| v.as_str()).unwrap_or("all"),
-                        pay.variant.map(|v| v.as_str()).unwrap_or("none")
+                        pay.target_arch.map_or("all", |v| v.as_str()),
+                        pay.variant.map_or("none", |v| v.as_str())
                     )
                 }
-                xwin::PayloadKind::SdkLibs => {
+                PayloadKind::SdkLibs => {
                     format!(
                         "SDK.libs.{}",
-                        pay.target_arch.map(|ta| ta.as_str()).unwrap_or("all")
+                        pay.target_arch.map_or("all", |ta| ta.as_str())
                     )
                 }
-                xwin::PayloadKind::SdkStoreLibs => "SDK.libs.store.all".to_owned(),
-                xwin::PayloadKind::Ucrt => "SDK.ucrt.all".to_owned(),
+                PayloadKind::SdkStoreLibs => "SDK.libs.store.all".to_owned(),
+                PayloadKind::Ucrt => "SDK.ucrt.all".to_owned(),
             };
 
             let pb = mp.add(
@@ -306,8 +390,10 @@ fn main() -> Result<(), Error> {
 
     mp.set_move_cursor(true);
 
-    let res =
-        std::thread::spawn(move || ctx.execute(pkgs, work_items, arches, variants, op)).join();
+    let res = std::thread::spawn(move || {
+        ctx.execute(pkgs, work_items, pruned.sdk_version, arches, variants, op)
+    })
+    .join();
 
     res.unwrap()
 }

@@ -50,17 +50,16 @@ pub(crate) fn download(
                 Some(mi) => mi
                     .payloads
                     .iter()
-                    .filter_map(|pay| {
-                        pay.file_name.ends_with(".cab").then(|| Cab {
-                            filename: pay
-                                .file_name
-                                .strip_prefix("Installers\\")
-                                .unwrap_or(&pay.file_name)
-                                .into(),
-                            sha256: pay.sha256.clone(),
-                            url: pay.url.clone(),
-                            size: pay.size,
-                        })
+                    .filter(|pay| pay.file_name.ends_with(".cab"))
+                    .map(|pay| Cab {
+                        filename: pay
+                            .file_name
+                            .strip_prefix("Installers\\")
+                            .unwrap_or(&pay.file_name)
+                            .into(),
+                        sha256: pay.sha256.clone(),
+                        url: pay.url.clone(),
+                        size: pay.size,
                     })
                     .collect(),
                 None => anyhow::bail!(
