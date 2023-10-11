@@ -1,15 +1,16 @@
-use crate::{Arch, Ctx, Error, Path, PathBuf, PayloadKind, Variant};
+use crate::{symlink, Arch, Ctx, Error, Path, PathBuf, PayloadKind, Variant};
 use anyhow::Context as _;
-use camino::Utf8Path;
 use rayon::prelude::*;
 use std::collections::BTreeMap;
 
+#[derive(Clone)]
 pub struct SplatConfig {
     pub include_debug_libs: bool,
     pub include_debug_symbols: bool,
     pub enable_symlinks: bool,
     pub preserve_ms_arch_notation: bool,
     pub output: PathBuf,
+    pub map: Option<PathBuf>,
     pub copy: bool,
     //pub isolated: bool,
 }
@@ -44,17 +45,15 @@ impl SdkHeaders {
 }
 
 pub(crate) struct SplatRoots {
-    crt: PathBuf,
-    sdk: PathBuf,
+    pub root: PathBuf,
+    pub crt: PathBuf,
+    pub sdk: PathBuf,
     src: PathBuf,
 }
 
-pub(crate) fn prep_splat(
-    ctx: std::sync::Arc<Ctx>,
-    config: &SplatConfig,
-) -> Result<SplatRoots, Error> {
-    let crt_root = config.output.join("crt");
-    let sdk_root = config.output.join("sdk");
+pub(crate) fn prep_splat(ctx: std::sync::Arc<Ctx>, root: &Path) -> Result<SplatRoots, Error> {
+    let crt_root = root.join("crt");
+    let sdk_root = root.join("sdk");
 
     if crt_root.exists() {
         std::fs::remove_dir_all(&crt_root)
@@ -74,28 +73,21 @@ pub(crate) fn prep_splat(
     let src_root = ctx.work_dir.join("unpack");
 
     Ok(SplatRoots {
+        root: root.to_owned(),
         crt: crt_root,
         sdk: sdk_root,
         src: src_root,
     })
 }
 
-/// Get the Windows SDK version from the .msi filename.
-fn find_sdk_version(sdk_filename: &Utf8Path) -> String {
-    sdk_filename
-        .as_str()
-        .chars()
-        .skip_while(|ch| ch != &'_')
-        .skip(1)
-        .take_while(|ch| ch != &'_')
-        .collect()
-}
-
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn splat(
     config: &SplatConfig,
     roots: &SplatRoots,
     item: &crate::WorkItem,
     tree: &crate::unpack::FileTree,
+    map: Option<&crate::Map>,
+    sdk_version: &str,
     arches: u32,
     variants: u32,
 ) -> Result<Option<SdkHeaders>, Error> {
@@ -119,9 +111,6 @@ pub(crate) fn splat(
         src.pop();
     }
 
-    let variant = item.payload.variant;
-    let kind = item.payload.kind;
-
     let get_tree = |src_path: &Path| -> Result<&crate::unpack::FileTree, Error> {
         let src_path = src_path
             .strip_prefix(&roots.src)
@@ -134,7 +123,19 @@ pub(crate) fn splat(
             .with_context(|| format!("missing expected subtree '{src_path}'"))
     };
 
-    let mappings = match item.payload.kind {
+    let push_arch = |src: &mut PathBuf, target: &mut PathBuf, arch: Arch| {
+        src.push(arch.as_ms_str());
+        target.push(if config.preserve_ms_arch_notation {
+            arch.as_ms_str()
+        } else {
+            arch.as_str()
+        });
+    };
+
+    let variant = item.payload.variant;
+    let kind = item.payload.kind;
+
+    let mappings = match kind {
         PayloadKind::CrtHeaders | PayloadKind::AtlHeaders => {
             src.push("include");
             let tree = get_tree(&src)?;
@@ -157,18 +158,13 @@ pub(crate) fn splat(
                 target.push("spectre");
             }
 
-            {
-                let arch = item
-                    .payload
+            push_arch(
+                &mut src,
+                &mut target,
+                item.payload
                     .target_arch
-                    .context("ATL libs didn't specify an architecture")?;
-                src.push(arch.as_ms_str());
-                target.push(if config.preserve_ms_arch_notation {
-                    arch.as_ms_str()
-                } else {
-                    arch.as_str()
-                });
-            }
+                    .context("ATL libs didn't specify an architecture")?,
+            );
 
             let tree = get_tree(&src)?;
 
@@ -211,18 +207,13 @@ pub(crate) fn splat(
                 Variant::Spectre => unreachable!(),
             }
 
-            {
-                let arch = item
-                    .payload
+            push_arch(
+                &mut src,
+                &mut target,
+                item.payload
                     .target_arch
-                    .context("CRT libs didn't specify an architecture")?;
-                src.push(arch.as_ms_str());
-                target.push(if config.preserve_ms_arch_notation {
-                    arch.as_ms_str()
-                } else {
-                    arch.as_str()
-                });
-            }
+                    .context("CRT libs didn't specify an architecture")?,
+            );
 
             let tree = get_tree(&src)?;
 
@@ -238,9 +229,18 @@ pub(crate) fn splat(
             src.push("include");
             let tree = get_tree(&src)?;
 
+            let target = if map.is_some() {
+                let mut inc = roots.sdk.clone();
+                inc.push("Include");
+                inc.push(sdk_version);
+                inc
+            } else {
+                roots.sdk.join("include")
+            };
+
             vec![Mapping {
                 src,
-                target: roots.sdk.join("include"),
+                target,
                 tree,
                 kind,
                 variant,
@@ -250,18 +250,13 @@ pub(crate) fn splat(
             src.push("lib/um");
             let mut target = roots.sdk.join("lib/um");
 
-            {
-                let arch = item
-                    .payload
+            push_arch(
+                &mut src,
+                &mut target,
+                item.payload
                     .target_arch
-                    .context("SDK libs didn't specify an architecture")?;
-                src.push(arch.as_ms_str());
-                target.push(if config.preserve_ms_arch_notation {
-                    arch.as_ms_str()
-                } else {
-                    arch.as_str()
-                });
-            }
+                    .context("SDK libs didn't specify an architecture")?,
+            );
 
             let tree = get_tree(&src)?;
 
@@ -279,16 +274,16 @@ pub(crate) fn splat(
 
             Arch::iter(arches)
                 .map(|arch| -> Result<Mapping<'_>, Error> {
-                    let src = src.join(arch.as_ms_str());
+                    let mut src = src.clone();
+                    let mut target = target.clone();
+
+                    push_arch(&mut src, &mut target, arch);
+
                     let tree = get_tree(&src)?;
 
                     Ok(Mapping {
                         src,
-                        target: target.join(if config.preserve_ms_arch_notation {
-                            arch.as_ms_str()
-                        } else {
-                            arch.as_str()
-                        }),
+                        target,
                         tree,
                         kind,
                         variant,
@@ -300,9 +295,19 @@ pub(crate) fn splat(
             let inc_src = src.join("include/ucrt");
             let tree = get_tree(&inc_src)?;
 
+            let target = if map.is_some() {
+                let mut inc = roots.sdk.clone();
+                inc.push("Include");
+                inc.push(sdk_version);
+                inc.push("ucrt");
+                inc
+            } else {
+                roots.sdk.join("include/ucrt")
+            };
+
             let mut mappings = vec![Mapping {
                 src: inc_src,
-                target: roots.sdk.join("include/ucrt"),
+                target,
                 tree,
                 kind,
                 variant,
@@ -311,16 +316,16 @@ pub(crate) fn splat(
             src.push("lib/ucrt");
             let target = roots.sdk.join("lib/ucrt");
             for arch in Arch::iter(arches) {
-                let src = src.join(arch.as_ms_str());
+                let mut src = src.clone();
+                let mut target = target.clone();
+
+                push_arch(&mut src, &mut target, arch);
+
                 let tree = get_tree(&src)?;
 
                 mappings.push(Mapping {
                     src,
-                    target: target.join(if config.preserve_ms_arch_notation {
-                        arch.as_ms_str()
-                    } else {
-                        arch.as_str()
-                    }),
+                    target,
                     tree,
                     kind,
                     variant,
@@ -331,9 +336,6 @@ pub(crate) fn splat(
         }
     };
 
-    let include_debug_libs = config.include_debug_libs;
-    let include_debug_symbols = config.include_debug_symbols;
-
     let mut results = Vec::new();
 
     item.progress.reset();
@@ -341,102 +343,234 @@ pub(crate) fn splat(
         .set_length(mappings.iter().map(|map| map.tree.stats().1).sum());
     item.progress.set_message("📦 splatting");
 
-    let filter_store = variants & Variant::Store as u32 == 0;
+    struct Dir<'ft> {
+        src: PathBuf,
+        tar: PathBuf,
+        tree: &'ft crate::unpack::FileTree,
+    }
 
-    mappings
-        .into_par_iter()
-        .map(|mapping| -> Result<Option<SdkHeaders>, Error> {
-            struct Dir<'ft> {
-                src: PathBuf,
-                tar: PathBuf,
-                tree: &'ft crate::unpack::FileTree,
-            }
+    if let Some(map) = map {
+        mappings
+            .into_par_iter()
+            .map(|mapping| -> Result<Option<SdkHeaders>, Error> {
+                //let rel_root = mapping.target.strip_prefix(&roots.root).unwrap();
 
-            let mut sdk_headers = (mapping.kind == PayloadKind::SdkHeaders)
-                .then(|| SdkHeaders::new(mapping.target.clone()));
+                let mut dir_stack = vec![Dir {
+                    src: mapping.src,
+                    tar: mapping.target,
+                    tree: mapping.tree,
+                }];
 
-            let mut dir_stack = vec![Dir {
-                src: mapping.src,
-                tar: mapping.target,
-                tree: mapping.tree,
-            }];
+                while let Some(Dir { src, mut tar, tree }) = dir_stack.pop() {
+                    let mut created_dir = false;
 
-            while let Some(Dir { src, mut tar, tree }) = dir_stack.pop() {
-                std::fs::create_dir_all(&tar).with_context(|| format!("unable to create {tar}"))?;
+                    for (fname, size) in &tree.files {
+                        // Even if we don't splat 100% of the source files, we still
+                        // want to show that we processed them all
+                        item.progress.inc(*size);
 
-                for (fname, size) in &tree.files {
-                    // Even if we don't splat 100% of the source files, we still
-                    // want to show that we processed them all
-                    item.progress.inc(*size);
+                        tar.push(fname);
 
-                    if !include_debug_symbols && fname.extension() == Some("pdb") {
-                        tracing::debug!("skipping {fname}");
-                        continue;
-                    }
+                        let unprefixed = tar
+                            .strip_prefix(&roots.root)
+                            .with_context(|| format!("invalid path {tar}"))?;
 
-                    let fname_str = fname.as_str();
-                    if !include_debug_libs
-                        && (mapping.kind == PayloadKind::CrtLibs
-                            || mapping.kind == PayloadKind::Ucrt)
-                    {
-                        if let Some(stripped) = fname_str.strip_suffix(".lib") {
-                            if stripped.ends_with('d')
-                                || stripped.ends_with("d_netcore")
-                                || stripped
-                                    .strip_suffix(|c: char| c.is_ascii_digit())
-                                    .map_or(false, |fname| fname.ends_with('d'))
-                            {
-                                tracing::debug!("skipping {fname}");
-                                continue;
+                        // if kind == PayloadKind::Ucrt {
+                        //     dbg!(&roots.root, &tar, unprefixed);
+                        // }
+
+                        if map.filter.contains(unprefixed.as_str()) {
+                            let src_path = src.join(fname);
+
+                            if !created_dir {
+                                std::fs::create_dir_all(tar.parent().unwrap())
+                                    .with_context(|| format!("unable to create {tar}"))?;
+                                created_dir = true;
+                            }
+
+                            if config.copy {
+                                std::fs::copy(&src_path, &tar).with_context(|| {
+                                    format!("failed to copy {src_path} to {tar}")
+                                })?;
+                            } else {
+                                std::fs::rename(&src_path, &tar).with_context(|| {
+                                    format!("failed to move {src_path} to {tar}")
+                                })?;
+                            }
+
+                            // Create any associated symlinks, these are always going to be symlinks
+                            // in the same target directory
+                            if let Some(symlinks) = map.symlinks.get(unprefixed.as_str()) {
+                                for sl in symlinks {
+                                    tar.pop();
+                                    tar.push(sl);
+                                    symlink(fname.as_str(), &tar)?;
+                                }
                             }
                         }
+
+                        tar.pop();
                     }
 
-                    tar.push(fname);
-
-                    let src_path = src.join(fname);
-
-                    if config.copy {
-                        std::fs::copy(&src_path, &tar)
-                            .with_context(|| format!("failed to copy {src_path} to {tar}"))?;
-                    } else {
-                        std::fs::rename(&src_path, &tar)
-                            .with_context(|| format!("failed to move {src_path} to {tar}"))?;
+                    for (dir, dtree) in &tree.dirs {
+                        dir_stack.push(Dir {
+                            src: src.join(dir),
+                            tar: tar.join(dir),
+                            tree: dtree,
+                        });
                     }
+                }
 
-                    let kind = mapping.kind;
+                // This is only if we are outputting symlinks, which we don't do when the user
+                // has specified an exact mapping
+                Ok(None)
+            })
+            .collect_into_vec(&mut results);
+    } else {
+        let include_debug_libs = config.include_debug_libs;
+        let include_debug_symbols = config.include_debug_symbols;
+        let filter_store = variants & Variant::Store as u32 == 0;
 
-                    let mut add_symlinks = || -> Result<(), Error> {
-                        match kind {
-                            // These are all internally consistent and lowercased, so if
-                            // a library is including them with different casing that is
-                            // kind of on them
-                            //
-                            // The SDK headers are also all over the place with casing
-                            // as well as being internally inconsistent, so we scan
-                            // them all for includes and add those that are referenced
-                            // incorrectly, but we wait until after all the of headers
-                            // have been unpacked before fixing them
-                            PayloadKind::CrtHeaders
-                            | PayloadKind::AtlHeaders
-                            | PayloadKind::Ucrt
-                            | PayloadKind::AtlLibs => {}
+        mappings
+            .into_par_iter()
+            .map(|mapping| -> Result<Option<SdkHeaders>, Error> {
+                let mut sdk_headers = (mapping.kind == PayloadKind::SdkHeaders)
+                    .then(|| SdkHeaders::new(mapping.target.clone()));
 
-                            PayloadKind::SdkHeaders => {
-                                if let Some(sdk_headers) = &mut sdk_headers {
-                                    let rel_target_path = sdk_headers.get_relative_path(&tar)?;
+                let mut dir_stack = vec![Dir {
+                    src: mapping.src,
+                    tar: mapping.target,
+                    tree: mapping.tree,
+                }];
 
-                                    let rel_hash = calc_lower_hash(rel_target_path.as_str());
+                while let Some(Dir { src, mut tar, tree }) = dir_stack.pop() {
+                    std::fs::create_dir_all(&tar)
+                        .with_context(|| format!("unable to create {tar}"))?;
 
-                                    if sdk_headers.inner.insert(rel_hash, tar.clone()).is_some() {
-                                        anyhow::bail!("found duplicate relative path when hashed");
+                    for (fname, size) in &tree.files {
+                        // Even if we don't splat 100% of the source files, we still
+                        // want to show that we processed them all
+                        item.progress.inc(*size);
+
+                        if !include_debug_symbols && fname.extension() == Some("pdb") {
+                            tracing::debug!("skipping {fname}");
+                            continue;
+                        }
+
+                        let fname_str = fname.as_str();
+                        if !include_debug_libs
+                            && (mapping.kind == PayloadKind::CrtLibs
+                                || mapping.kind == PayloadKind::Ucrt)
+                        {
+                            if let Some(stripped) = fname_str.strip_suffix(".lib") {
+                                if stripped.ends_with('d')
+                                    || stripped.ends_with("d_netcore")
+                                    || stripped
+                                        .strip_suffix(|c: char| c.is_ascii_digit())
+                                        .map_or(false, |fname| fname.ends_with('d'))
+                                {
+                                    tracing::debug!("skipping {fname}");
+                                    continue;
+                                }
+                            }
+                        }
+
+                        tar.push(fname);
+
+                        let src_path = src.join(fname);
+
+                        if config.copy {
+                            std::fs::copy(&src_path, &tar)
+                                .with_context(|| format!("failed to copy {src_path} to {tar}"))?;
+                        } else {
+                            std::fs::rename(&src_path, &tar)
+                                .with_context(|| format!("failed to move {src_path} to {tar}"))?;
+                        }
+
+                        let kind = mapping.kind;
+
+                        let mut add_symlinks = || -> Result<(), Error> {
+                            match kind {
+                                // These are all internally consistent and lowercased, so if
+                                // a library is including them with different casing that is
+                                // kind of on them
+                                //
+                                // The SDK headers are also all over the place with casing
+                                // as well as being internally inconsistent, so we scan
+                                // them all for includes and add those that are referenced
+                                // incorrectly, but we wait until after all the of headers
+                                // have been unpacked before fixing them
+                                PayloadKind::CrtHeaders
+                                | PayloadKind::AtlHeaders
+                                | PayloadKind::Ucrt
+                                | PayloadKind::AtlLibs => {}
+
+                                PayloadKind::SdkHeaders => {
+                                    if let Some(sdk_headers) = &mut sdk_headers {
+                                        let rel_target_path =
+                                            sdk_headers.get_relative_path(&tar)?;
+
+                                        let rel_hash = calc_lower_hash(rel_target_path.as_str());
+
+                                        if sdk_headers.inner.insert(rel_hash, tar.clone()).is_some()
+                                        {
+                                            anyhow::bail!(
+                                                "found duplicate relative path when hashed"
+                                            );
+                                        }
+
+                                        if let Some(additional_name) = match fname_str {
+                                            // https://github.com/zeromq/libzmq/blob/3070a4b2461ec64129062907d915ed665d2ac126/src/precompiled.hpp#L73
+                                            "mstcpip.h" => Some("Mstcpip.h"),
+                                            // https://github.com/ponylang/ponyc/blob/8d41d6650b48b9733cd675df199588e6fccc6346/src/common/platform.h#L191
+                                            "basetsd.h" => Some("BaseTsd.h"),
+                                            _ => None,
+                                        } {
+                                            tar.pop();
+                                            tar.push(additional_name);
+
+                                            symlink(fname_str, &tar)?;
+                                        }
+                                    }
+                                }
+                                PayloadKind::CrtLibs => {
+                                    // While _most_ of the libs *stares at Microsoft.VisualC.STLCLR.dll* are lower case,
+                                    // sometimes when they are specified as linker arguments, crates will link with
+                                    // SCREAMING as if they are angry at the linker, so fix this in the few "common" cases.
+                                    // This list is probably not complete, but that's what PRs are for
+                                    if let Some(angry_lib) = match fname_str.strip_suffix(".lib") {
+                                        Some("libcmt") => Some("LIBCMT.lib"),
+                                        Some("msvcrt") => Some("MSVCRT.lib"),
+                                        Some("oldnames") => Some("OLDNAMES.lib"),
+                                        _ => None,
+                                    } {
+                                        tar.pop();
+                                        tar.push(angry_lib);
+
+                                        symlink(fname_str, &tar)?;
+                                    }
+                                }
+                                PayloadKind::SdkLibs | PayloadKind::SdkStoreLibs => {
+                                    // The SDK libraries are just completely inconsistent, but
+                                    // all usage I have ever seen just links them with lowercase
+                                    // names, so we just fix all of them to be lowercase.
+                                    // Note that we need to not only fix the name but also the
+                                    // extension, as for some inexplicable reason about half of
+                                    // them use an uppercase L for the extension. WTF. This also
+                                    // applies to the tlb files, so at least they are consistently
+                                    // inconsistent
+                                    if fname_str.contains(|c: char| c.is_ascii_uppercase()) {
+                                        tar.pop();
+                                        tar.push(fname_str.to_ascii_lowercase());
+
+                                        symlink(fname_str, &tar)?;
                                     }
 
+                                    // There is also this: https://github.com/time-rs/time/blob/v0.3.2/src/utc_offset.rs#L454
+                                    // And this: https://github.com/webrtc-rs/util/blob/main/src/ifaces/ffi/windows/mod.rs#L33
                                     if let Some(additional_name) = match fname_str {
-                                        // https://github.com/zeromq/libzmq/blob/3070a4b2461ec64129062907d915ed665d2ac126/src/precompiled.hpp#L73
-                                        "mstcpip.h" => Some("Mstcpip.h"),
-                                        // https://github.com/ponylang/ponyc/blob/8d41d6650b48b9733cd675df199588e6fccc6346/src/common/platform.h#L191
-                                        "basetsd.h" => Some("BaseTsd.h"),
+                                        "kernel32.Lib" => Some("Kernel32.lib"),
+                                        "iphlpapi.lib" => Some("Iphlpapi.lib"),
                                         _ => None,
                                     } {
                                         tar.pop();
@@ -444,169 +578,109 @@ pub(crate) fn splat(
 
                                         symlink(fname_str, &tar)?;
                                     }
+
+                                    // We also need to support SCREAMING case for the library names
+                                    // due to...reasons https://github.com/microsoft/windows-rs/blob/a27a74784ccf304ab362bf2416f5f44e98e5eecd/src/bindings.rs#L3772
+                                    if tar.extension() == Some("lib") {
+                                        tar.pop();
+                                        tar.push(fname_str.to_ascii_uppercase());
+                                        tar.set_extension("lib");
+
+                                        symlink(fname_str, &tar)?;
+                                    }
                                 }
                             }
-                            PayloadKind::CrtLibs => {
-                                // While _most_ of the libs *stares at Microsoft.VisualC.STLCLR.dll* are lower case,
-                                // sometimes when they are specified as linker arguments, crates will link with
-                                // SCREAMING as if they are angry at the linker, so fix this in the few "common" cases.
-                                // This list is probably not complete, but that's what PRs are for
-                                if let Some(angry_lib) = match fname_str.strip_suffix(".lib") {
-                                    Some("libcmt") => Some("LIBCMT.lib"),
-                                    Some("msvcrt") => Some("MSVCRT.lib"),
-                                    Some("oldnames") => Some("OLDNAMES.lib"),
-                                    _ => None,
-                                } {
-                                    tar.pop();
-                                    tar.push(angry_lib);
 
-                                    symlink(fname_str, &tar)?;
-                                }
-                            }
-                            PayloadKind::SdkLibs | PayloadKind::SdkStoreLibs => {
-                                // The SDK libraries are just completely inconsistent, but
-                                // all usage I have ever seen just links them with lowercase
-                                // names, so we just fix all of them to be lowercase.
-                                // Note that we need to not only fix the name but also the
-                                // extension, as for some inexplicable reason about half of
-                                // them use an uppercase L for the extension. WTF. This also
-                                // applies to the tlb files, so at least they are consistently
-                                // inconsistent
-                                if fname_str.contains(|c: char| c.is_ascii_uppercase()) {
-                                    tar.pop();
-                                    tar.push(fname_str.to_ascii_lowercase());
+                            Ok(())
+                        };
 
-                                    symlink(fname_str, &tar)?;
-                                }
-
-                                // There is also this: https://github.com/time-rs/time/blob/v0.3.2/src/utc_offset.rs#L454
-                                // And this: https://github.com/webrtc-rs/util/blob/main/src/ifaces/ffi/windows/mod.rs#L33
-                                if let Some(additional_name) = match fname_str {
-                                    "kernel32.Lib" => Some("Kernel32.lib"),
-                                    "iphlpapi.lib" => Some("Iphlpapi.lib"),
-                                    _ => None,
-                                } {
-                                    tar.pop();
-                                    tar.push(additional_name);
-
-                                    symlink(fname_str, &tar)?;
-                                }
-
-                                // We also need to support SCREAMING case for the library names
-                                // due to...reasons https://github.com/microsoft/windows-rs/blob/a27a74784ccf304ab362bf2416f5f44e98e5eecd/src/bindings.rs#L3772
-                                if tar.extension() == Some("lib") {
-                                    tar.pop();
-                                    tar.push(fname_str.to_ascii_uppercase());
-                                    tar.set_extension("lib");
-
-                                    symlink(fname_str, &tar)?;
-                                }
-                            }
+                        if config.enable_symlinks {
+                            add_symlinks()?;
                         }
 
-                        Ok(())
-                    };
-
-                    if config.enable_symlinks {
-                        add_symlinks()?;
+                        tar.pop();
                     }
 
-                    tar.pop();
-                }
-
-                // Due to some libs from the CRT Store libs variant being needed
-                // by the regular Desktop variant, if we are not actually
-                // targeting the Store we can avoid adding the additional
-                // uwp and store subdirectories
-                if mapping.variant == Some(Variant::Store) && filter_store {
-                    if mapping.kind == PayloadKind::CrtLibs {
+                    // Due to some libs from the CRT Store libs variant being needed
+                    // by the regular Desktop variant, if we are not actually
+                    // targeting the Store we can avoid adding the additional
+                    // uwp and store subdirectories
+                    if mapping.variant == Some(Variant::Store)
+                        && filter_store
+                        && mapping.kind == PayloadKind::CrtLibs
+                    {
                         tracing::debug!("skipping CRT subdirs");
 
                         item.progress
                             .inc(tree.dirs.iter().map(|(_, ft)| ft.stats().1).sum());
                         continue;
-                    } else if mapping.kind == PayloadKind::SdkHeaders {
+                    }
+
+                    for (dir, dtree) in &tree.dirs {
+                        dir_stack.push(Dir {
+                            src: src.join(dir),
+                            tar: tar.join(dir),
+                            tree: dtree,
+                        });
                     }
                 }
 
-                for (dir, dtree) in &tree.dirs {
-                    dir_stack.push(Dir {
-                        src: src.join(dir),
-                        tar: tar.join(dir),
-                        tree: dtree,
-                    });
+                Ok(sdk_headers)
+            })
+            .collect_into_vec(&mut results);
+
+        match kind {
+            PayloadKind::SdkLibs => {
+                // Symlink sdk/lib/{sdkversion} -> sdk/lib, regardless of filesystem case sensitivity.
+                let mut versioned_linkname = roots.sdk.clone();
+                versioned_linkname.push("lib");
+                versioned_linkname.push(sdk_version);
+
+                // Multiple architectures both have a lib dir,
+                // but we only need to create this symlink once.
+                if !versioned_linkname.exists() {
+                    symlink(".", &versioned_linkname)?;
+                }
+
+                // https://github.com/llvm/llvm-project/blob/release/14.x/clang/lib/Driver/ToolChains/MSVC.cpp#L1102
+                if config.enable_symlinks {
+                    let mut title_case = roots.sdk.clone();
+                    title_case.push("Lib");
+                    if !title_case.exists() {
+                        symlink("lib", &title_case)?;
+                    }
                 }
             }
+            PayloadKind::SdkHeaders => {
+                // Symlink sdk/include/{sdkversion} -> sdk/include, regardless of filesystem case sensitivity.
+                let mut versioned_linkname = roots.sdk.clone();
+                versioned_linkname.push("include");
+                versioned_linkname.push(sdk_version);
 
-            Ok(sdk_headers)
-        })
-        .collect_into_vec(&mut results);
+                // Desktop and Store variants both have an include dir,
+                // but we only need to create this symlink once.
+                if !versioned_linkname.exists() {
+                    symlink(".", &versioned_linkname)?;
+                }
 
-    match item.payload.kind {
-        PayloadKind::SdkLibs => {
-            // Symlink sdk/lib/{sdkversion} -> sdk/lib, regardless of filesystem case sensitivity.
-            let sdk_version = find_sdk_version(&item.payload.filename);
-            let mut versioned_linkname = roots.sdk.clone();
-            versioned_linkname.push("lib");
-            versioned_linkname.push(sdk_version);
-
-            // Multiple architectures both have a lib dir,
-            // but we only need to create this symlink once.
-            if !versioned_linkname.exists() {
-                symlink(".", &versioned_linkname)?;
-            }
-
-            // https://github.com/llvm/llvm-project/blob/release/14.x/clang/lib/Driver/ToolChains/MSVC.cpp#L1102
-            if config.enable_symlinks {
-                let mut title_case = roots.sdk.clone();
-                title_case.push("Lib");
-                if !title_case.exists() {
-                    symlink("lib", &title_case)?;
+                // https://github.com/llvm/llvm-project/blob/release/14.x/clang/lib/Driver/ToolChains/MSVC.cpp#L1340-L1346
+                if config.enable_symlinks {
+                    let mut title_case = roots.sdk.clone();
+                    title_case.push("Include");
+                    if !title_case.exists() {
+                        symlink("include", &title_case)?;
+                    }
                 }
             }
-        }
-        PayloadKind::SdkHeaders => {
-            // Symlink sdk/include/{sdkversion} -> sdk/include, regardless of filesystem case sensitivity.
-            let sdk_version = find_sdk_version(&item.payload.filename);
-            let mut versioned_linkname = roots.sdk.clone();
-            versioned_linkname.push("include");
-            versioned_linkname.push(sdk_version);
-
-            // Desktop and Store variants both have an include dir,
-            // but we only need to create this symlink once.
-            if !versioned_linkname.exists() {
-                symlink(".", &versioned_linkname)?;
-            }
-
-            // https://github.com/llvm/llvm-project/blob/release/14.x/clang/lib/Driver/ToolChains/MSVC.cpp#L1340-L1346
-            if config.enable_symlinks {
-                let mut title_case = roots.sdk.clone();
-                title_case.push("Include");
-                if !title_case.exists() {
-                    symlink("include", &title_case)?;
-                }
-            }
-        }
-        _ => (),
-    };
+            _ => (),
+        };
+    }
 
     item.progress.finish_with_message("📦 splatted");
 
     let headers = results.into_iter().collect::<Result<Vec<_>, _>>()?;
 
     Ok(headers.into_iter().find_map(|headers| headers))
-}
-
-#[cfg(unix)]
-#[inline]
-fn symlink(original: &str, link: &Path) -> Result<(), Error> {
-    std::os::unix::fs::symlink(original, link)
-        .with_context(|| format!("unable to symlink from {link} to {original}"))
-}
-
-#[cfg(windows)]
-fn symlink(_original: &str, _link: &Path) -> Result<(), Error> {
-    Ok(())
 }
 
 pub(crate) fn finalize_splat(

@@ -7,11 +7,13 @@ use std::{collections::BTreeMap, fmt};
 mod ctx;
 mod download;
 pub mod manifest;
+mod minimize;
 mod splat;
 mod unpack;
 pub mod util;
 
 pub use ctx::Ctx;
+pub use minimize::MinimizeConfig;
 pub use splat::SplatConfig;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -136,7 +138,8 @@ impl Variant {
 pub enum Ops {
     Download,
     Unpack,
-    Splat(crate::splat::SplatConfig),
+    Splat(SplatConfig),
+    Minimize(MinimizeConfig),
 }
 
 #[derive(Clone)]
@@ -178,22 +181,39 @@ pub enum PayloadKind {
     Ucrt,
 }
 
+pub struct PrunedPackageList {
+    pub sdk_version: String,
+    pub payloads: Vec<Payload>,
+}
+
 /// Returns the list of packages that are actually needed for cross compilation
 pub fn prune_pkg_list(
     pkg_manifest: &manifest::PackageManifest,
     arches: u32,
     variants: u32,
     include_atl: bool,
-) -> Result<Vec<Payload>, Error> {
+    sdk_version: Option<String>,
+    crt_version: Option<String>,
+) -> Result<PrunedPackageList, Error> {
     // We only really need 2 core pieces from the manifest, the CRT (headers + libs)
     // and the Windows SDK
     let pkgs = &pkg_manifest.packages;
-    let mut pruned = Vec::new();
+    let mut payloads = Vec::new();
 
-    get_crt(pkgs, arches, variants, &mut pruned, include_atl)?;
-    get_sdk(pkgs, arches, &mut pruned)?;
+    get_crt(
+        pkgs,
+        arches,
+        variants,
+        &mut payloads,
+        include_atl,
+        crt_version,
+    )?;
+    let sdk_version = get_sdk(pkgs, arches, sdk_version, &mut payloads)?;
 
-    Ok(pruned)
+    Ok(PrunedPackageList {
+        sdk_version,
+        payloads,
+    })
 }
 
 fn get_crt(
@@ -202,6 +222,7 @@ fn get_crt(
     variants: u32,
     pruned: &mut Vec<Payload>,
     include_atl: bool,
+    crt_version: Option<String>,
 ) -> Result<(), Error> {
     fn to_payload(mi: &manifest::ManifestItem, payload: &manifest::Payload) -> Payload {
         // These are really the only two we care about
@@ -258,17 +279,33 @@ fn get_crt(
         .get("Microsoft.VisualStudio.Product.BuildTools")
         .context("unable to find root BuildTools item")?;
 
-    let crt_version_rs_versions = build_tools
-        .dependencies
-        .keys()
-        .filter_map(|key| {
-            key.strip_prefix("Microsoft.VisualStudio.Component.VC.")
-                .and_then(|s| s.strip_suffix(".x86.x64"))
-                .and_then(versions::Version::new)
-        })
-        .max()
-        .context("unable to find latest CRT version")?;
-    let crt_version = &crt_version_rs_versions.to_string();
+    let crt_version = if let Some(user) = crt_version {
+        // Ensure it is a valid version and that it actually exists in the manifest
+        versions::Version::new(&user)
+            .with_context(|| format!("invalid CRT version '{user}' specified"))?;
+
+        build_tools
+            .dependencies
+            .get(&format!(
+                "Microsoft.VisualStudio.Component.VC.{user}.x86.x64"
+            ))
+            .with_context(|| format!("CRT version '{user}' does not exist in the manifest"))?;
+
+        user
+    } else {
+        let crt_version_rs_versions = build_tools
+            .dependencies
+            .keys()
+            .filter_map(|key| {
+                key.strip_prefix("Microsoft.VisualStudio.Component.VC.")
+                    .and_then(|s| s.strip_suffix(".x86.x64"))
+                    .and_then(versions::Version::new)
+            })
+            .max()
+            .context("unable to find latest CRT version")?;
+
+        crt_version_rs_versions.to_string()
+    };
 
     // The CRT headers are in the "base" package
     // `Microsoft.VC.<ridiculous_version_numbers>.CRT.Headers.base`
@@ -330,7 +367,7 @@ fn get_crt(
             }
         }
         if include_atl {
-            get_atl(pkgs, arches, spectre, pruned, crt_version)?;
+            get_atl(pkgs, arches, spectre, pruned, &crt_version)?;
         }
     }
 
@@ -435,7 +472,9 @@ fn get_atl(
     Ok(())
 }
 
-fn get_latest_sdk_version<'keys>(keys: impl Iterator<Item = &'keys String>) -> Option<String> {
+fn get_latest_sdk_version<'keys>(
+    keys: impl Iterator<Item = &'keys String>,
+) -> Option<(String, versions::Version)> {
     // Normally I would consider regex overkill for this, but we already use
     // it for include scanning so...meh, this is only called once so there is
     // no need to do one time initialization or the like (except in tests where it doesn't matter)
@@ -453,20 +492,35 @@ fn get_latest_sdk_version<'keys>(keys: impl Iterator<Item = &'keys String>) -> O
         })
         .max()?;
 
-    Some(format!("Win{major}SDK_{full}"))
+    Some((format!("Win{major}SDK_{full}"), full))
 }
 
 fn get_sdk(
     pkgs: &BTreeMap<String, manifest::ManifestItem>,
     arches: u32,
+    sdk_version: Option<String>,
     pruned: &mut Vec<Payload>,
-) -> Result<(), Error> {
-    let latest =
-        get_latest_sdk_version(pkgs.keys()).context("unable to find latest WinSDK version")?;
+) -> Result<String, Error> {
+    let (sdk, sdk_version) = if let Some(sdk_version) = sdk_version {
+        let sv = versions::Version::new(&sdk_version)
+            .with_context(|| format!("invalid SDK version '{sdk_version}'"))?;
 
-    let sdk = pkgs
-        .get(&latest)
-        .with_context(|| format!("unable to locate SDK {latest}"))?;
+        let (_, mi) = pkgs
+            .iter()
+            .find(|(key, _)| key.ends_with(&sdk_version))
+            .with_context(|| "unable to locate SDK '{sdk_version}'")?;
+
+        (mi, sv)
+    } else {
+        let (full, sdk_version) =
+            get_latest_sdk_version(pkgs.keys()).context("unable to find latest WinSDK version")?;
+
+        let sdk = pkgs
+            .get(&full)
+            .with_context(|| format!("unable to locate SDK {sdk_version}"))?;
+
+        (sdk, sdk_version)
+    };
 
     // So. There are multiple SDK Desktop Headers, one per architecture. However,
     // all of the non-x86 ones include either 0 or few files, with x86 containing
@@ -629,6 +683,26 @@ fn get_sdk(
         });
     }
 
+    Ok(sdk_version.to_string())
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Default)]
+pub struct Map {
+    #[serde(default)]
+    pub filter: std::collections::BTreeSet<String>,
+    #[serde(default)]
+    pub symlinks: std::collections::BTreeMap<String, Vec<String>>,
+}
+
+#[cfg(unix)]
+#[inline]
+fn symlink(original: &str, link: &Path) -> Result<(), Error> {
+    std::os::unix::fs::symlink(original, link)
+        .with_context(|| format!("unable to symlink from {link} to {original}"))
+}
+
+#[cfg(windows)]
+fn symlink(_original: &str, _link: &Path) -> Result<(), Error> {
     Ok(())
 }
 
@@ -644,18 +718,21 @@ mod test {
             "Win10SDK_10.0.17134".to_owned(),
         ];
 
-        assert_eq!(just_10[1], glsv(just_10.iter()).unwrap());
+        let (full, vers) = glsv(just_10.iter()).unwrap();
+
+        assert_eq!(just_10[1], full);
+        assert_eq!("10.0.17763", vers.to_string());
 
         let just_11 = [
             "Win11SDK_10.0.22001".to_owned(),
             "Win11SDK_10.0.22000".to_owned(),
         ];
 
-        assert_eq!(just_11[0], glsv(just_11.iter()).unwrap());
+        assert_eq!(just_11[0], glsv(just_11.iter()).unwrap().0);
 
         assert_eq!(
             just_11[0],
-            glsv(just_11.iter().chain(just_10.iter())).unwrap()
+            glsv(just_11.iter().chain(just_10.iter())).unwrap().0
         );
     }
 }

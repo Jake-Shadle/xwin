@@ -15,6 +15,10 @@ Commands:
   splat     Fixes the packages to prune unneeded files and adds symlinks to
                 address file casing issues and then spalts the final artifacts
                 into directories
+  minimize  Runs the specified build command, detecting all of the headers
+                and libraries used by the build, and generating a file that can
+                be used to filter future splat operations, and optionally move
+                only the user files to a new directory
   help      Print this message or the help of the given subcommand(s)
 
 Options:
@@ -55,6 +59,16 @@ Options:
           The product channel to use
           
           [default: release]
+
+      --sdk-version <SDK_VERSION>
+          If specified, this is the version of the SDK that the user wishes to
+          use instead of defaulting to the latest SDK available in the the
+          manifest
+
+      --crt-version <CRT_VERSION>
+          If specified, this is the version of the MSVCRT that the user wishes
+          to use instead of defaulting to the latest MSVCRT available in the the
+          manifest
 
       --include-atl
           Whether to include the Active Template Library (ATL) in the

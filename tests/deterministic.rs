@@ -24,6 +24,8 @@ fn verify_deterministic() {
         xwin::Arch::X86_64 as u32,
         xwin::Variant::Desktop as u32,
         true,
+        None,
+        None,
     )
     .unwrap();
 
@@ -37,6 +39,7 @@ fn verify_deterministic() {
         include_debug_symbols: false,
         enable_symlinks: true,
         preserve_ms_arch_notation: false,
+        map: None,
         copy: true,
         output: output_dir.clone(),
     });
@@ -46,12 +49,14 @@ fn verify_deterministic() {
     ctx.execute(
         pkg_manifest.packages,
         pruned
+            .payloads
             .into_iter()
             .map(|payload| xwin::WorkItem {
                 progress: hidden.clone(),
                 payload: std::sync::Arc::new(payload),
             })
             .collect(),
+        pruned.sdk_version,
         xwin::Arch::X86_64 as u32,
         xwin::Variant::Desktop as u32,
         op,
