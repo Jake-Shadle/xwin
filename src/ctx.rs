@@ -1,4 +1,3 @@
-use std::env;
 use std::time::Duration;
 
 use crate::{
@@ -30,15 +29,19 @@ impl Ctx {
         let mut builder = ureq::builder();
         #[cfg(feature = "native-tls")]
         {
-            use std::sync::Arc;
+            use std::env;
             use std::fs::File;
             use std::io::BufReader;
+            use std::sync::Arc;
 
             let mut tls_builder = native_tls_crate::TlsConnector::builder();
-            if let Some(custom_ca) = env::var_os("REQUESTS_CA_BUNDLE").or_else(|| env::var_os("CURL_CA_BUNDLE")){
+            if let Some(custom_ca) =
+                env::var_os("REQUESTS_CA_BUNDLE").or_else(|| env::var_os("CURL_CA_BUNDLE"))
+            {
                 let mut reader = BufReader::new(File::open(custom_ca)?);
                 for cert in rustls_pemfile::certs(&mut reader)? {
-                    tls_builder.add_root_certificate(native_tls_crate::Certificate::from_pem(&cert)?);
+                    tls_builder
+                        .add_root_certificate(native_tls_crate::Certificate::from_pem(&cert)?);
                 }
             }
             builder = builder.tls_connector(Arc::new(tls_builder.build()?));
