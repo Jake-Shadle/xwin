@@ -16,7 +16,7 @@ default = ["rustls-tls"]
 rustls-tls = ["ureq/tls"]
 # If this feature is enabled we instead use the native TLS implementation for the
 # target platform
-native-tls = ["ureq/native-tls", "native-tls-crate/vendored"]
+native-tls = ["ureq/native-tls", "native-tls-crate/vendored", "rustls-pemfile", "rustls"]
 
 [dependencies]
 # Easy errors
@@ -47,6 +47,9 @@ regex = "1.0"
 ureq = { version = "2.4", default-features = false, features = ["gzip"] }
 memchr = "2.6"
 native-tls-crate = { package = "native-tls", version = "0.2", optional = true }
+# CA Cert for HTTP requests
+rustls = { version = "0.21.8", optional = true }
+rustls-pemfile = { version = "1.0.3", optional = true }
 # SHA-256 verification
 sha2 = "0.10"
 # Deserialization
