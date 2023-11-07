@@ -27,24 +27,39 @@ pub struct Ctx {
 impl Ctx {
     fn http_client(read_timeout: Option<Duration>) -> Result<ureq::Agent, Error> {
         let mut builder = ureq::builder();
-        #[cfg(feature = "native-tls")]
-        {
-            use std::env;
-            use std::fs::File;
-            use std::io::BufReader;
-            use std::sync::Arc;
 
-            let mut tls_builder = native_tls_crate::TlsConnector::builder();
-            if let Some(custom_ca) =
-                env::var_os("REQUESTS_CA_BUNDLE").or_else(|| env::var_os("CURL_CA_BUNDLE"))
-            {
-                let mut reader = BufReader::new(File::open(custom_ca)?);
+        #[cfg(feature = "native-tls")]
+        'custom: {
+            // "common"? env vars that people who use custom certs use? I guess
+            // this is easy to expand if it's not the case. /shrug
+            const CERT_ENVS: &[&str] = &["REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "SSL_CERT_FILE"];
+
+            let Some((env, cert_path)) = CERT_ENVS.iter().find_map(|env| {
+                std::env::var_os(env).map(|var| (env, std::path::PathBuf::from(var)))
+            }) else {
+                break 'custom;
+            };
+
+            fn build(
+                cert_path: &std::path::Path,
+            ) -> anyhow::Result<native_tls_crate::TlsConnector> {
+                let mut tls_builder = native_tls_crate::TlsConnector::builder();
+                let mut reader = std::io::BufReader::new(std::fs::File::open(cert_path)?);
                 for cert in rustls_pemfile::certs(&mut reader)? {
                     tls_builder
                         .add_root_certificate(native_tls_crate::Certificate::from_pem(&cert)?);
                 }
+                Ok(tls_builder.build()?)
             }
-            builder = builder.tls_connector(Arc::new(tls_builder.build()?));
+
+            let tls_connector = build(&cert_path).with_context(|| {
+                format!(
+                    "failed to add custom cert from path '{}' configured by env var '{env}'",
+                    cert_path.display()
+                )
+            })?;
+
+            builder = builder.tls_connector(std::sync::Arc::new(tls_connector));
         }
 
         // Allow user to specify timeout values in the case of bad/slow proxies
@@ -213,43 +228,46 @@ impl Ctx {
 
         let packages = std::sync::Arc::new(packages);
 
-        let splat_roots = match &ops {
-            crate::Ops::Splat(config) => {
-                Some(crate::splat::prep_splat(self.clone(), &config.output)?)
-            }
-            crate::Ops::Minimize(config) => Some(crate::splat::prep_splat(
-                self.clone(),
-                &config.splat_output,
-            )?),
-            _ => None,
-        };
-
         let mut results = Vec::new();
         let crt_ft = parking_lot::Mutex::new(None);
         let atl_ft = parking_lot::Mutex::new(None);
 
         let splat_config = match &ops {
-            crate::Ops::Splat(config) => Some(config.clone()),
-            crate::Ops::Minimize(config) => Some(crate::SplatConfig {
-                preserve_ms_arch_notation: config.preserve_ms_arch_notation,
-                include_debug_libs: config.include_debug_libs,
-                include_debug_symbols: config.include_debug_symbols,
-                enable_symlinks: config.enable_symlinks,
-                output: config.splat_output.clone(),
-                map: Some(config.map.clone()),
-                copy: config.copy,
-            }),
+            crate::Ops::Splat(config) => {
+                let splat_roots = crate::splat::prep_splat(self.clone(), &config.output)?;
+                let mut config = config.clone();
+                config.output = splat_roots.root.clone();
+
+                Some((splat_roots, config))
+            }
+            crate::Ops::Minimize(config) => {
+                let splat_roots = crate::splat::prep_splat(self.clone(), &config.splat_output)?;
+
+                let config = crate::SplatConfig {
+                    preserve_ms_arch_notation: config.preserve_ms_arch_notation,
+                    include_debug_libs: config.include_debug_libs,
+                    include_debug_symbols: config.include_debug_symbols,
+                    enable_symlinks: config.enable_symlinks,
+                    output: splat_roots.root.clone(),
+                    map: Some(config.map.clone()),
+                    copy: config.copy,
+                };
+
+                Some((splat_roots, config))
+            }
             _ => None,
         };
 
-        let map = if let Some(map) = splat_config.as_ref().and_then(|sp| sp.map.as_ref()) {
+        let map = if let Some(map) = splat_config.as_ref().and_then(|(_, sp)| sp.map.as_ref()) {
             match std::fs::read_to_string(map) {
                 Ok(m) => Some(
                     toml::from_str::<crate::Map>(&m)
                         .with_context(|| format!("failed to deserialize '{map}'"))?,
                 ),
                 Err(err) => {
-                    tracing::error!("unable to read mapping from '{map}': {err}");
+                    if !matches!(err.kind(), std::io::ErrorKind::NotFound) {
+                        tracing::error!("unable to read mapping from '{map}': {err}");
+                    }
                     None
                 }
             }
@@ -273,10 +291,10 @@ impl Ctx {
                     return Ok(None);
                 }
 
-                let sdk_headers = if let Some(config) = &splat_config {
+                let sdk_headers = if let Some((splat_roots, config)) = &splat_config {
                     crate::splat::splat(
                         config,
-                        splat_roots.as_ref().unwrap(),
+                        splat_roots,
                         &wi,
                         &ft,
                         map.as_ref()
@@ -303,61 +321,63 @@ impl Ctx {
         let sdk_headers = results.into_iter().collect::<Result<Vec<_>, _>>()?;
         let sdk_headers = sdk_headers.into_iter().flatten().collect();
 
-        if let Some(roots) = splat_roots {
-            let splat_links = |enable_symlinks: bool| -> anyhow::Result<()> {
-                if enable_symlinks {
-                    let crt_ft = crt_ft.lock().take();
-                    let atl_ft = atl_ft.lock().take();
+        let Some(roots) = splat_config.map(|(sr, _)| sr) else {
+            return Ok(());
+        };
 
-                    crate::splat::finalize_splat(&self, &roots, sdk_headers, crt_ft, atl_ft)?;
-                }
+        let splat_links = |enable_symlinks: bool| -> anyhow::Result<()> {
+            if enable_symlinks {
+                let crt_ft = crt_ft.lock().take();
+                let atl_ft = atl_ft.lock().take();
 
-                Ok(())
-            };
+                crate::splat::finalize_splat(&self, &roots, sdk_headers, crt_ft, atl_ft)?;
+            }
 
-            match ops {
-                crate::Ops::Minimize(config) => {
-                    splat_links(config.enable_symlinks)?;
-                    let results = crate::minimize::minimize(self, config, roots)?;
+            Ok(())
+        };
 
-                    fn emit(name: &str, num: crate::minimize::FileNumbers) {
-                        fn hb(bytes: u64) -> String {
-                            let mut bytes = bytes as f64;
+        match ops {
+            crate::Ops::Minimize(config) => {
+                splat_links(config.enable_symlinks)?;
+                let results = crate::minimize::minimize(self, config, roots, &sdk_version)?;
 
-                            for unit in ["B", "KiB", "MiB", "GiB"] {
-                                if bytes > 1024.0 {
-                                    bytes /= 1024.0;
-                                } else {
-                                    return format!("{bytes:.1}{unit}");
-                                }
+                fn emit(name: &str, num: crate::minimize::FileNumbers) {
+                    fn hb(bytes: u64) -> String {
+                        let mut bytes = bytes as f64;
+
+                        for unit in ["B", "KiB", "MiB", "GiB"] {
+                            if bytes > 1024.0 {
+                                bytes /= 1024.0;
+                            } else {
+                                return format!("{bytes:.1}{unit}");
                             }
-
-                            "this seems bad".to_owned()
                         }
 
-                        let ratio = (num.used.bytes as f64 / num.total.bytes as f64) * 100.0;
-
-                        println!(
-                            "  {name}: {}({}) / {}({}) => {ratio:.02}%",
-                            num.used.count,
-                            hb(num.used.bytes),
-                            num.total.count,
-                            hb(num.total.bytes),
-                        );
+                        "this seems bad".to_owned()
                     }
 
-                    emit("crt headers", results.crt_headers);
-                    emit("crt libs", results.crt_libs);
-                    emit("sdk headers", results.sdk_headers);
-                    emit("sdk libs", results.sdk_libs);
+                    let ratio = (num.used.bytes as f64 / num.total.bytes as f64) * 100.0;
+
+                    println!(
+                        "  {name}: {}({}) / {}({}) => {ratio:.02}%",
+                        num.used.count,
+                        hb(num.used.bytes),
+                        num.total.count,
+                        hb(num.total.bytes),
+                    );
                 }
-                crate::Ops::Splat(config) => {
-                    if map.is_none() {
-                        splat_links(config.enable_symlinks)?;
-                    }
-                }
-                _ => {}
+
+                emit("crt headers", results.crt_headers);
+                emit("crt libs", results.crt_libs);
+                emit("sdk headers", results.sdk_headers);
+                emit("sdk libs", results.sdk_libs);
             }
+            crate::Ops::Splat(config) => {
+                if map.is_none() {
+                    splat_links(config.enable_symlinks)?;
+                }
+            }
+            _ => {}
         }
 
         Ok(())

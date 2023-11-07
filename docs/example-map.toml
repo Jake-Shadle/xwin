@@ -1,7 +1,3 @@
----
-source: tests/compiles.rs
-expression: "std::fs::read_to_string(map_path).unwrap()"
----
 [crt.headers]
 filter = [
     "__msvc_iter_core.hpp",
@@ -54,10 +50,7 @@ filter = [
 ]
 
 [crt.libs]
-filter = [
-    "x86_64/msvcrt.lib",
-    "x86_64/vcruntime.lib",
-]
+filter = ["x86_64/msvcrt.lib", "x86_64/vcruntime.lib"]
 
 [crt.libs.symlinks]
 "x86_64/msvcrt.lib" = ["MSVCRT.lib"]
@@ -263,23 +256,9 @@ filter = [
 ]
 
 [sdk.libs.symlinks]
-"um/x86_64/AdvAPI32.Lib" = [
-    "ADVAPI32.lib",
-    "advapi32.lib",
-]
-"um/x86_64/UserEnv.Lib" = [
-    "USERENV.lib",
-    "userenv.lib",
-]
-"um/x86_64/WS2_32.Lib" = [
-    "WS2_32.lib",
-    "ws2_32.lib",
-]
+"um/x86_64/AdvAPI32.Lib" = ["ADVAPI32.lib", "advapi32.lib"]
+"um/x86_64/UserEnv.Lib" = ["USERENV.lib", "userenv.lib"]
+"um/x86_64/WS2_32.Lib" = ["WS2_32.lib", "ws2_32.lib"]
 "um/x86_64/bcrypt.lib" = ["BCRYPT.lib"]
-"um/x86_64/kernel32.Lib" = [
-    "KERNEL32.lib",
-    "Kernel32.lib",
-    "kernel32.lib",
-]
+"um/x86_64/kernel32.Lib" = ["KERNEL32.lib", "Kernel32.lib", "kernel32.lib"]
 "um/x86_64/ntdll.lib" = ["NTDLL.lib"]
-

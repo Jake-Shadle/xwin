@@ -9,6 +9,15 @@ repository = "https://github.com/Jake-Shadle/xwin"
 homepage = "https://github.com/Jake-Shadle/xwin"
 categories = ["development-tools", "command-line-utilities"]
 keywords = ["windows", "cross-compilation"]
+exclude = [
+    ".cargo",
+    ".github",
+    "docs",
+    "tests/**",
+    "deny.toml",
+    "release.toml",
+    "xwin.dockerfile",
+]
 
 [features]
 # By default we use rustls for TLS
@@ -16,7 +25,12 @@ default = ["rustls-tls"]
 rustls-tls = ["ureq/tls"]
 # If this feature is enabled we instead use the native TLS implementation for the
 # target platform
-native-tls = ["ureq/native-tls", "native-tls-crate/vendored", "rustls-pemfile", "rustls"]
+native-tls = [
+    "ureq/native-tls",
+    "native-tls-crate/vendored",
+    "rustls-pemfile",
+    "rustls",
+]
 
 [dependencies]
 # Easy errors
@@ -37,7 +51,7 @@ flate2 = { version = "1.0", default-features = false, features = [
 # Pretty progress bars
 indicatif = "0.17"
 # Decoding of MSI installer packages
-msi = "0.6"
+msi = "0.7"
 parking_lot = "0.12"
 # brrr
 rayon = "1.5"

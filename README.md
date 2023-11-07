@@ -40,6 +40,8 @@ You can download a prebuilt binary from the [Releases](https://github.com/Jake-S
 
 ## Usage
 
+### Common
+
 * `--accept-license` - Doesn't display the prompt to accept the license. You can also set the `XWIN_ACCEPT_LICENSE=1` environment variable
 * `--arch <arch>` - The architectures to include [default: x86_64]  [possible values: x86, x86_64, aarch, aarch64]. Note that I haven't fully tested aarch/64 nor x86 so there _might_ be issues with them, please file an issue if you encounter problems with them.
 * `--cache-dir <cache-dir>` - Specifies the cache directory used to persist downloaded items to disk. Defaults to `./.xwin-cache` if not specified.
@@ -48,6 +50,12 @@ You can download a prebuilt binary from the [Releases](https://github.com/Jake-S
 * `--channel <channel>` - The product channel to use [default: release]
 * `--manifest-version <version>` - The manifest version to retrieve  [default: 16].
 * `--manifest` - Specifies a top level manifest to use, rather than downloading it from Microsoft. This can be used to ensure the output is reproducible.
+* `--sdk-version` - The specific SDK version to use. If not specified the latest SDK version in the manifest is used.
+* `--crt-version` - The specific CRT version to use. If not specified the latest CRT version in the manifest is used.
+* `--timeout` - Specifies a timeout for long a single HTTP get request is allowed to take. The default is 60s.
+
+### Env vars
+
 * `https_proxy` - Environment variable that specifies the HTTPS proxy to use.
 
 ### `xwin download`
@@ -62,12 +70,15 @@ Decompresses all of the downloaded package contents to disk. `download` is run a
 
 Fixes the packages to prune unneeded files and adds symlinks to address file casing issues and then spalts the final artifacts into directories. This is the main command you will want to run as it also `download`s and `unpack`s automatically, providing the desired headers at the path specified to `--output` (`./.xwin-cache/splat`).
 
+#### Splat options
+
 * `--copy` - Copies files from the unpack directory to the splat directory instead of moving them, which preserves the original unpack directories but increases overall execution time and disk usage.
 * `--disable-symlinks` - By default, symlinks are added to both the CRT and WindowsSDK to address casing issues in general usage. For example, if you are compiling C/C++ code that does `#include <windows.h>`, it will break on a case-sensitive file system, as the actual path in the WindowsSDK is `Windows.h`. This also applies even if the C/C++ you are compiling uses correct casing for all CRT/SDK includes, as the internal headers also use incorrect casing in most cases
 * `--include-debug-libs` - The MSVCRT includes (non-redistributable) debug versions of the various libs that are generally uninteresting to keep for most usage
 * `--include-debug-symbols` - The MSVCRT includes PDB (debug symbols) files for several of the libraries that are generally uninteresting to keep for most usage
 * `--preserve-ms-arch-notation` - By default, we convert the MS specific `x64`, `arm`, and `arm64` target architectures to the more canonical `x86_64`, `aarch`, and `aarch64` of LLVM etc when creating directories/names. Passing this flag will preserve the MS names for those targets
 * `--output` - The root output directory. Defaults to `./.xwin-cache/splat` if not specified
+* `--map` - An optional [map](#map-file) file used to configure what files are splatted, and any additional symlinks to create.
 
 This moves all of the unpacked files which aren't pruned to their canonical locations under a root directory, for example here is what an `x86_64` `Desktop` splat looks like. `unpack` is run automatically as needed.
 
@@ -113,9 +124,58 @@ This moves all of the unpacked files which aren't pruned to their canonical loca
          └── x86_64
 ```
 
+### `xwin minimize`
+
+This is an advanced command that performs a `splat` before performing a build on a cargo manifest using strace to capture all of the headers and libraries that are used throughout the build and dumping them to a [map](#map-file). This command can also output the final splat to disk, or the map file can be used with `splat` to only splat the files and symlinks described in it.
+
+Note that currently the build is always done with the `/vctoolsdir` and `/winsdkdir` options, so it is expected these are the same options used when compiling C/C++ code in your normal environment. If that is not the case please open an issue.
+
+#### Requirements
+
+* Linux host - This _might_ work on other platforms, but it's not guaranteed, nor tested
+* `cargo` - This is the singular supported build tool.
+* `<arch>-pc-windows-msvc` - The target you are building for needs to be installed (eg. via `rustup target add`)
+* `clang-cl` - This is used as the C/C++ compiler
+* `llvm-lib` - This is used as the archiver
+* `lld-link` - This is used as the linker
+* `strace` - This is used to capture the syscalls made by the lld and clang compiler
+
+#### Minimize options
+
+Note all of the [splat options](#splat-options) also apply to minimize.
+
+* `--map` - The path to the [map](#map-file) to output the minimized results to. Default to `./.xwin-cache/xwin-map.toml` if not specified.
+* `--minimize-output` - The root directory where only the minimized files are splatted to. If not specified only the `--map` file is written in addition to the normal splat
+* `--preserve-strace` - By default the `strace` output is written to disk in a temporary location that is deleted once the build is finished, passing this option allows it to be persisted. The path is written out before the build starts.
+
+## Map file
+
+As noted in [minimize](#xwin-minimize), there are many restrictions on it to make my life easier, but that make it unsuitable for those who don't use cargo/rust. It's possible for others to come up with their own versions of minimize that can output the same format that `splat` understands to still get the benefits of `xwin` without cargo/rust.
+
+The format is extremely simple
+
+```txt
+├── crt
+│  ├── headers
+│  │  ├── filter - Array of relative paths to keep
+│  │  └── symlinks
+│  │     └── <path> - The same path as one of the filters
+│  │        └── <names> - Array of symlinks to create in the same directory as the parent path
+│  ├── libs *
+└── sdk *
+```
+
+### Example
+
+See [docs/example-map.toml](docs/example-map.toml) for a real world example.
+
 ## Container
 
 [xwin.dockerfile](xwin.dockerfile) is an example Dockerfile that can be used a container image capable of building and testing Rust crates targeting `x86_64-pc-windows-msvc`.
+
+## Custom certificates
+
+If you require custom certificates you can specify the path via the `SSL_CERT_FILE`, `CURL_CA_BUNDLE`, or `REQUESTS_CA_BUNDLE` environment variables. This requires being compiled with the `native-tls` feature.
 
 ### Thanks
 

@@ -1,4 +1,4 @@
-use crate::{symlink, Arch, Ctx, Error, Path, PathBuf, PayloadKind, Variant};
+use crate::{symlink, Arch, Ctx, Error, Path, PathBuf, PayloadKind, SectionKind, Variant};
 use anyhow::Context as _;
 use rayon::prelude::*;
 use std::collections::BTreeMap;
@@ -52,6 +52,13 @@ pub(crate) struct SplatRoots {
 }
 
 pub(crate) fn prep_splat(ctx: std::sync::Arc<Ctx>, root: &Path) -> Result<SplatRoots, Error> {
+    // Ensure we create the path first, you can't canonicalize a non-existant path
+    if !root.exists() {
+        std::fs::create_dir_all(root)
+            .with_context(|| format!("unable to create splat directory {root}"))?;
+    }
+
+    let root = crate::util::canonicalize(root)?;
     let crt_root = root.join("crt");
     let sdk_root = root.join("sdk");
 
@@ -73,7 +80,7 @@ pub(crate) fn prep_splat(ctx: std::sync::Arc<Ctx>, root: &Path) -> Result<SplatR
     let src_root = ctx.work_dir.join("unpack");
 
     Ok(SplatRoots {
-        root: root.to_owned(),
+        root,
         crt: crt_root,
         sdk: sdk_root,
         src: src_root,
@@ -97,6 +104,7 @@ pub(crate) fn splat(
         tree: &'ft crate::unpack::FileTree,
         kind: PayloadKind,
         variant: Option<Variant>,
+        section: SectionKind,
     }
 
     let mut src = roots.src.join(&item.payload.filename);
@@ -146,6 +154,7 @@ pub(crate) fn splat(
                 tree,
                 kind,
                 variant,
+                section: SectionKind::CrtHeader,
             }]
         }
         PayloadKind::AtlLibs => {
@@ -174,6 +183,7 @@ pub(crate) fn splat(
                 tree,
                 kind,
                 variant,
+                section: SectionKind::CrtLib,
             }]
         }
 
@@ -223,6 +233,7 @@ pub(crate) fn splat(
                 tree,
                 kind,
                 variant,
+                section: SectionKind::CrtLib,
             }]
         }
         PayloadKind::SdkHeaders => {
@@ -244,6 +255,7 @@ pub(crate) fn splat(
                 tree,
                 kind,
                 variant,
+                section: SectionKind::SdkHeader,
             }]
         }
         PayloadKind::SdkLibs => {
@@ -266,6 +278,7 @@ pub(crate) fn splat(
                 tree,
                 kind,
                 variant,
+                section: SectionKind::SdkLib,
             }]
         }
         PayloadKind::SdkStoreLibs => {
@@ -287,6 +300,7 @@ pub(crate) fn splat(
                         tree,
                         kind,
                         variant,
+                        section: SectionKind::SdkLib,
                     })
                 })
                 .collect::<Result<Vec<_>, _>>()?
@@ -311,6 +325,7 @@ pub(crate) fn splat(
                 tree,
                 kind,
                 variant,
+                section: SectionKind::SdkHeader,
             }];
 
             src.push("lib/ucrt");
@@ -329,6 +344,7 @@ pub(crate) fn splat(
                     tree,
                     kind,
                     variant,
+                    section: SectionKind::SdkLib,
                 });
             }
 
@@ -353,7 +369,32 @@ pub(crate) fn splat(
         mappings
             .into_par_iter()
             .map(|mapping| -> Result<Option<SdkHeaders>, Error> {
-                //let rel_root = mapping.target.strip_prefix(&roots.root).unwrap();
+                let (prefix, section) = match mapping.section {
+                    SectionKind::SdkHeader => {
+                        // All ucrt headers are in the ucrt subdir, but we have a flat
+                        // list in the mapping file, so we need to drop that from the prefix
+                        // so they match like all the other paths
+
+                        (
+                            if matches!(mapping.kind, PayloadKind::Ucrt) {
+                                mapping.target.parent().unwrap().to_owned()
+                            } else {
+                                mapping.target.clone()
+                            },
+                            &map.sdk.headers,
+                        )
+                    }
+                    SectionKind::SdkLib => (roots.sdk.join("lib"), &map.sdk.libs),
+                    SectionKind::CrtHeader => (mapping.target.clone(), &map.crt.headers),
+                    SectionKind::CrtLib => {
+                        (
+                            // Pop the arch directory, it's part of the prefix in
+                            // the filter
+                            mapping.target.parent().unwrap().to_owned(),
+                            &map.crt.libs,
+                        )
+                    }
+                };
 
                 let mut dir_stack = vec![Dir {
                     src: mapping.src,
@@ -371,41 +412,38 @@ pub(crate) fn splat(
 
                         tar.push(fname);
 
-                        let unprefixed = tar
-                            .strip_prefix(&roots.root)
-                            .with_context(|| format!("invalid path {tar}"))?;
+                        let unprefixed = tar.strip_prefix(&prefix).with_context(|| {
+                            format!("invalid path {tar}: doesn't begin with prefix {prefix}")
+                        })?;
 
-                        // if kind == PayloadKind::Ucrt {
-                        //     dbg!(&roots.root, &tar, unprefixed);
-                        // }
+                        if !section.filter.contains(unprefixed.as_str()) {
+                            tar.pop();
+                            continue;
+                        }
 
-                        if map.filter.contains(unprefixed.as_str()) {
-                            let src_path = src.join(fname);
+                        let src_path = src.join(fname);
 
-                            if !created_dir {
-                                std::fs::create_dir_all(tar.parent().unwrap())
-                                    .with_context(|| format!("unable to create {tar}"))?;
-                                created_dir = true;
-                            }
+                        if !created_dir {
+                            std::fs::create_dir_all(tar.parent().unwrap())
+                                .with_context(|| format!("unable to create {tar}"))?;
+                            created_dir = true;
+                        }
 
-                            if config.copy {
-                                std::fs::copy(&src_path, &tar).with_context(|| {
-                                    format!("failed to copy {src_path} to {tar}")
-                                })?;
-                            } else {
-                                std::fs::rename(&src_path, &tar).with_context(|| {
-                                    format!("failed to move {src_path} to {tar}")
-                                })?;
-                            }
+                        if config.copy {
+                            std::fs::copy(&src_path, &tar)
+                                .with_context(|| format!("failed to copy {src_path} to {tar}"))?;
+                        } else {
+                            std::fs::rename(&src_path, &tar)
+                                .with_context(|| format!("failed to move {src_path} to {tar}"))?;
+                        }
 
-                            // Create any associated symlinks, these are always going to be symlinks
-                            // in the same target directory
-                            if let Some(symlinks) = map.symlinks.get(unprefixed.as_str()) {
-                                for sl in symlinks {
-                                    tar.pop();
-                                    tar.push(sl);
-                                    symlink(fname.as_str(), &tar)?;
-                                }
+                        // Create any associated symlinks, these are always going to be symlinks
+                        // in the same target directory
+                        if let Some(symlinks) = section.symlinks.get(unprefixed.as_str()) {
+                            for sl in symlinks {
+                                tar.pop();
+                                tar.push(sl);
+                                symlink(fname.as_str(), &tar)?;
                             }
                         }
 

@@ -50,8 +50,6 @@ fn verify_compiles() {
         output: output_dir.clone(),
     });
 
-    let output_dir = xwin::PathBuf::from_path_buf(output_dir.canonicalize().unwrap()).unwrap();
-
     ctx.execute(
         pkg_manifest.packages,
         pruned
@@ -82,8 +80,10 @@ fn verify_compiles() {
         "tests/xwin-test/Cargo.toml",
     ]);
 
-    let includes = format!("-Wno-unused-command-line-argument -fuse-ld=lld-link /imsvc{0}/crt/include /imsvc{0}/sdk/include/ucrt /imsvc{0}/sdk/include/um /imsvc{0}/sdk/include/shared", output_dir);
-    let libs = format!("-C linker=lld-link -Lnative={0}/crt/lib/x86_64 -Lnative={0}/sdk/lib/um/x86_64 -Lnative={0}/sdk/lib/ucrt/x86_64", output_dir);
+    let od = xwin::util::canonicalize(&output_dir).unwrap();
+
+    let includes = format!("-Wno-unused-command-line-argument -fuse-ld=lld-link /imsvc{od}/crt/include /imsvc{od}/sdk/include/ucrt /imsvc{od}/sdk/include/um /imsvc{od}/sdk/include/shared");
+    let libs = format!("-C linker=lld-link -Lnative={od}/crt/lib/x86_64 -Lnative={od}/sdk/lib/um/x86_64 -Lnative={od}/sdk/lib/ucrt/x86_64");
 
     let cc_env = [
         ("CC_x86_64_pc_windows_msvc", "clang-cl"),
@@ -117,10 +117,9 @@ fn verify_compiles() {
     ]);
 
     let includes = format!(
-        "-Wno-unused-command-line-argument -fuse-ld=lld-link /vctoolsdir {0}/crt /winsdkdir {0}/sdk",
-        output_dir
+        "-Wno-unused-command-line-argument -fuse-ld=lld-link /vctoolsdir {od}/crt /winsdkdir {od}/sdk"
     );
-    let libs = format!("-C linker=lld-link -Lnative={0}/crt/lib/x86_64 -Lnative={0}/sdk/lib/um/x86_64 -Lnative={0}/sdk/lib/ucrt/x86_64", output_dir);
+    let libs = format!("-C linker=lld-link -Lnative={od}/crt/lib/x86_64 -Lnative={od}/sdk/lib/um/x86_64 -Lnative={od}/sdk/lib/ucrt/x86_64");
 
     let cc_env = [
         ("CC_x86_64_pc_windows_msvc", "clang-cl"),
@@ -196,11 +195,9 @@ fn verify_compiles_minimized() {
         splat_output: output_dir.clone(),
         manifest_path: "tests/xwin-test/Cargo.toml".into(),
         target: "x86_64-pc-windows-msvc".into(),
-        output: Some(filtered.clone()),
+        minimize_output: Some(filtered.clone()),
         preserve_strace: false,
     });
-
-    let output_dir = xwin::PathBuf::from_path_buf(filtered.canonicalize().unwrap()).unwrap();
 
     ctx.execute(
         pkg_manifest.packages,
@@ -234,11 +231,12 @@ fn verify_compiles_minimized() {
         "tests/xwin-test/Cargo.toml",
     ]);
 
+    let od = xwin::util::canonicalize(&filtered).unwrap();
+
     let includes = format!(
-        "-Wno-unused-command-line-argument -fuse-ld=lld-link /vctoolsdir {0}/crt /winsdkdir {0}/sdk",
-        output_dir
+        "-Wno-unused-command-line-argument -fuse-ld=lld-link /vctoolsdir {od}/crt /winsdkdir {od}/sdk"
     );
-    let libs = format!("-C linker=lld-link -Lnative={0}/crt/lib/x86_64 -Lnative={0}/sdk/lib/um/x86_64 -Lnative={0}/sdk/lib/ucrt/x86_64", output_dir);
+    let libs = format!("-C linker=lld-link -Lnative={od}/crt/lib/x86_64 -Lnative={od}/sdk/lib/um/x86_64 -Lnative={od}/sdk/lib/ucrt/x86_64");
 
     let cc_env = [
         ("CC_x86_64_pc_windows_msvc", "clang-cl"),

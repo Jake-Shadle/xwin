@@ -2,7 +2,10 @@
 
 use anyhow::{Context as _, Error};
 pub use camino::{Utf8Path as Path, Utf8PathBuf as PathBuf};
-use std::{collections::BTreeMap, fmt};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+};
 
 mod ctx;
 mod download;
@@ -688,10 +691,51 @@ fn get_sdk(
 
 #[derive(serde::Serialize, serde::Deserialize, Default)]
 pub struct Map {
-    #[serde(default)]
-    pub filter: std::collections::BTreeSet<String>,
-    #[serde(default)]
-    pub symlinks: std::collections::BTreeMap<String, Vec<String>>,
+    pub crt: Block,
+    pub sdk: Block,
+}
+
+impl Map {
+    fn clear(&mut self) {
+        self.crt.clear();
+        self.sdk.clear();
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Default)]
+pub struct Block {
+    pub headers: Section,
+    pub libs: Section,
+}
+
+impl Block {
+    fn clear(&mut self) {
+        self.headers.clear();
+        self.libs.clear();
+    }
+}
+
+#[derive(Copy, Clone)]
+pub enum SectionKind {
+    CrtHeader,
+    CrtLib,
+    SdkHeader,
+    SdkLib,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Default)]
+pub struct Section {
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub filter: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub symlinks: BTreeMap<String, Vec<String>>,
+}
+
+impl Section {
+    fn clear(&mut self) {
+        self.filter.clear();
+        self.symlinks.clear();
+    }
 }
 
 #[cfg(unix)]

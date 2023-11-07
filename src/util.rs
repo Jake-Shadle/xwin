@@ -1,5 +1,15 @@
-use anyhow::Error;
+use crate::{Path, PathBuf};
+use anyhow::{Context as _, Error};
 use std::fmt;
+
+#[inline]
+pub fn canonicalize(path: &Path) -> anyhow::Result<PathBuf> {
+    PathBuf::from_path_buf(
+        path.canonicalize()
+            .with_context(|| format!("unable to canonicalize path '{path}'"))?,
+    )
+    .map_err(|pb| anyhow::anyhow!("canonicalized path {} is not utf-8", pb.display()))
+}
 
 #[derive(Copy, Clone)]
 pub enum ProgressTarget {

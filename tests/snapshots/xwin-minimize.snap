@@ -41,12 +41,14 @@ Options:
           The path of the filter file that is generated. Defaults to
           ./.xwin-cache/xwin-map.toml
 
-      --splat-output <SPLAT_OUTPUT>
-          The root output directory. Defaults to `./.xwin-cache/splat` if not
-          specified
-
       --output <OUTPUT>
-          The root output directory
+          The root splat output directory. Defaults to `./.xwin-cache/splat` if
+          not specified
+
+      --minimize-output <MINIMIZE_OUTPUT>
+          The root output directory for the minimized set of files discovered
+          during the build. If not specified only the map file is written in
+          addition to the splat
 
       --copy
           Copies files from the splat directory rather than moving them. Only
