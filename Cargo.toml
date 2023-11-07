@@ -9,6 +9,15 @@ repository = "https://github.com/Jake-Shadle/xwin"
 homepage = "https://github.com/Jake-Shadle/xwin"
 categories = ["development-tools", "command-line-utilities"]
 keywords = ["windows", "cross-compilation"]
+exclude = [
+    ".cargo",
+    ".github",
+    "docs",
+    "tests/**",
+    "deny.toml",
+    "release.toml",
+    "xwin.dockerfile",
+]
 
 [features]
 # By default we use rustls for TLS
