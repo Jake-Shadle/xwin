@@ -195,7 +195,7 @@ fn verify_compiles_minimized() {
         splat_output: output_dir.clone(),
         manifest_path: "tests/xwin-test/Cargo.toml".into(),
         target: "x86_64-pc-windows-msvc".into(),
-        output: Some(filtered.clone()),
+        minimize_output: Some(filtered.clone()),
         preserve_strace: false,
     });
 

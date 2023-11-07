@@ -106,13 +106,15 @@ pub enum Command {
         /// The path of the filter file that is generated. Defaults to ./.xwin-cache/xwin-map.toml
         #[arg(long)]
         map: Option<PathBuf>,
-        /// The root output directory. Defaults to `./.xwin-cache/splat` if not
+        /// The root splat output directory. Defaults to `./.xwin-cache/splat` if not
         /// specified.
         #[arg(long)]
-        splat_output: Option<PathBuf>,
-        /// The root output directory.
-        #[arg(long)]
         output: Option<PathBuf>,
+        /// The root output directory for the minimized set of files discovered during
+        /// the build. If not specified only the map file is written in addition
+        /// to the splat.
+        #[arg(long)]
+        minimize_output: Option<PathBuf>,
         /// Copies files from the splat directory rather than moving them. Only
         /// used if --output is specified.
         #[arg(long)]
@@ -311,7 +313,7 @@ fn main() -> Result<(), Error> {
             map,
             output,
             copy,
-            splat_output,
+            minimize_output,
             options,
             target,
             manifest_path,
@@ -321,9 +323,9 @@ fn main() -> Result<(), Error> {
             include_debug_symbols: options.include_debug_symbols,
             enable_symlinks: !options.disable_symlinks,
             preserve_ms_arch_notation: options.preserve_ms_arch_notation,
-            splat_output: splat_output.unwrap_or_else(|| ctx.work_dir.join("splat")),
+            splat_output: output.unwrap_or_else(|| ctx.work_dir.join("splat")),
             copy,
-            output,
+            minimize_output,
             map: map.unwrap_or_else(|| ctx.work_dir.join("xwin-map.toml")),
             target: target.unwrap_or("x86_64-pc-windows-msvc".to_owned()),
             manifest_path: manifest_path.unwrap_or("Cargo.toml".into()),

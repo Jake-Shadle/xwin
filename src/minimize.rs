@@ -8,7 +8,7 @@ pub struct MinimizeConfig {
     pub preserve_ms_arch_notation: bool,
     pub splat_output: PathBuf,
     pub copy: bool,
-    pub output: Option<PathBuf>,
+    pub minimize_output: Option<PathBuf>,
     pub map: PathBuf,
     pub target: String,
     pub manifest_path: PathBuf,
@@ -101,11 +101,13 @@ pub(crate) fn minimize(
 
             let mut libs = format!("-C linker=lld-link -Lnative={splat_root}/crt/lib/x86_64 -Lnative={splat_root}/sdk/lib/um/x86_64 -Lnative={splat_root}/sdk/lib/ucrt/x86_64");
 
-            // Sigh, some people use RUSTFLAGS to enable hidden library features, incredibly annoying
-            if let Ok(rf) = std::env::var(format!(
+            let rust_flags_env = format!(
                 "CARGO_TARGET_{}_RUSTFLAGS",
                 config.target.replace('-', "_").to_uppercase()
-            )) {
+            );
+
+            // Sigh, some people use RUSTFLAGS to enable hidden library features, incredibly annoying
+            if let Ok(rf) = std::env::var(&rust_flags_env) {
                 libs.push(' ');
                 libs.push_str(&rf);
             } else if let Ok(rf) = std::env::var("RUSTFLAGS") {
@@ -121,7 +123,7 @@ pub(crate) fn minimize(
                 (format!("AR_{triple}"), "llvm-lib"),
                 (format!("CFLAGS_{triple}"), &includes),
                 (format!("CXXFLAGS_{triple}"), &includes),
-                ("RUSTFLAGS".to_owned(), &libs),
+                (rust_flags_env, &libs),
             ];
 
             strace.envs(cc_env);
@@ -484,7 +486,7 @@ pub(crate) fn minimize(
             Ok(())
         },
         || -> anyhow::Result<()> {
-            let Some(od) = config.output else {
+            let Some(od) = config.minimize_output else {
                 return Ok(());
             };
 
