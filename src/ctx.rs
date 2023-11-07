@@ -27,24 +27,39 @@ pub struct Ctx {
 impl Ctx {
     fn http_client(read_timeout: Option<Duration>) -> Result<ureq::Agent, Error> {
         let mut builder = ureq::builder();
-        #[cfg(feature = "native-tls")]
-        {
-            use std::env;
-            use std::fs::File;
-            use std::io::BufReader;
-            use std::sync::Arc;
 
-            let mut tls_builder = native_tls_crate::TlsConnector::builder();
-            if let Some(custom_ca) =
-                env::var_os("REQUESTS_CA_BUNDLE").or_else(|| env::var_os("CURL_CA_BUNDLE"))
-            {
-                let mut reader = BufReader::new(File::open(custom_ca)?);
+        #[cfg(feature = "native-tls")]
+        'custom: {
+            // "common"? env vars that people who use custom certs use? I guess
+            // this is easy to expand if it's not the case. /shrug
+            const CERT_ENVS: &[&str] = &["REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "SSL_CERT_FILE"];
+
+            let Some((env, cert_path)) = CERT_ENVS.iter().find_map(|env| {
+                std::env::var_os(env).map(|var| (env, std::path::PathBuf::from(var)))
+            }) else {
+                break 'custom;
+            };
+
+            fn build(
+                cert_path: &std::path::Path,
+            ) -> anyhow::Result<native_tls_crate::TlsConnector> {
+                let mut tls_builder = native_tls_crate::TlsConnector::builder();
+                let mut reader = std::io::BufReader::new(std::fs::File::open(cert_path)?);
                 for cert in rustls_pemfile::certs(&mut reader)? {
                     tls_builder
                         .add_root_certificate(native_tls_crate::Certificate::from_pem(&cert)?);
                 }
+                Ok(tls_builder.build()?)
             }
-            builder = builder.tls_connector(Arc::new(tls_builder.build()?));
+
+            let tls_connector = build(&cert_path).with_context(|| {
+                format!(
+                    "failed to add custom cert from path '{}' configured by env var '{env}'",
+                    cert_path.display()
+                )
+            })?;
+
+            builder = builder.tls_connector(std::sync::Arc::new(tls_connector));
         }
 
         // Allow user to specify timeout values in the case of bad/slow proxies

@@ -145,9 +145,9 @@ dependencies = [
 
 [[package]]
 name = "cfb"
-version = "0.7.3"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d38f2da7a0a2c4ccf0065be06397cc26a81f4e528be095826eee9d4adbb8c60f"
+checksum = "b390793e912300f1aa713429f7fd0c391024e6c18b988962558bc4f96a349b1f"
 dependencies = [
  "byteorder",
  "fnv",
@@ -640,9 +640,9 @@ dependencies = [
 
 [[package]]
 name = "msi"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7124fc3188eff23916d20d82bcbbb993914b22fba5603f9e7745e347a86cf67"
+checksum = "226b2404f03d2cf47375b9715c8adfae4e388bb2377cff908e8a40f31e421514"
 dependencies = [
  "byteorder",
  "cfb",
