@@ -130,6 +130,15 @@ This is an advanced command that performs a `splat` before performing a build on
 
 Note that currently the build is always done with the `/vctoolsdir` and `/winsdkdir` options, so it is expected these are the same options used when compiling C/C++ code in your normal environment. If that is not the case please open an issue.
 
+At the end of the command, a printout of the amount and size of the original versus minimized files is done, eg.
+
+```txt
+  crt headers: 73(2.6MiB) / 384(18.4MiB) => 14.00%
+  crt libs: 5(28.0MiB) / 26(81.1MiB) => 34.58%
+  sdk headers: 180(9.6MiB) / 4435(304.7MiB) => 3.15%
+  sdk libs: 29(69.8MiB) / 456(169.9MiB) => 41.06%
+```
+
 #### Requirements
 
 * Linux host - This _might_ work on other platforms, but it's not guaranteed, nor tested
