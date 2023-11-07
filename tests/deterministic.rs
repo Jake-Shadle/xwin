@@ -44,8 +44,6 @@ fn verify_deterministic() {
         output: output_dir.clone(),
     });
 
-    let output_dir = PathBuf::from_path_buf(output_dir.canonicalize().unwrap()).unwrap();
-
     ctx.execute(
         pkg_manifest.packages,
         pruned
@@ -92,6 +90,7 @@ fn verify_deterministic() {
         hash: u64,
     }
 
+    let output_dir = xwin::util::canonicalize(&output_dir).unwrap();
     let mut files: Vec<_> = walkdir::WalkDir::new(&output_dir)
         .sort_by_file_name()
         .into_iter()

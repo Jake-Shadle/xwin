@@ -228,36 +228,37 @@ impl Ctx {
 
         let packages = std::sync::Arc::new(packages);
 
-        let splat_roots = match &ops {
-            crate::Ops::Splat(config) => {
-                Some(crate::splat::prep_splat(self.clone(), &config.output)?)
-            }
-            crate::Ops::Minimize(config) => Some(crate::splat::prep_splat(
-                self.clone(),
-                &config.splat_output,
-            )?),
-            _ => None,
-        };
-
         let mut results = Vec::new();
         let crt_ft = parking_lot::Mutex::new(None);
         let atl_ft = parking_lot::Mutex::new(None);
 
         let splat_config = match &ops {
-            crate::Ops::Splat(config) => Some(config.clone()),
-            crate::Ops::Minimize(config) => Some(crate::SplatConfig {
-                preserve_ms_arch_notation: config.preserve_ms_arch_notation,
-                include_debug_libs: config.include_debug_libs,
-                include_debug_symbols: config.include_debug_symbols,
-                enable_symlinks: config.enable_symlinks,
-                output: config.splat_output.clone(),
-                map: Some(config.map.clone()),
-                copy: config.copy,
-            }),
+            crate::Ops::Splat(config) => {
+                let splat_roots = crate::splat::prep_splat(self.clone(), &config.output)?;
+                let mut config = config.clone();
+                config.output = splat_roots.root.clone();
+
+                Some((splat_roots, config))
+            }
+            crate::Ops::Minimize(config) => {
+                let splat_roots = crate::splat::prep_splat(self.clone(), &config.splat_output)?;
+
+                let config = crate::SplatConfig {
+                    preserve_ms_arch_notation: config.preserve_ms_arch_notation,
+                    include_debug_libs: config.include_debug_libs,
+                    include_debug_symbols: config.include_debug_symbols,
+                    enable_symlinks: config.enable_symlinks,
+                    output: splat_roots.root.clone(),
+                    map: Some(config.map.clone()),
+                    copy: config.copy,
+                };
+
+                Some((splat_roots, config))
+            }
             _ => None,
         };
 
-        let map = if let Some(map) = splat_config.as_ref().and_then(|sp| sp.map.as_ref()) {
+        let map = if let Some(map) = splat_config.as_ref().and_then(|(_, sp)| sp.map.as_ref()) {
             match std::fs::read_to_string(map) {
                 Ok(m) => Some(
                     toml::from_str::<crate::Map>(&m)
@@ -290,10 +291,10 @@ impl Ctx {
                     return Ok(None);
                 }
 
-                let sdk_headers = if let Some(config) = &splat_config {
+                let sdk_headers = if let Some((splat_roots, config)) = &splat_config {
                     crate::splat::splat(
                         config,
-                        splat_roots.as_ref().unwrap(),
+                        splat_roots,
                         &wi,
                         &ft,
                         map.as_ref()
@@ -320,61 +321,63 @@ impl Ctx {
         let sdk_headers = results.into_iter().collect::<Result<Vec<_>, _>>()?;
         let sdk_headers = sdk_headers.into_iter().flatten().collect();
 
-        if let Some(roots) = splat_roots {
-            let splat_links = |enable_symlinks: bool| -> anyhow::Result<()> {
-                if enable_symlinks {
-                    let crt_ft = crt_ft.lock().take();
-                    let atl_ft = atl_ft.lock().take();
+        let Some(roots) = splat_config.map(|(sr, _)| sr) else {
+            return Ok(());
+        };
 
-                    crate::splat::finalize_splat(&self, &roots, sdk_headers, crt_ft, atl_ft)?;
-                }
+        let splat_links = |enable_symlinks: bool| -> anyhow::Result<()> {
+            if enable_symlinks {
+                let crt_ft = crt_ft.lock().take();
+                let atl_ft = atl_ft.lock().take();
 
-                Ok(())
-            };
+                crate::splat::finalize_splat(&self, &roots, sdk_headers, crt_ft, atl_ft)?;
+            }
 
-            match ops {
-                crate::Ops::Minimize(config) => {
-                    splat_links(config.enable_symlinks)?;
-                    let results = crate::minimize::minimize(self, config, roots, &sdk_version)?;
+            Ok(())
+        };
 
-                    fn emit(name: &str, num: crate::minimize::FileNumbers) {
-                        fn hb(bytes: u64) -> String {
-                            let mut bytes = bytes as f64;
+        match ops {
+            crate::Ops::Minimize(config) => {
+                splat_links(config.enable_symlinks)?;
+                let results = crate::minimize::minimize(self, config, roots, &sdk_version)?;
 
-                            for unit in ["B", "KiB", "MiB", "GiB"] {
-                                if bytes > 1024.0 {
-                                    bytes /= 1024.0;
-                                } else {
-                                    return format!("{bytes:.1}{unit}");
-                                }
+                fn emit(name: &str, num: crate::minimize::FileNumbers) {
+                    fn hb(bytes: u64) -> String {
+                        let mut bytes = bytes as f64;
+
+                        for unit in ["B", "KiB", "MiB", "GiB"] {
+                            if bytes > 1024.0 {
+                                bytes /= 1024.0;
+                            } else {
+                                return format!("{bytes:.1}{unit}");
                             }
-
-                            "this seems bad".to_owned()
                         }
 
-                        let ratio = (num.used.bytes as f64 / num.total.bytes as f64) * 100.0;
-
-                        println!(
-                            "  {name}: {}({}) / {}({}) => {ratio:.02}%",
-                            num.used.count,
-                            hb(num.used.bytes),
-                            num.total.count,
-                            hb(num.total.bytes),
-                        );
+                        "this seems bad".to_owned()
                     }
 
-                    emit("crt headers", results.crt_headers);
-                    emit("crt libs", results.crt_libs);
-                    emit("sdk headers", results.sdk_headers);
-                    emit("sdk libs", results.sdk_libs);
+                    let ratio = (num.used.bytes as f64 / num.total.bytes as f64) * 100.0;
+
+                    println!(
+                        "  {name}: {}({}) / {}({}) => {ratio:.02}%",
+                        num.used.count,
+                        hb(num.used.bytes),
+                        num.total.count,
+                        hb(num.total.bytes),
+                    );
                 }
-                crate::Ops::Splat(config) => {
-                    if map.is_none() {
-                        splat_links(config.enable_symlinks)?;
-                    }
-                }
-                _ => {}
+
+                emit("crt headers", results.crt_headers);
+                emit("crt libs", results.crt_libs);
+                emit("sdk headers", results.sdk_headers);
+                emit("sdk libs", results.sdk_libs);
             }
+            crate::Ops::Splat(config) => {
+                if map.is_none() {
+                    splat_links(config.enable_symlinks)?;
+                }
+            }
+            _ => {}
         }
 
         Ok(())

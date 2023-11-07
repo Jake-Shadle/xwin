@@ -52,6 +52,13 @@ pub(crate) struct SplatRoots {
 }
 
 pub(crate) fn prep_splat(ctx: std::sync::Arc<Ctx>, root: &Path) -> Result<SplatRoots, Error> {
+    // Ensure we create the path first, you can't canonicalize a non-existant path
+    if !root.exists() {
+        std::fs::create_dir_all(root)
+            .with_context(|| format!("unable to create splat directory {root}"))?;
+    }
+
+    let root = crate::util::canonicalize(root)?;
     let crt_root = root.join("crt");
     let sdk_root = root.join("sdk");
 
@@ -73,7 +80,7 @@ pub(crate) fn prep_splat(ctx: std::sync::Arc<Ctx>, root: &Path) -> Result<SplatR
     let src_root = ctx.work_dir.join("unpack");
 
     Ok(SplatRoots {
-        root: root.to_owned(),
+        root,
         crt: crt_root,
         sdk: sdk_root,
         src: src_root,

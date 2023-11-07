@@ -1,4 +1,4 @@
-use crate::{Ctx, Path, PathBuf, SectionKind};
+use crate::{util::canonicalize, Ctx, Path, PathBuf, SectionKind};
 use anyhow::Context as _;
 
 pub struct MinimizeConfig {
@@ -45,12 +45,6 @@ pub(crate) fn minimize(
         PathBuf,
         (SectionKind, std::collections::BTreeSet<String>),
     > = std::collections::BTreeMap::new();
-
-    #[inline]
-    fn canonicalize(path: &Path) -> anyhow::Result<PathBuf> {
-        PathBuf::from_path_buf(path.canonicalize().context("unable to canonicalize path")?)
-            .map_err(|pb| anyhow::anyhow!("canonicalized path {} is not utf-8", pb.display()))
-    }
 
     let (used, total) = rayon::join(
         || -> anyhow::Result<_> {
@@ -404,8 +398,8 @@ pub(crate) fn minimize(
 
     tracing::info!("added {additional_symlinks} additional symlinks");
 
-    let (_, mv) = rayon::join(
-        || {
+    let (serialize, mv) = rayon::join(
+        || -> anyhow::Result<()> {
             let cur_map = if config.map.exists() {
                 match std::fs::read_to_string(&config.map) {
                     Ok(contents) => match toml::from_str::<crate::Map>(&contents) {
@@ -486,6 +480,8 @@ pub(crate) fn minimize(
                     "failed to write map file"
                 );
             }
+
+            Ok(())
         },
         || -> anyhow::Result<()> {
             let Some(od) = config.output else {
@@ -527,6 +523,7 @@ pub(crate) fn minimize(
         },
     );
 
+    serialize?;
     mv?;
 
     Ok(MinimizeResults {
