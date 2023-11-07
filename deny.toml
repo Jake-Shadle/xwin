@@ -43,8 +43,6 @@ skip = [
   { name = "regex-syntax", version = "=0.6.29" },
   # ditto :(
   { name = "regex-automata", version = "=0.1.10" },
-  # ureq
-  { name = "rustls-webpki", version = "=0.100.2" },
 ]
 skip-tree = [
   # clap -> terminal_size
