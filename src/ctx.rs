@@ -264,7 +264,9 @@ impl Ctx {
                         .with_context(|| format!("failed to deserialize '{map}'"))?,
                 ),
                 Err(err) => {
-                    tracing::error!("unable to read mapping from '{map}': {err}");
+                    if !matches!(err.kind(), std::io::ErrorKind::NotFound) {
+                        tracing::error!("unable to read mapping from '{map}': {err}");
+                    }
                     None
                 }
             }
@@ -333,7 +335,7 @@ impl Ctx {
             match ops {
                 crate::Ops::Minimize(config) => {
                     splat_links(config.enable_symlinks)?;
-                    let results = crate::minimize::minimize(self, config, roots)?;
+                    let results = crate::minimize::minimize(self, config, roots, &sdk_version)?;
 
                     fn emit(name: &str, num: crate::minimize::FileNumbers) {
                         fn hb(bytes: u64) -> String {

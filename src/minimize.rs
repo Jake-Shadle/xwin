@@ -1,4 +1,4 @@
-use crate::{Ctx, Path, PathBuf};
+use crate::{Ctx, Path, PathBuf, SectionKind};
 use anyhow::Context as _;
 
 pub struct MinimizeConfig {
@@ -39,9 +39,12 @@ pub(crate) fn minimize(
     _ctx: std::sync::Arc<Ctx>,
     config: MinimizeConfig,
     roots: crate::splat::SplatRoots,
+    sdk_version: &str,
 ) -> anyhow::Result<MinimizeResults> {
-    let mut used_paths: std::collections::BTreeMap<PathBuf, std::collections::BTreeSet<String>> =
-        std::collections::BTreeMap::new();
+    let mut used_paths: std::collections::BTreeMap<
+        PathBuf,
+        (SectionKind, std::collections::BTreeSet<String>),
+    > = std::collections::BTreeMap::new();
 
     #[inline]
     fn canonicalize(path: &Path) -> anyhow::Result<PathBuf> {
@@ -237,23 +240,37 @@ pub(crate) fn minimize(
 
                     while let Ok(path) = rx.recv() {
                         let path = PathBuf::from(path);
-                        let (hdrs, libs) = if path.starts_with(&sdk_root) {
-                            (&mut sdk_headers, &mut sdk_libs)
+                        let (hdrs, libs, is_sdk) = if path.starts_with(&sdk_root) {
+                            (&mut sdk_headers, &mut sdk_libs, true)
                         } else if path.starts_with(&crt_root) {
-                            (&mut crt_headers, &mut crt_libs)
+                            (&mut crt_headers, &mut crt_libs, false)
                         } else {
                             continue;
                         };
 
-                        let counts = match path.extension() {
+                        let (counts, which) = match path.extension() {
                             // Some headers don't have extensions, eg ciso646
-                            Some("h" | "hpp") | None => hdrs,
-                            Some("lib" | "Lib") => libs,
+                            Some("h" | "hpp") | None => (
+                                hdrs,
+                                if is_sdk {
+                                    SectionKind::SdkHeader
+                                } else {
+                                    SectionKind::CrtHeader
+                                },
+                            ),
+                            Some("lib" | "Lib") => (
+                                libs,
+                                if is_sdk {
+                                    SectionKind::SdkLib
+                                } else {
+                                    SectionKind::CrtLib
+                                },
+                            ),
                             _ => continue,
                         };
 
                         let mut insert = |path: PathBuf, symlink: Option<String>| {
-                            if let Some(sls) = used_paths.get_mut(&path) {
+                            if let Some((_, sls)) = used_paths.get_mut(&path) {
                                 sls.extend(symlink);
                                 return;
                             }
@@ -275,7 +292,11 @@ pub(crate) fn minimize(
                             counts.bytes += md.len();
                             counts.count += 1;
 
-                            used_paths.entry(path).or_default().extend(symlink);
+                            used_paths
+                                .entry(path)
+                                .or_insert_with(|| (which, Default::default()))
+                                .1
+                                .extend(symlink);
                         };
 
                         if path.is_symlink() {
@@ -374,7 +395,7 @@ pub(crate) fn minimize(
     // all the symlinks from which they are rereferenced, so just be conservative
     // and add all of them
     for (p, sls) in symlinks {
-        if let Some(symlinks) = used_paths.get_mut(&p) {
+        if let Some((_, symlinks)) = used_paths.get_mut(&p) {
             let before = symlinks.len();
             symlinks.extend(sls);
             additional_symlinks += symlinks.len() - before;
@@ -418,22 +439,43 @@ pub(crate) fn minimize(
             // actually using any longer, if this file is in source control then
             // they can just revert the changes if a file that was previously in
             // the list was removed
-            map.filter.clear();
-            map.symlinks.clear();
+            map.clear();
 
-            map.filter.extend(used_paths.keys().map(|p| {
-                let path = p.strip_prefix(&root).unwrap().as_str().to_owned();
-                path
-            }));
-            map.symlinks
-                .extend(used_paths.iter().filter_map(|(p, sls)| {
-                    if sls.is_empty() {
-                        return None;
-                    }
+            let crt_hdr_prefix = roots.crt.join("include");
+            let crt_lib_prefix = roots.crt.join("lib");
+            let sdk_hdr_prefix = {
+                let mut sp = roots.sdk.clone();
+                sp.push("Include");
+                sp.push(sdk_version);
+                sp
+            };
+            let sdk_lib_prefix = roots.sdk.join("lib");
 
-                    let path = p.strip_prefix(&root).unwrap().as_str().to_owned();
-                    Some((path, sls.iter().cloned().collect()))
-                }));
+            for (p, (which, sls)) in &used_paths {
+                let (prefix, section) = match which {
+                    SectionKind::SdkHeader => (&sdk_hdr_prefix, &mut map.sdk.headers),
+                    SectionKind::SdkLib => (&sdk_lib_prefix, &mut map.sdk.libs),
+                    SectionKind::CrtHeader => (&crt_hdr_prefix, &mut map.crt.headers),
+                    SectionKind::CrtLib => (&crt_lib_prefix, &mut map.crt.libs),
+                };
+
+                let path = p
+                    .strip_prefix(prefix)
+                    .with_context(|| {
+                        format!("path {p} did not begin with expected prefix {prefix}")
+                    })
+                    .unwrap()
+                    .as_str()
+                    .to_owned();
+
+                if sls.is_empty() {
+                    section.filter.insert(path);
+                    continue;
+                }
+
+                section.filter.insert(path.clone());
+                section.symlinks.insert(path, sls.iter().cloned().collect());
+            }
 
             let serialized = toml::to_string_pretty(&map).unwrap();
 
@@ -471,7 +513,7 @@ pub(crate) fn minimize(
                 Ok(np)
             };
 
-            for (up, sls) in &used_paths {
+            for (up, (_, sls)) in &used_paths {
                 let np = mv(up)?;
 
                 for sl in sls {
