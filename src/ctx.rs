@@ -27,11 +27,24 @@ pub struct Ctx {
 impl Ctx {
     fn http_client(read_timeout: Option<Duration>) -> Result<ureq::Agent, Error> {
         let mut builder = ureq::builder();
-
         #[cfg(feature = "native-tls")]
         {
+            use std::env;
+            use std::fs::File;
+            use std::io::BufReader;
             use std::sync::Arc;
-            builder = builder.tls_connector(Arc::new(native_tls_crate::TlsConnector::new()?));
+
+            let mut tls_builder = native_tls_crate::TlsConnector::builder();
+            if let Some(custom_ca) =
+                env::var_os("REQUESTS_CA_BUNDLE").or_else(|| env::var_os("CURL_CA_BUNDLE"))
+            {
+                let mut reader = BufReader::new(File::open(custom_ca)?);
+                for cert in rustls_pemfile::certs(&mut reader)? {
+                    tls_builder
+                        .add_root_certificate(native_tls_crate::Certificate::from_pem(&cert)?);
+                }
+            }
+            builder = builder.tls_connector(Arc::new(tls_builder.build()?));
         }
 
         // Allow user to specify timeout values in the case of bad/slow proxies
