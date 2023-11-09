@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#108](https://github.com/Jake-Shadle/xwin/pull/108) resolved [#107](https://github.com/Jake-Shadle/xwin/issues/107) by fixing the Window symlink code added in [PR#105](https://github.com/Jake-Shadle/xwin/pull/105) and only using it in the two cases it was needed.
+
 ## [0.4.0] - 2023-11-07
 ### Added
 - [PR#101](https://github.com/Jake-Shadle/xwin/pull/101) resolved [#28](https://github.com/Jake-Shadle/xwin/issues/28), [#84](https://github.com/Jake-Shadle/xwin/issues/84), and [#85](https://github.com/Jake-Shadle/xwin/issues/85) by adding a `minimize` command that straces a cargo build to write a `map` file that can be used by a `splat` command to only splat the headers and libraries actually needed to build, drastically reducing the splat output (eg. 1.3GiB -> 101MiB). This `map` file also allows the creation of symlinks on a per-file basis, allowing users to create their own symlinks if needed.
