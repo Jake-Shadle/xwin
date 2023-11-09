@@ -677,7 +677,7 @@ pub(crate) fn splat(
                 // Multiple architectures both have a lib dir,
                 // but we only need to create this symlink once.
                 if !versioned_linkname.exists() {
-                    symlink(".", &versioned_linkname)?;
+                    crate::symlink_on_windows_too(".", &versioned_linkname)?;
                 }
 
                 // https://github.com/llvm/llvm-project/blob/release/14.x/clang/lib/Driver/ToolChains/MSVC.cpp#L1102
@@ -698,7 +698,7 @@ pub(crate) fn splat(
                 // Desktop and Store variants both have an include dir,
                 // but we only need to create this symlink once.
                 if !versioned_linkname.exists() {
-                    symlink(".", &versioned_linkname)?;
+                    crate::symlink_on_windows_too(".", &versioned_linkname)?;
                 }
 
                 // https://github.com/llvm/llvm-project/blob/release/14.x/clang/lib/Driver/ToolChains/MSVC.cpp#L1340-L1346
