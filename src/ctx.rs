@@ -28,7 +28,7 @@ impl Ctx {
     fn http_client(read_timeout: Option<Duration>) -> Result<ureq::Agent, Error> {
         let mut builder = ureq::builder();
 
-        #[cfg(feature = "native-tls")]
+        #[cfg(any(feature = "native-tls", feature = "rustls-tls"))]
         'custom: {
             // "common"? env vars that people who use custom certs use? I guess
             // this is easy to expand if it's not the case. /shrug
