@@ -212,9 +212,12 @@ pub struct Args {
     /// Whether to include the Active Template Library (ATL) in the installation
     #[arg(long)]
     include_atl: bool,
-    /// Specifies a timeout for how long a single download is allowed to take. The default is 60s.
-    #[arg(short, long, value_parser = parse_duration)]
-    timeout: Option<Duration>,
+    /// Specifies a timeout for how long a single download is allowed to take.
+    #[arg(short, long, value_parser = parse_duration, default_value = "60s")]
+    timeout: Duration,
+    /// An HTTPS proxy to use
+    #[arg(long, env = "HTTPS_PROXY")]
+    https_proxy: Option<String>,
     /// The architectures to include
     #[arg(
         long,
@@ -259,19 +262,36 @@ fn main() -> Result<(), Error> {
 
     let draw_target = xwin::util::ProgressTarget::Stdout;
 
+    let client = {
+        let mut builder = ureq::AgentBuilder::new().timeout_read(args.timeout);
+
+        if let Some(proxy) = args.https_proxy {
+            let proxy = ureq::Proxy::new(proxy).context("failed to parse https proxy address")?;
+            builder = builder.proxy(proxy);
+        }
+
+        builder.build()
+    };
+
     let ctx = if args.temp {
-        xwin::Ctx::with_temp(draw_target, args.timeout)?
+        xwin::Ctx::with_temp(draw_target, client)?
     } else {
         let cache_dir = match &args.cache_dir {
             Some(cd) => cd.clone(),
             None => cwd.join(".xwin-cache"),
         };
-        xwin::Ctx::with_dir(cache_dir, draw_target, args.timeout)?
+        xwin::Ctx::with_dir(cache_dir, draw_target, client)?
     };
 
     let ctx = std::sync::Arc::new(ctx);
 
-    let pkg_manifest = load_manifest(&ctx, &args, draw_target)?;
+    let pkg_manifest = load_manifest(
+        &ctx,
+        args.manifest.as_ref(),
+        &args.manifest_version,
+        &args.channel,
+        draw_target,
+    )?;
 
     let arches = args.arch.into_iter().fold(0, |acc, arch| acc | arch as u32);
     let variants = args
@@ -453,7 +473,9 @@ fn print_packages(payloads: &[xwin::Payload]) {
 
 fn load_manifest(
     ctx: &xwin::Ctx,
-    args: &Args,
+    manifest: Option<&PathBuf>,
+    manifest_version: &str,
+    channel: &str,
     dt: xwin::util::ProgressTarget,
 ) -> anyhow::Result<xwin::manifest::PackageManifest> {
     let manifest_pb = ia::ProgressBar::with_draw_target(Some(0), dt.into())
@@ -467,19 +489,14 @@ fn load_manifest(
     manifest_pb.set_prefix("Manifest");
     manifest_pb.set_message("📥 downloading");
 
-    let manifest = match &args.manifest {
+    let manifest = match manifest {
         Some(manifest_path) => {
             let manifest_content = std::fs::read_to_string(manifest_path)
                 .with_context(|| format!("failed to read path '{}'", manifest_path))?;
             serde_json::from_str(&manifest_content)
                 .with_context(|| format!("failed to deserialize manifest in '{}'", manifest_path))?
         }
-        None => xwin::manifest::get_manifest(
-            ctx,
-            &args.manifest_version,
-            &args.channel,
-            manifest_pb.clone(),
-        )?,
+        None => xwin::manifest::get_manifest(ctx, manifest_version, channel, manifest_pb.clone())?,
     };
 
     let pkg_manifest = xwin::manifest::get_package_manifest(ctx, &manifest, manifest_pb.clone())?;

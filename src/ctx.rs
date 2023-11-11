@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use crate::{
     splat::SdkHeaders,
     util::{ProgressTarget, Sha256},
@@ -25,93 +23,8 @@ pub struct Ctx {
 }
 
 impl Ctx {
-    fn http_client(read_timeout: Option<Duration>) -> Result<ureq::Agent, Error> {
-        let mut builder = ureq::builder();
-
-        #[cfg(feature = "native-tls")]
-        'custom: {
-            // "common"? env vars that people who use custom certs use? I guess
-            // this is easy to expand if it's not the case. /shrug
-            const CERT_ENVS: &[&str] = &["REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "SSL_CERT_FILE"];
-
-            let Some((env, cert_path)) = CERT_ENVS.iter().find_map(|env| {
-                std::env::var_os(env).map(|var| (env, std::path::PathBuf::from(var)))
-            }) else {
-                break 'custom;
-            };
-
-            fn build(
-                cert_path: &std::path::Path,
-            ) -> anyhow::Result<native_tls_crate::TlsConnector> {
-                let mut tls_builder = native_tls_crate::TlsConnector::builder();
-                let mut reader = std::io::BufReader::new(std::fs::File::open(cert_path)?);
-                for cert in rustls_pemfile::certs(&mut reader)? {
-                    tls_builder
-                        .add_root_certificate(native_tls_crate::Certificate::from_pem(&cert)?);
-                }
-                Ok(tls_builder.build()?)
-            }
-
-            let tls_connector = build(&cert_path).with_context(|| {
-                format!(
-                    "failed to add custom cert from path '{}' configured by env var '{env}'",
-                    cert_path.display()
-                )
-            })?;
-
-            builder = builder.tls_connector(std::sync::Arc::new(tls_connector));
-        }
-
-        #[cfg(feature = "rustls-tls")]
-        'custom: {
-            // "common"? env vars that people who use custom certs use? I guess
-            // this is easy to expand if it's not the case. /shrug
-            const CERT_ENVS: &[&str] = &["REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "SSL_CERT_FILE"];
-
-            let Some((env, cert_path)) = CERT_ENVS.iter().find_map(|env| {
-                std::env::var_os(env).map(|var| (env, std::path::PathBuf::from(var)))
-            }) else {
-                break 'custom;
-            };
-
-            fn build(cert_path: &std::path::Path) -> anyhow::Result<rustls::ClientConfig> {
-                let mut reader = std::io::BufReader::new(std::fs::File::open(cert_path)?);
-                let certs = rustls_pemfile::certs(&mut reader)?;
-                let mut root_certs = rustls::RootCertStore::empty();
-                root_certs.add_parsable_certificates(&certs);
-                let client_config = rustls::ClientConfig::builder()
-                    .with_safe_defaults()
-                    .with_root_certificates(root_certs)
-                    .with_no_client_auth();
-                Ok(client_config)
-            }
-
-            let client_config = build(&cert_path).with_context(|| {
-                format!(
-                    "failed to add custom cert from path '{}' configured by env var '{env}'",
-                    cert_path.display()
-                )
-            })?;
-
-            builder = builder.tls_config(std::sync::Arc::new(client_config));
-        }
-
-        // Allow user to specify timeout values in the case of bad/slow proxies
-        // or MS itself being terrible, but default to a minute, which is _far_
-        // more than it should take in normal situations, as by default ureq
-        // sets no timeout on the response
-        builder = builder.timeout_read(read_timeout.unwrap_or(Duration::from_secs(60)));
-
-        if let Ok(proxy) = std::env::var("https_proxy") {
-            let proxy = ureq::Proxy::new(proxy)?;
-            builder = builder.proxy(proxy);
-        }
-        Ok(builder.build())
-    }
-
-    pub fn with_temp(dt: ProgressTarget, read_timeout: Option<Duration>) -> Result<Self, Error> {
+    pub fn with_temp(dt: ProgressTarget, client: ureq::Agent) -> Result<Self, Error> {
         let td = tempfile::TempDir::new()?;
-        let client = Self::http_client(read_timeout)?;
 
         Ok(Self {
             work_dir: PathBuf::from_path_buf(td.path().to_owned()).map_err(|pb| {
@@ -126,10 +39,8 @@ impl Ctx {
     pub fn with_dir(
         mut work_dir: PathBuf,
         dt: ProgressTarget,
-        read_timeout: Option<Duration>,
+        client: ureq::Agent,
     ) -> Result<Self, Error> {
-        let client = Self::http_client(read_timeout)?;
-
         work_dir.push("dl");
         std::fs::create_dir_all(&work_dir)?;
         work_dir.pop();
