@@ -74,9 +74,7 @@ impl Ctx {
                 break 'custom;
             };
 
-            fn build(
-                cert_path: &std::path::Path,
-            ) -> anyhow::Result<rustls::ClientConfig> {
+            fn build(cert_path: &std::path::Path) -> anyhow::Result<rustls::ClientConfig> {
                 let mut reader = std::io::BufReader::new(std::fs::File::open(cert_path)?);
                 let certs = rustls_pemfile::certs(&mut reader)?;
                 let mut root_certs = rustls::RootCertStore::empty();
