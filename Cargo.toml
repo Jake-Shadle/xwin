@@ -22,14 +22,13 @@ exclude = [
 [features]
 # By default we use rustls for TLS
 default = ["rustls-tls"]
-rustls-tls = ["ureq/tls"]
+rustls-tls = ["ureq/tls", "rustls-pemfile", "rustls"]
 # If this feature is enabled we instead use the native TLS implementation for the
 # target platform
 native-tls = [
     "ureq/native-tls",
     "native-tls-crate/vendored",
     "rustls-pemfile",
-    "rustls",
 ]
 
 [dependencies]
