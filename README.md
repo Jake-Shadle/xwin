@@ -94,7 +94,7 @@ This moves all of the unpacked files which aren't pruned to their canonical loca
 │  │  └── msclr
 │  │     └── com
 │  └── lib
-│     └── x86_64
+│     └── x64
 └── sdk
    ├── include
    │  ├── cppwinrt
@@ -119,9 +119,9 @@ This moves all of the unpacked files which aren't pruned to their canonical loca
    │        └── wrappers
    └── lib
       ├── ucrt
-      │  └── x86_64
+      │  └── x64
       └── um
-         └── x86_64
+         └── x64
 ```
 
 ### `xwin minimize`
