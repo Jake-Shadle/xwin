@@ -75,8 +75,14 @@ Options:
           installation
 
   -t, --timeout <TIMEOUT>
-          Specifies a timeout for how long a single download is allowed to take.
-          The default is 60s
+          Specifies a timeout for how long a single download is allowed to take
+          
+          [default: 60s]
+
+      --https-proxy <HTTPS_PROXY>
+          An HTTPS proxy to use
+          
+          [env: HTTPS_PROXY]
 
       --arch <ARCH>
           The architectures to include

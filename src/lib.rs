@@ -18,6 +18,7 @@ pub mod util;
 pub use ctx::Ctx;
 pub use minimize::MinimizeConfig;
 pub use splat::SplatConfig;
+pub use ureq;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Arch {
