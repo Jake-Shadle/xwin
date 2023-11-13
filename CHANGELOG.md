@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.5.0] - 2023-11-13
 ### Changed
 - [PR#110](https://github.com/Jake-Shadle/xwin/pull/110) changed how `Ctx` is built. It was getting too complicated to support niche use cases, some of which didn't belong in a library (like reading environment variables), so this functionality has been completely removed. Instead, one must pass in a `ureq::Agent` that is fully configured how the user wants it.
 - [PR#110](https://github.com/Jake-Shadle/xwin/pull/110) changed the environment variable read to the `xwin` binary instead of the library, as well as its name `https_proxy` -> `HTTPS_PROXY`, and added it to an an option on the command line.
@@ -158,7 +159,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation if downloading, unpacking, and splatting of the CRT and Windows SDK. This first pass focused on targeting x86_64 Desktop, so targeting the Windows Store or other architectures is not guaranteed to work.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.4.1...HEAD
+[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.5.0...HEAD
+[0.5.0]: https://github.com/Jake-Shadle/xwin/compare/0.4.1...0.5.0
 [0.4.1]: https://github.com/Jake-Shadle/xwin/compare/0.4.0...0.4.1
 [0.4.0]: https://github.com/Jake-Shadle/xwin/compare/0.3.1...0.4.0
 [0.3.1]: https://github.com/Jake-Shadle/xwin/compare/0.3.0...0.3.1
