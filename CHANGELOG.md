@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#110](https://github.com/Jake-Shadle/xwin/pull/110) changed how `Ctx` is built. It was getting too complicated to support niche use cases, some of which didn't belong in a library (like reading environment variables), so this functionality has been completely removed. Instead, one must pass in a `ureq::Agent` that is fully configured how the user wants it.
+- [PR#110](https://github.com/Jake-Shadle/xwin/pull/110) changed the environment variable read to the `xwin` binary instead of the library, as well as its name `https_proxy` -> `HTTPS_PROXY`, and added it to an an option on the command line.
+
 ## [0.4.1] - 2023-11-09
 ### Fixed
 - [PR#108](https://github.com/Jake-Shadle/xwin/pull/108) resolved [#107](https://github.com/Jake-Shadle/xwin/issues/107) by fixing the Window symlink code added in [PR#105](https://github.com/Jake-Shadle/xwin/pull/105) and only using it in the two cases it was needed.
