@@ -182,10 +182,6 @@ See [docs/example-map.toml](docs/example-map.toml) for a real world example.
 
 [xwin.dockerfile](xwin.dockerfile) is an example Dockerfile that can be used a container image capable of building and testing Rust crates targeting `x86_64-pc-windows-msvc`.
 
-## Custom certificates
-
-If you require custom certificates you can specify the path via the `SSL_CERT_FILE`, `CURL_CA_BUNDLE`, or `REQUESTS_CA_BUNDLE` environment variables. This requires being compiled with the `native-tls` feature.
-
 ### Thanks
 
 Special thanks to <https://github.com/mstorsjo/msvc-wine> for the inspiration and [@mdsteele](https://github.com/mdsteele) for publishing several Rust crates around msi/cab files that were needed in this project
