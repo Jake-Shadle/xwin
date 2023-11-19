@@ -512,7 +512,7 @@ fn get_sdk(
         let (_, mi) = pkgs
             .iter()
             .find(|(key, _)| key.ends_with(&sdk_version))
-            .with_context(|| "unable to locate SDK '{sdk_version}'")?;
+            .with_context(|| format!("unable to locate SDK '{sdk_version}'"))?;
 
         (mi, sv)
     } else {
