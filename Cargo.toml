@@ -89,6 +89,10 @@ walkdir = "2.3"
 # Unpacking of VSIX "packages"
 zip = { version = "0.6", default-features = false, features = ["deflate"] }
 
+[target.'cfg(target_env = "musl")'.dependencies]
+# Faster allocator for musl builds
+mimalloc = { version = "*", default-features = false }
+
 [dev-dependencies]
 insta = "1.12"
 
