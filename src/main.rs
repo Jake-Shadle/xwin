@@ -1,3 +1,9 @@
+#[cfg(target_env = "musl")]
+use mimalloc::MiMalloc;
+#[cfg(target_env = "musl")]
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
+
 use anyhow::{Context as _, Error};
 use camino::Utf8PathBuf as PathBuf;
 use clap::builder::{PossibleValuesParser, TypedValueParser as _};
