@@ -389,6 +389,7 @@ pub(crate) fn unpack(
                             return Some(Err(anyhow::anyhow!("invalid row in 'File'")));
                         }
 
+                        #[allow(clippy::blocks_in_conditions)]
                         let (dir, fname, id, seq, size) = match || -> Result<_, Error> {
                             let fname = fix_name(&row[2])?;
                             let dir = components
