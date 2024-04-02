@@ -89,7 +89,7 @@ walkdir = "2.3"
 # Unpacking of VSIX "packages"
 zip = { version = "0.6", default-features = false, features = ["deflate"] }
 
-[target.'cfg(target_env = "musl")'.dependencies]
+[target.'cfg(all(target_env = "musl", target_arch = "x86_64"))'.dependencies]
 # Faster allocator for musl builds
 mimalloc = { version = "0.1", default-features = false }
 
