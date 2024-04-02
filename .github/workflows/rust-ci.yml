@@ -116,7 +116,7 @@ jobs:
       - run: cargo fetch --target ${{ matrix.target }}
       - name: Install musl tools
         if: endsWith(matrix.target, '-linux-musl')
-        run: sudo apt-get install -y musl-tools llvm
+        run: sudo apt-get install -y musl-tools llvm gcc-multilib
       - name: cargo publish check
         run: cargo publish --dry-run --target ${{ matrix.target }}
 
