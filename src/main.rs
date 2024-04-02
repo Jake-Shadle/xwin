@@ -1,3 +1,7 @@
+#[cfg(all(target_env = "musl", target_arch = "x86_64"))]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use anyhow::{Context as _, Error};
 use camino::Utf8PathBuf as PathBuf;
 use clap::builder::{PossibleValuesParser, TypedValueParser as _};

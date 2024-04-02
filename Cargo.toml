@@ -33,7 +33,7 @@ anyhow = "1.0"
 # Network/file buffers
 bytes = "1.0"
 # CAB files are used in conjunction with MSI files for SDK packages
-cab = "0.4"
+cab = "0.5"
 # Nicer to use utf-8 paths
 camino = "1.0"
 # Easy CLI tables
@@ -57,7 +57,7 @@ ureq = { version = "2.4", default-features = false, features = ["gzip"] }
 memchr = "2.6"
 native-tls-crate = { package = "native-tls", version = "0.2", optional = true }
 # CA Cert for HTTP requests
-rustls = { version = "0.21.8", optional = true }
+rustls = { version = "0.22", optional = true }
 rustls-pemfile = { version = "1.0.3", optional = true }
 # SHA-256 verification
 sha2 = "0.10"
@@ -84,10 +84,14 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
 # Hashing
 twox-hash = "1.6"
 # Determine the latest CRT and SDK versions
-versions = "5.0.0"
+versions = "6.2"
 walkdir = "2.3"
 # Unpacking of VSIX "packages"
 zip = { version = "0.6", default-features = false, features = ["deflate"] }
+
+[target.'cfg(all(target_env = "musl", target_arch = "x86_64"))'.dependencies]
+# Faster allocator for musl builds
+mimalloc = { version = "0.1", default-features = false }
 
 [dev-dependencies]
 insta = "1.12"

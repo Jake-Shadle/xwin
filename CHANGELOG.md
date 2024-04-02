@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#116](https://github.com/Jake-Shadle/xwin/pull/116) (a rework of [#115](https://github.com/Jake-Shadle/xwin/pull/115>)) improves the speed of the `x86_64-unknown-linux-musl` binary by using `mimalloc`.
+
 ## [0.5.0] - 2023-11-13
 ### Changed
 - [PR#110](https://github.com/Jake-Shadle/xwin/pull/110) changed how `Ctx` is built. It was getting too complicated to support niche use cases, some of which didn't belong in a library (like reading environment variables), so this functionality has been completely removed. Instead, one must pass in a `ureq::Agent` that is fully configured how the user wants it.
