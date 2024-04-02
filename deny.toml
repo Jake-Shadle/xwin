@@ -1,20 +1,18 @@
+[graph]
 targets = [
-  { triple = "x86_64-unknown-linux-musl" },
-  { triple = "x86_64-unknown-linux-gnu" },
-  { triple = "x86_64-apple-darwin" },
-  { triple = "aarch64-apple-darwin" },
+  "x86_64-unknown-linux-musl",
+  "x86_64-unknown-linux-gnu",
+  "x86_64-apple-darwin",
+  "aarch64-apple-darwin",
 ]
 
 [advisories]
-vulnerability = "deny"
-unmaintained = "deny"
-yanked = "deny"
+version = 2
 ignore = []
 
 [licenses]
-unlicensed = "deny"
+version = 2
 allow = ["MIT", "Apache-2.0", "BSD-3-Clause", "ISC"]
-copyleft = "deny"
 exceptions = [
   { allow = ["MPL-2.0"], name = "webpki-roots" },
   # ring uses code from multiple libraries but all with permissive licenses
@@ -44,10 +42,7 @@ skip = [
   # ditto :(
   { name = "regex-automata", version = "=0.1.10" },
 ]
-skip-tree = [
-  # clap -> terminal_size
-  { name = "rustix", version = "=0.37.23" },
-]
+skip-tree = []
 
 [sources]
 unknown-registry = "deny"
