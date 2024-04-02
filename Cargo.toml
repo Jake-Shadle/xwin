@@ -84,7 +84,7 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
 # Hashing
 twox-hash = "1.6"
 # Determine the latest CRT and SDK versions
-versions = "5.0.0"
+versions = "6.2"
 walkdir = "2.3"
 # Unpacking of VSIX "packages"
 zip = { version = "0.6", default-features = false, features = ["deflate"] }
