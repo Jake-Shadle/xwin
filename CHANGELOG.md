@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#117](https://github.com/Jake-Shadle/xwin/pull/117) updated a few crates, notably `zip`.
+
 ## [0.5.1] - 2024-04-02
 ### Changed
 - [PR#116](https://github.com/Jake-Shadle/xwin/pull/116) (a rework of [#115](https://github.com/Jake-Shadle/xwin/pull/115>)) improves the speed of the `x86_64-unknown-linux-musl` binary by using `mimalloc`.
