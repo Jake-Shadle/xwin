@@ -87,7 +87,7 @@ twox-hash = "1.6"
 versions = "6.2"
 walkdir = "2.3"
 # Unpacking of VSIX "packages"
-zip = { version = "0.6", default-features = false, features = ["deflate"] }
+zip = { version = "1.0", default-features = false, features = ["deflate"] }
 
 [target.'cfg(all(target_env = "musl", target_arch = "x86_64"))'.dependencies]
 # Faster allocator for musl builds
