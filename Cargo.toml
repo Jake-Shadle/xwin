@@ -62,7 +62,8 @@ serde_json = "1.0"
 clap = { version = "4.0", features = ["derive", "env", "wrap_help"] }
 # Easy management of temp files
 tempfile = "3.1"
-toml = "0.8"
+# We need to pin it to not get duplicates due to zip -> num_enum -> proc-macro-crate -> (WHY!?!?) toml_edit
+toml = "=0.8.9"
 # Tracing logs
 tracing = { version = "0.1", default-features = false, features = [
     "attributes",
