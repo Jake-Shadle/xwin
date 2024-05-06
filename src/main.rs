@@ -42,19 +42,21 @@ pub struct SplatOptions {
     /// libraries that are generally uninteresting to keep for most usage
     #[arg(long)]
     include_debug_symbols: bool,
-    /// By default, symlinks are added to both the CRT and WindowsSDK to
-    /// address casing issues in general usage. For example, if you are
-    /// compiling C/C++ code that does `#include <windows.h>`, it will break
-    /// on a case-sensitive file system, as the actual path in the WindowsSDK
-    /// is `Windows.h`. This also applies even if the C/C++ you are compiling
-    /// uses correct casing for all CRT/SDK includes, as the internal headers
-    /// also use incorrect casing in most cases.
+    /// By default, symlinks are added to both the CRT and `WindowsSDK` to
+    /// address casing issues in general usage.
+    ///
+    /// For example, if you are compiling C/C++ code that does
+    /// `#include <windows.h>`, it will break on a case-sensitive file system,
+    /// as the actual path in the `WindowsSDK` is `Windows.h`. This also applies
+    /// even if the C/C++ you are compiling uses correct casing for all CRT/SDK
+    /// includes, as the internal headers also use incorrect casing in most cases.
     #[arg(long)]
     disable_symlinks: bool,
     /// By default, we convert the MS specific `x64`, `arm`, and `arm64`
     /// target architectures to the more canonical `x86_64`, `aarch`, and
-    /// `aarch64` of LLVM etc when creating directories/names. Passing this
-    /// flag will preserve the MS names for those targets.
+    /// `aarch64` of LLVM etc when creating directories/names.
+    ///
+    /// Passing this flag will preserve the MS names for those targets.
     #[arg(long)]
     preserve_ms_arch_notation: bool,
 }
