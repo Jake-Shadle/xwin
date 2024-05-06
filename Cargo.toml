@@ -22,7 +22,7 @@ exclude = [
 [features]
 # By default we use rustls for TLS
 default = ["rustls-tls"]
-rustls-tls = ["ureq/tls", "rustls"]
+rustls-tls = ["ureq/tls"]
 # If this feature is enabled we instead use the native TLS implementation for the
 # target platform
 native-tls = ["ureq/native-tls", "native-tls-crate/vendored"]
@@ -33,16 +33,12 @@ anyhow = "1.0"
 # Network/file buffers
 bytes = "1.0"
 # CAB files are used in conjunction with MSI files for SDK packages
-cab = "0.5"
+cab = "0.6"
 # Nicer to use utf-8 paths
 camino = "1.0"
 # Easy CLI tables
 cli-table = { version = "0.4", default-features = false }
 crossbeam-channel = "0.5"
-# GZIP/Deflate
-flate2 = { version = "1.0", default-features = false, features = [
-    "rust_backend",
-] }
 # Pretty progress bars
 indicatif = "0.17"
 # Decoding of MSI installer packages
@@ -56,9 +52,6 @@ regex = "1.0"
 ureq = { version = "2.4", default-features = false, features = ["gzip"] }
 memchr = "2.6"
 native-tls-crate = { package = "native-tls", version = "0.2", optional = true }
-# CA Cert for HTTP requests
-rustls = { version = "0.22", optional = true }
-rustls-pemfile = { version = "1.0.3", optional = true }
 # SHA-256 verification
 sha2 = "0.10"
 # Deserialization
@@ -69,7 +62,8 @@ serde_json = "1.0"
 clap = { version = "4.0", features = ["derive", "env", "wrap_help"] }
 # Easy management of temp files
 tempfile = "3.1"
-toml = "0.8"
+# We need to pin it to not get duplicates due to zip -> num_enum -> proc-macro-crate -> (WHY!?!?) toml_edit
+toml = "=0.8.9"
 # Tracing logs
 tracing = { version = "0.1", default-features = false, features = [
     "attributes",
@@ -87,7 +81,7 @@ twox-hash = "1.6"
 versions = "6.2"
 walkdir = "2.3"
 # Unpacking of VSIX "packages"
-zip = { version = "0.6", default-features = false, features = ["deflate"] }
+zip = { version = "1.0", default-features = false, features = ["deflate"] }
 
 [target.'cfg(all(target_env = "musl", target_arch = "x86_64"))'.dependencies]
 # Faster allocator for musl builds
