@@ -69,7 +69,7 @@ ENV CC_x86_64_pc_windows_msvc="clang-cl" \
     # Note that we only disable unused-command-line-argument here since clang-cl
     # doesn't implement all of the options supported by cl, but the ones it doesn't
     # are _generally_ not interesting.
-    CL_FLAGS="-Wno-unused-command-line-argument -fuse-ld=lld-link /imsvc/xwin/crt/include /imsvc/xwin/sdk/include/ucrt /imsvc/xwin/sdk/include/um /imsvc/xwin/sdk/include/shared" \
+    CL_FLAGS="-Wno-unused-command-line-argument -fuse-ld=lld-link /imsvc/xwin/crt/include /imsvc/xwin/sdk/include/ucrt /imsvc/xwin/sdk/include/um /imsvc/xwin/sdk/include/shared /imsvc/xwin/sdk/include/winrt" \
     # Let cargo know what linker to invoke if you haven't already specified it
     # in a .cargo/config.toml file
     CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER="lld-link" \
