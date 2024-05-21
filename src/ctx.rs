@@ -164,6 +164,7 @@ impl Ctx {
         self: std::sync::Arc<Self>,
         packages: std::collections::BTreeMap<String, crate::manifest::ManifestItem>,
         payloads: Vec<WorkItem>,
+        crt_version: String,
         sdk_version: String,
         arches: u32,
         variants: u32,
@@ -179,20 +180,21 @@ impl Ctx {
 
         let splat_config = match &ops {
             crate::Ops::Splat(config) => {
-                let splat_roots = crate::splat::prep_splat(self.clone(), &config.output)?;
+                let splat_roots = crate::splat::prep_splat(self.clone(), &config.output, &crt_version, config.use_winsysroot_style)?;
                 let mut config = config.clone();
                 config.output = splat_roots.root.clone();
 
                 Some((splat_roots, config))
             }
             crate::Ops::Minimize(config) => {
-                let splat_roots = crate::splat::prep_splat(self.clone(), &config.splat_output)?;
+                let splat_roots = crate::splat::prep_splat(self.clone(), &config.splat_output, &crt_version, config.use_winsysroot_style)?;
 
                 let config = crate::SplatConfig {
                     preserve_ms_arch_notation: config.preserve_ms_arch_notation,
                     include_debug_libs: config.include_debug_libs,
                     include_debug_symbols: config.include_debug_symbols,
                     enable_symlinks: config.enable_symlinks,
+                    use_winsysroot_style: config.use_winsysroot_style,
                     output: splat_roots.root.clone(),
                     map: Some(config.map.clone()),
                     copy: config.copy,

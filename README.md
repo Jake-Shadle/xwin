@@ -77,6 +77,7 @@ Fixes the packages to prune unneeded files and adds symlinks to address file cas
 * `--include-debug-libs` - The MSVCRT includes (non-redistributable) debug versions of the various libs that are generally uninteresting to keep for most usage
 * `--include-debug-symbols` - The MSVCRT includes PDB (debug symbols) files for several of the libraries that are generally uninteresting to keep for most usage
 * `--preserve-ms-arch-notation` - By default, we convert the MS specific `x64`, `arm`, and `arm64` target architectures to the more canonical `x86_64`, `aarch`, and `aarch64` of LLVM etc when creating directories/names. Passing this flag will preserve the MS names for those targets
+* `--use-winsysroot-style` - Use the /winsysroot layout, so that clang-cl's /winsysroot flag can be used with the output, rather than needing both -vctoolsdir and -winsdkdir. You will likely also want to use --preserve-ms-arch-notation and --disable-symlinks for use with clang-cl on Windows.
 * `--output` - The root output directory. Defaults to `./.xwin-cache/splat` if not specified
 * `--map` - An optional [map](#map-file) file used to configure what files are splatted, and any additional symlinks to create.
 

@@ -59,6 +59,12 @@ pub struct SplatOptions {
     /// Passing this flag will preserve the MS names for those targets.
     #[arg(long)]
     preserve_ms_arch_notation: bool,
+    /// Use the /winsysroot layout, so that clang-cl's /winsysroot flag can be
+    /// used with the output, rather than needing both -vctoolsdir and
+    /// -winsdkdir. You will likely also want to use --preserve-ms-arch-notation
+    /// and --disable-symlinks for use with clang-cl on Windows.
+    #[arg(long)]
+    use_winsysroot_style: bool,
 }
 
 #[derive(Subcommand)]
@@ -331,6 +337,7 @@ fn main() -> Result<(), Error> {
             include_debug_symbols: options.include_debug_symbols,
             enable_symlinks: !options.disable_symlinks,
             preserve_ms_arch_notation: options.preserve_ms_arch_notation,
+            use_winsysroot_style: options.use_winsysroot_style,
             copy,
             map,
             output: output.unwrap_or_else(|| ctx.work_dir.join("splat")),
@@ -349,6 +356,7 @@ fn main() -> Result<(), Error> {
             include_debug_symbols: options.include_debug_symbols,
             enable_symlinks: !options.disable_symlinks,
             preserve_ms_arch_notation: options.preserve_ms_arch_notation,
+            use_winsysroot_style: options.use_winsysroot_style,
             splat_output: output.unwrap_or_else(|| ctx.work_dir.join("splat")),
             copy,
             minimize_output,
@@ -419,7 +427,7 @@ fn main() -> Result<(), Error> {
     mp.set_move_cursor(true);
 
     let res = std::thread::spawn(move || {
-        ctx.execute(pkgs, work_items, pruned.sdk_version, arches, variants, op)
+        ctx.execute(pkgs, work_items, pruned.crt_version, pruned.sdk_version, arches, variants, op)
     })
     .join();
 

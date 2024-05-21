@@ -9,6 +9,7 @@ pub struct SplatConfig {
     pub include_debug_symbols: bool,
     pub enable_symlinks: bool,
     pub preserve_ms_arch_notation: bool,
+    pub use_winsysroot_style: bool,
     pub output: PathBuf,
     pub map: Option<PathBuf>,
     pub copy: bool,
@@ -51,7 +52,7 @@ pub(crate) struct SplatRoots {
     src: PathBuf,
 }
 
-pub(crate) fn prep_splat(ctx: std::sync::Arc<Ctx>, root: &Path) -> Result<SplatRoots, Error> {
+pub(crate) fn prep_splat(ctx: std::sync::Arc<Ctx>, root: &Path, crt_version: &String, use_winsysroot_style: bool) -> Result<SplatRoots, Error> {
     // Ensure we create the path first, you can't canonicalize a non-existant path
     if !root.exists() {
         std::fs::create_dir_all(root)
@@ -59,8 +60,20 @@ pub(crate) fn prep_splat(ctx: std::sync::Arc<Ctx>, root: &Path) -> Result<SplatR
     }
 
     let root = crate::util::canonicalize(root)?;
-    let crt_root = root.join("crt");
-    let sdk_root = root.join("sdk");
+
+    let (crt_root, sdk_root) = if use_winsysroot_style {
+        let mut crt = root.join("VC");
+        crt.push("Tools");
+        crt.push("MSVC");
+        crt.push(crt_version);
+
+        let mut sdk = root.join("Windows Kits");
+        sdk.push("10");
+
+        (crt, sdk)
+    } else {
+        (root.join("crt"), root.join("sdk"))
+    };
 
     if crt_root.exists() {
         std::fs::remove_dir_all(&crt_root)
@@ -246,7 +259,13 @@ pub(crate) fn splat(
                 inc.push(sdk_version);
                 inc
             } else {
-                roots.sdk.join("include")
+                if config.use_winsysroot_style {
+                    let mut tar = roots.sdk.join("include");
+                    tar.push(sdk_version);
+                    tar
+                } else {
+                    roots.sdk.join("include")
+                }
             };
 
             vec![Mapping {
@@ -260,7 +279,14 @@ pub(crate) fn splat(
         }
         PayloadKind::SdkLibs => {
             src.push("lib/um");
-            let mut target = roots.sdk.join("lib/um");
+            let mut target = if config.use_winsysroot_style {
+                let mut tar = roots.sdk.join("lib");
+                tar.push(sdk_version);
+                tar.push("um");
+                tar
+            } else {
+                roots.sdk.join("lib/um")
+            };
 
             push_arch(
                 &mut src,
@@ -283,7 +309,14 @@ pub(crate) fn splat(
         }
         PayloadKind::SdkStoreLibs => {
             src.push("lib/um");
-            let target = roots.sdk.join("lib/um");
+            let target = if config.use_winsysroot_style {
+                let mut tar = roots.sdk.join("lib");
+                tar.push(sdk_version);
+                tar.push("um");
+                tar
+            } else {
+                roots.sdk.join("lib/um")
+            };
 
             Arch::iter(arches)
                 .map(|arch| -> Result<Mapping<'_>, Error> {
@@ -316,7 +349,14 @@ pub(crate) fn splat(
                 inc.push("ucrt");
                 inc
             } else {
-                roots.sdk.join("include/ucrt")
+                if config.use_winsysroot_style {
+                    let mut tar = roots.sdk.join("include");
+                    tar.push(sdk_version);
+                    tar.push("ucrt");
+                    tar
+                } else {
+                    roots.sdk.join("include/ucrt")
+                }
             };
 
             let mut mappings = vec![Mapping {
@@ -329,7 +369,14 @@ pub(crate) fn splat(
             }];
 
             src.push("lib/ucrt");
-            let target = roots.sdk.join("lib/ucrt");
+            let target = if config.use_winsysroot_style {
+                let mut tar = roots.sdk.join("lib");
+                tar.push(sdk_version);
+                tar.push("ucrt");
+                tar
+            } else {
+                roots.sdk.join("lib/ucrt")
+            };
             for arch in Arch::iter(arches) {
                 let mut src = src.clone();
                 let mut target = target.clone();
@@ -669,44 +716,48 @@ pub(crate) fn splat(
 
         match kind {
             PayloadKind::SdkLibs => {
-                // Symlink sdk/lib/{sdkversion} -> sdk/lib, regardless of filesystem case sensitivity.
-                let mut versioned_linkname = roots.sdk.clone();
-                versioned_linkname.push("lib");
-                versioned_linkname.push(sdk_version);
+                if !config.use_winsysroot_style {
+                    // Symlink sdk/lib/{sdkversion} -> sdk/lib, regardless of filesystem case sensitivity.
+                    let mut versioned_linkname = roots.sdk.clone();
+                    versioned_linkname.push("lib");
+                    versioned_linkname.push(sdk_version);
 
-                // Multiple architectures both have a lib dir,
-                // but we only need to create this symlink once.
-                if !versioned_linkname.exists() {
-                    crate::symlink_on_windows_too(".", &versioned_linkname)?;
-                }
+                    // Multiple architectures both have a lib dir,
+                    // but we only need to create this symlink once.
+                    if !versioned_linkname.exists() {
+                        crate::symlink_on_windows_too(".", &versioned_linkname)?;
+                    }
 
-                // https://github.com/llvm/llvm-project/blob/release/14.x/clang/lib/Driver/ToolChains/MSVC.cpp#L1102
-                if config.enable_symlinks {
-                    let mut title_case = roots.sdk.clone();
-                    title_case.push("Lib");
-                    if !title_case.exists() {
-                        symlink("lib", &title_case)?;
+                    // https://github.com/llvm/llvm-project/blob/release/14.x/clang/lib/Driver/ToolChains/MSVC.cpp#L1102
+                    if config.enable_symlinks {
+                        let mut title_case = roots.sdk.clone();
+                        title_case.push("Lib");
+                        if !title_case.exists() {
+                            symlink("lib", &title_case)?;
+                        }
                     }
                 }
             }
             PayloadKind::SdkHeaders => {
-                // Symlink sdk/include/{sdkversion} -> sdk/include, regardless of filesystem case sensitivity.
-                let mut versioned_linkname = roots.sdk.clone();
-                versioned_linkname.push("include");
-                versioned_linkname.push(sdk_version);
+                if !config.use_winsysroot_style {
+                    // Symlink sdk/include/{sdkversion} -> sdk/include, regardless of filesystem case sensitivity.
+                    let mut versioned_linkname = roots.sdk.clone();
+                    versioned_linkname.push("include");
+                    versioned_linkname.push(sdk_version);
 
-                // Desktop and Store variants both have an include dir,
-                // but we only need to create this symlink once.
-                if !versioned_linkname.exists() {
-                    crate::symlink_on_windows_too(".", &versioned_linkname)?;
-                }
+                    // Desktop and Store variants both have an include dir,
+                    // but we only need to create this symlink once.
+                    if !versioned_linkname.exists() {
+                        crate::symlink_on_windows_too(".", &versioned_linkname)?;
+                    }
 
-                // https://github.com/llvm/llvm-project/blob/release/14.x/clang/lib/Driver/ToolChains/MSVC.cpp#L1340-L1346
-                if config.enable_symlinks {
-                    let mut title_case = roots.sdk.clone();
-                    title_case.push("Include");
-                    if !title_case.exists() {
-                        symlink("include", &title_case)?;
+                    // https://github.com/llvm/llvm-project/blob/release/14.x/clang/lib/Driver/ToolChains/MSVC.cpp#L1340-L1346
+                    if config.enable_symlinks {
+                        let mut title_case = roots.sdk.clone();
+                        title_case.push("Include");
+                        if !title_case.exists() {
+                            symlink("include", &title_case)?;
+                        }
                     }
                 }
             }

@@ -45,6 +45,7 @@ fn verify_compiles() {
         include_debug_symbols: false,
         enable_symlinks: true,
         preserve_ms_arch_notation: false,
+        use_winsysroot_style: false,
         map: None,
         copy: true,
         output: output_dir.clone(),
@@ -60,6 +61,7 @@ fn verify_compiles() {
                 payload: std::sync::Arc::new(payload),
             })
             .collect(),
+        pruned.crt_version,
         pruned.sdk_version,
         xwin::Arch::X86_64 as u32,
         xwin::Variant::Desktop as u32,
@@ -190,6 +192,7 @@ fn verify_compiles_minimized() {
         include_debug_symbols: false,
         enable_symlinks: true,
         preserve_ms_arch_notation: false,
+        use_winsysroot_style: false,
         map: map_path.clone(),
         copy: true,
         splat_output: output_dir.clone(),
@@ -209,6 +212,7 @@ fn verify_compiles_minimized() {
                 payload: std::sync::Arc::new(payload),
             })
             .collect(),
+        pruned.crt_version,
         pruned.sdk_version,
         xwin::Arch::X86_64 as u32,
         xwin::Variant::Desktop as u32,
