@@ -28,7 +28,7 @@ RUN set -eux; \
     # ensure that clang/clang++ are callable directly
     ln -s clang-13 /usr/bin/clang && ln -s clang /usr/bin/clang++ && ln -s lld-13 /usr/bin/ld.lld; \
     # We also need to setup symlinks ourselves for the MSVC shims because they aren't in the debian packages
-    ln -s clang-13 /usr/bin/clang-cl && ln -s llvm-ar-13 /usr/bin/llvm-lib && ln -s lld-link-13 /usr/bin/lld-link; \
+    ln -s clang-13 /usr/bin/clang-cl && ln -s llvm-ar-13 /usr/bin/llvm-lib && ln -s lld-link-13 /usr/bin/lld-link && ln -s llvm-rc-13 /usr/bin/llvm-rc; \
     # Verify the symlinks are correct
     clang++ -v; \
     ld.lld -v; \
