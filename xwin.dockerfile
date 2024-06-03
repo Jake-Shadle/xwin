@@ -1,5 +1,5 @@
 # We'll just use the official Rust image rather than build our own from scratch
-FROM docker.io/library/rust:1.58.1-slim-bullseye
+FROM docker.io/library/rust:1.78.0-slim-bookworm
 
 ENV KEYRINGS /usr/local/share/keyrings
 
@@ -10,25 +10,25 @@ RUN set -eux; \
     curl --fail https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor > $KEYRINGS/llvm.gpg; \
     # wine
     curl --fail https://dl.winehq.org/wine-builds/winehq.key | gpg --dearmor > $KEYRINGS/winehq.gpg; \
-    echo "deb [signed-by=$KEYRINGS/llvm.gpg] http://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-13 main" > /etc/apt/sources.list.d/llvm.list; \
-    echo "deb [signed-by=$KEYRINGS/winehq.gpg] https://dl.winehq.org/wine-builds/debian/ bullseye main" > /etc/apt/sources.list.d/winehq.list;
+    echo "deb [signed-by=$KEYRINGS/llvm.gpg] http://apt.llvm.org/bullseye/ llvm-toolchain-bookworm-18 main" > /etc/apt/sources.list.d/llvm.list; \
+    echo "deb [signed-by=$KEYRINGS/winehq.gpg] https://dl.winehq.org/wine-builds/debian/ bookworm main" > /etc/apt/sources.list.d/winehq.list;
 
 RUN set -eux; \
     dpkg --add-architecture i386; \
     # Skipping all of the "recommended" cruft reduces total images size by ~300MiB
     apt-get update && apt-get install --no-install-recommends -y \
-        clang-13 \
+        clang-18 \
         # llvm-ar
-        llvm-13 \
-        lld-13 \
+        llvm-18 \
+        lld-18 \
         # get a recent wine so we can run tests
         winehq-staging \
         # Unpack xwin
         tar; \
     # ensure that clang/clang++ are callable directly
-    ln -s clang-13 /usr/bin/clang && ln -s clang /usr/bin/clang++ && ln -s lld-13 /usr/bin/ld.lld; \
+    ln -s clang-18 /usr/bin/clang && ln -s clang /usr/bin/clang++ && ln -s lld-13 /usr/bin/ld.lld; \
     # We also need to setup symlinks ourselves for the MSVC shims because they aren't in the debian packages
-    ln -s clang-13 /usr/bin/clang-cl && ln -s llvm-ar-13 /usr/bin/llvm-lib && ln -s lld-link-13 /usr/bin/lld-link && ln -s llvm-rc-13 /usr/bin/llvm-rc; \
+    ln -s clang-18 /usr/bin/clang-cl && ln -s llvm-ar-18 /usr/bin/llvm-lib && ln -s lld-link-18 /usr/bin/lld-link && ln -s llvm-rc-18 /usr/bin/llvm-rc; \
     # Verify the symlinks are correct
     clang++ -v; \
     ld.lld -v; \
@@ -47,7 +47,7 @@ RUN set -eux; \
 RUN rustup target add x86_64-pc-windows-msvc
 
 RUN set -eux; \
-    xwin_version="0.5.2"; \
+    xwin_version="0.6.0"; \
     xwin_prefix="xwin-$xwin_version-x86_64-unknown-linux-musl"; \
     # Install xwin to cargo/bin via github release. Note you could also just use `cargo install xwin`.
     curl --fail -L https://github.com/Jake-Shadle/xwin/releases/download/$xwin_version/$xwin_prefix.tar.gz | tar -xzv -C /usr/local/cargo/bin --strip-components=1 $xwin_prefix/xwin; \
@@ -69,7 +69,7 @@ ENV CC_x86_64_pc_windows_msvc="clang-cl" \
     # Note that we only disable unused-command-line-argument here since clang-cl
     # doesn't implement all of the options supported by cl, but the ones it doesn't
     # are _generally_ not interesting.
-    CL_FLAGS="-Wno-unused-command-line-argument -fuse-ld=lld-link /imsvc/xwin/crt/include /imsvc/xwin/sdk/include/ucrt /imsvc/xwin/sdk/include/um /imsvc/xwin/sdk/include/shared /imsvc/xwin/sdk/include/winrt" \
+    CL_FLAGS="-Wno-unused-command-line-argument -fuse-ld=lld-link /vctoolsdir /xwin/crt /winsdkdir /xwin/sdk" \
     # Let cargo know what linker to invoke if you haven't already specified it
     # in a .cargo/config.toml file
     CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER="lld-link" \
