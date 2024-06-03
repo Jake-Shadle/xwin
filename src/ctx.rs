@@ -160,6 +160,7 @@ impl Ctx {
         Ok(body)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn execute(
         self: std::sync::Arc<Self>,
         packages: std::collections::BTreeMap<String, crate::manifest::ManifestItem>,
