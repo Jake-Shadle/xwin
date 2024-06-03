@@ -427,7 +427,15 @@ fn main() -> Result<(), Error> {
     mp.set_move_cursor(true);
 
     let res = std::thread::spawn(move || {
-        ctx.execute(pkgs, work_items, pruned.crt_version, pruned.sdk_version, arches, variants, op)
+        ctx.execute(
+            pkgs,
+            work_items,
+            pruned.crt_version,
+            pruned.sdk_version,
+            arches,
+            variants,
+            op,
+        )
     })
     .join();
 
