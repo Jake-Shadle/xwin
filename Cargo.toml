@@ -63,7 +63,7 @@ clap = { version = "4.0", features = ["derive", "env", "wrap_help"] }
 # Easy management of temp files
 tempfile = "3.1"
 # We need to pin it to not get duplicates due to zip -> num_enum -> proc-macro-crate -> (WHY!?!?) toml_edit
-toml = "=0.8.9"
+toml = "0.8"
 # Tracing logs
 tracing = { version = "0.1", default-features = false, features = [
     "attributes",
@@ -81,7 +81,7 @@ twox-hash = "1.6"
 versions = "6.2"
 walkdir = "2.3"
 # Unpacking of VSIX "packages"
-zip = { version = "1.0", default-features = false, features = ["deflate"] }
+zip = { version = "2.1", default-features = false, features = ["deflate"] }
 
 [target.'cfg(all(target_env = "musl", target_arch = "x86_64"))'.dependencies]
 # Faster allocator for musl builds

@@ -20,6 +20,7 @@ exceptions = [
   # https://tldrlegal.com/license/openssl-license-(openssl)
   { allow = ["ISC", "MIT", "OpenSSL"], name = "ring" },
   { allow = ["Unicode-DFS-2016"], name = "unicode-ident" },
+  { allow = ["BSL-1.0"], name = "lockfree-object-pool" },
 ]
 
 [[licenses.clarify]]
