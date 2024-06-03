@@ -52,7 +52,11 @@ pub(crate) struct SplatRoots {
     src: PathBuf,
 }
 
-pub(crate) fn prep_splat(ctx: std::sync::Arc<Ctx>, root: &Path, crt_version: &String, use_winsysroot_style: bool) -> Result<SplatRoots, Error> {
+pub(crate) fn prep_splat(
+    ctx: std::sync::Arc<Ctx>,
+    root: &Path,
+    winroot: Option<&str>,
+) -> Result<SplatRoots, Error> {
     // Ensure we create the path first, you can't canonicalize a non-existant path
     if !root.exists() {
         std::fs::create_dir_all(root)
@@ -61,10 +65,8 @@ pub(crate) fn prep_splat(ctx: std::sync::Arc<Ctx>, root: &Path, crt_version: &St
 
     let root = crate::util::canonicalize(root)?;
 
-    let (crt_root, sdk_root) = if use_winsysroot_style {
-        let mut crt = root.join("VC");
-        crt.push("Tools");
-        crt.push("MSVC");
+    let (crt_root, sdk_root) = if let Some(crt_version) = winroot {
+        let mut crt = root.join("VC/Tools/MSVC");
         crt.push(crt_version);
 
         let mut sdk = root.join("Windows Kits");
@@ -259,13 +261,13 @@ pub(crate) fn splat(
                 inc.push(sdk_version);
                 inc
             } else {
+                let mut target = roots.sdk.join("include");
+
                 if config.use_winsysroot_style {
-                    let mut tar = roots.sdk.join("include");
-                    tar.push(sdk_version);
-                    tar
-                } else {
-                    roots.sdk.join("include")
+                    target.push(sdk_version);
                 }
+
+                target
             };
 
             vec![Mapping {
@@ -279,14 +281,14 @@ pub(crate) fn splat(
         }
         PayloadKind::SdkLibs => {
             src.push("lib/um");
-            let mut target = if config.use_winsysroot_style {
-                let mut tar = roots.sdk.join("lib");
-                tar.push(sdk_version);
-                tar.push("um");
-                tar
-            } else {
-                roots.sdk.join("lib/um")
-            };
+
+            let mut target = roots.sdk.join("lib");
+
+            if config.use_winsysroot_style {
+                target.push(sdk_version);
+            }
+
+            target.push("um");
 
             push_arch(
                 &mut src,
@@ -309,14 +311,14 @@ pub(crate) fn splat(
         }
         PayloadKind::SdkStoreLibs => {
             src.push("lib/um");
-            let target = if config.use_winsysroot_style {
-                let mut tar = roots.sdk.join("lib");
-                tar.push(sdk_version);
-                tar.push("um");
-                tar
-            } else {
-                roots.sdk.join("lib/um")
-            };
+
+            let mut target = roots.sdk.join("lib");
+
+            if config.use_winsysroot_style {
+                target.push(sdk_version);
+            }
+
+            target.push("um");
 
             Arch::iter(arches)
                 .map(|arch| -> Result<Mapping<'_>, Error> {
@@ -342,22 +344,19 @@ pub(crate) fn splat(
             let inc_src = src.join("include/ucrt");
             let tree = get_tree(&inc_src)?;
 
-            let target = if map.is_some() {
-                let mut inc = roots.sdk.clone();
-                inc.push("Include");
+            let mut target = if map.is_some() {
+                let mut inc = roots.sdk.join("Include");
                 inc.push(sdk_version);
-                inc.push("ucrt");
                 inc
             } else {
+                let mut target = roots.sdk.join("include");
                 if config.use_winsysroot_style {
-                    let mut tar = roots.sdk.join("include");
-                    tar.push(sdk_version);
-                    tar.push("ucrt");
-                    tar
-                } else {
-                    roots.sdk.join("include/ucrt")
+                    target.push(sdk_version);
                 }
+                target
             };
+
+            target.push("ucrt");
 
             let mut mappings = vec![Mapping {
                 src: inc_src,
@@ -369,14 +368,15 @@ pub(crate) fn splat(
             }];
 
             src.push("lib/ucrt");
-            let target = if config.use_winsysroot_style {
-                let mut tar = roots.sdk.join("lib");
-                tar.push(sdk_version);
-                tar.push("ucrt");
-                tar
-            } else {
-                roots.sdk.join("lib/ucrt")
-            };
+
+            let mut target = roots.sdk.join("lib");
+
+            if config.use_winsysroot_style {
+                target.push(sdk_version);
+            }
+
+            target.push("ucrt");
+
             for arch in Arch::iter(arches) {
                 let mut src = src.clone();
                 let mut target = target.clone();
@@ -714,9 +714,9 @@ pub(crate) fn splat(
             })
             .collect_into_vec(&mut results);
 
-        match kind {
-            PayloadKind::SdkLibs => {
-                if !config.use_winsysroot_style {
+        if !config.use_winsysroot_style {
+            match kind {
+                PayloadKind::SdkLibs => {
                     // Symlink sdk/lib/{sdkversion} -> sdk/lib, regardless of filesystem case sensitivity.
                     let mut versioned_linkname = roots.sdk.clone();
                     versioned_linkname.push("lib");
@@ -737,9 +737,7 @@ pub(crate) fn splat(
                         }
                     }
                 }
-            }
-            PayloadKind::SdkHeaders => {
-                if !config.use_winsysroot_style {
+                PayloadKind::SdkHeaders => {
                     // Symlink sdk/include/{sdkversion} -> sdk/include, regardless of filesystem case sensitivity.
                     let mut versioned_linkname = roots.sdk.clone();
                     versioned_linkname.push("include");
@@ -760,9 +758,9 @@ pub(crate) fn splat(
                         }
                     }
                 }
-            }
-            _ => (),
-        };
+                _ => (),
+            };
+        }
     }
 
     item.progress.finish_with_message("📦 splatted");
@@ -774,6 +772,7 @@ pub(crate) fn splat(
 
 pub(crate) fn finalize_splat(
     ctx: &Ctx,
+    sdk_version: Option<&str>,
     roots: &SplatRoots,
     sdk_headers: Vec<SdkHeaders>,
     crt_headers: Option<crate::unpack::FileTree>,
@@ -972,7 +971,14 @@ pub(crate) fn finalize_splat(
 
     // There is a um/gl directory, but of course there is an include for GL/
     // instead, so fix that as well :p
-    symlink("gl", &roots.sdk.join("include/um/GL"))?;
+    if let Some(_sdk_version) = sdk_version {
+        // let mut target = roots.sdk.join("Include");
+        // target.push(sdk_version);
+        // target.push("um/GL");
+        // symlink("gl", &target)?;
+    } else {
+        symlink("gl", &roots.sdk.join("include/um/GL"))?;
+    }
 
     Ok(())
 }

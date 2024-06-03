@@ -1,3 +1,5 @@
+<!-- markdownlint-disable no-inline-html first-line-heading no-emphasis-as-heading -->
+
 <div align="center">
 
 # `xwin`
