@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.6.0] - 2024-06-03
 ### Added
 - [PR#123](https://github.com/Jake-Shadle/xwin/pull/123) (a rework of [#119](https://github.com/Jake-Shadle/xwin/pull/119)) adds the ability to splat in the format understood by clang-cl `/winsysroot` option.
 
@@ -170,7 +171,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation if downloading, unpacking, and splatting of the CRT and Windows SDK. This first pass focused on targeting x86_64 Desktop, so targeting the Windows Store or other architectures is not guaranteed to work.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.5.2...HEAD
+[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.6.0...HEAD
+[0.6.0]: https://github.com/Jake-Shadle/xwin/compare/0.5.2...0.6.0
 [0.5.2]: https://github.com/Jake-Shadle/xwin/compare/0.5.1...0.5.2
 [0.5.1]: https://github.com/Jake-Shadle/xwin/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/Jake-Shadle/xwin/compare/0.4.1...0.5.0
