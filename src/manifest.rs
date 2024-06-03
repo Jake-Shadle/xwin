@@ -4,7 +4,7 @@ use std::{cmp, collections::BTreeMap};
 
 use crate::Ctx;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Payload {
     #[serde(rename = "fileName")]
     pub file_name: String,
@@ -57,13 +57,13 @@ pub enum ItemKind {
     Zip,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 pub struct InstallSizes {
     pub target_drive: Option<u64>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ManifestItem {
     pub id: String,

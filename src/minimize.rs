@@ -5,6 +5,7 @@ pub struct MinimizeConfig {
     pub include_debug_libs: bool,
     pub include_debug_symbols: bool,
     pub enable_symlinks: bool,
+    pub use_winsysroot_style: bool,
     pub preserve_ms_arch_notation: bool,
     pub splat_output: PathBuf,
     pub copy: bool,

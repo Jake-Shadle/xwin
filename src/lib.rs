@@ -186,6 +186,7 @@ pub enum PayloadKind {
 }
 
 pub struct PrunedPackageList {
+    pub crt_version: String,
     pub sdk_version: String,
     pub payloads: Vec<Payload>,
 }
@@ -204,7 +205,7 @@ pub fn prune_pkg_list(
     let pkgs = &pkg_manifest.packages;
     let mut payloads = Vec::new();
 
-    get_crt(
+    let crt_version = get_crt(
         pkgs,
         arches,
         variants,
@@ -215,6 +216,7 @@ pub fn prune_pkg_list(
     let sdk_version = get_sdk(pkgs, arches, sdk_version, &mut payloads)?;
 
     Ok(PrunedPackageList {
+        crt_version,
         sdk_version,
         payloads,
     })
@@ -227,7 +229,7 @@ fn get_crt(
     pruned: &mut Vec<Payload>,
     include_atl: bool,
     crt_version: Option<String>,
-) -> Result<(), Error> {
+) -> Result<String, Error> {
     fn to_payload(mi: &manifest::ManifestItem, payload: &manifest::Payload) -> Payload {
         // These are really the only two we care about
         let kind = if mi.id.contains("Headers") {
@@ -375,7 +377,7 @@ fn get_crt(
         }
     }
 
-    Ok(())
+    Ok(crt_version)
 }
 
 fn get_atl(

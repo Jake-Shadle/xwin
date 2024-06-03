@@ -34,6 +34,13 @@ Options:
           
           Passing this flag will preserve the MS names for those targets.
 
+      --use-winsysroot-style
+          Use the /winsysroot layout, so that clang-cl's /winsysroot flag can be
+          used with the output, rather than needing both -vctoolsdir and
+          -winsdkdir. You will likely also want to use
+          --preserve-ms-arch-notation and --disable-symlinks for use with
+          clang-cl on Windows
+
       --output <OUTPUT>
           The root output directory. Defaults to `./.xwin-cache/splat` if not
           specified

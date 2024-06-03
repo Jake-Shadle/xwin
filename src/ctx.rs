@@ -160,10 +160,12 @@ impl Ctx {
         Ok(body)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn execute(
         self: std::sync::Arc<Self>,
         packages: std::collections::BTreeMap<String, crate::manifest::ManifestItem>,
         payloads: Vec<WorkItem>,
+        crt_version: String,
         sdk_version: String,
         arches: u32,
         variants: u32,
@@ -179,20 +181,29 @@ impl Ctx {
 
         let splat_config = match &ops {
             crate::Ops::Splat(config) => {
-                let splat_roots = crate::splat::prep_splat(self.clone(), &config.output)?;
+                let splat_roots = crate::splat::prep_splat(
+                    self.clone(),
+                    &config.output,
+                    config.use_winsysroot_style.then_some(&crt_version),
+                )?;
                 let mut config = config.clone();
                 config.output = splat_roots.root.clone();
 
                 Some((splat_roots, config))
             }
             crate::Ops::Minimize(config) => {
-                let splat_roots = crate::splat::prep_splat(self.clone(), &config.splat_output)?;
+                let splat_roots = crate::splat::prep_splat(
+                    self.clone(),
+                    &config.splat_output,
+                    config.use_winsysroot_style.then_some(&crt_version),
+                )?;
 
                 let config = crate::SplatConfig {
                     preserve_ms_arch_notation: config.preserve_ms_arch_notation,
                     include_debug_libs: config.include_debug_libs,
                     include_debug_symbols: config.include_debug_symbols,
                     enable_symlinks: config.enable_symlinks,
+                    use_winsysroot_style: config.use_winsysroot_style,
                     output: splat_roots.root.clone(),
                     map: Some(config.map.clone()),
                     copy: config.copy,
@@ -266,7 +277,7 @@ impl Ctx {
         let sdk_headers = results.into_iter().collect::<Result<Vec<_>, _>>()?;
         let sdk_headers = sdk_headers.into_iter().flatten().collect();
 
-        let Some(roots) = splat_config.map(|(sr, _)| sr) else {
+        let Some((roots, sc)) = splat_config else {
             return Ok(());
         };
 
@@ -275,7 +286,14 @@ impl Ctx {
                 let crt_ft = crt_ft.lock().take();
                 let atl_ft = atl_ft.lock().take();
 
-                crate::splat::finalize_splat(&self, &roots, sdk_headers, crt_ft, atl_ft)?;
+                crate::splat::finalize_splat(
+                    &self,
+                    sc.use_winsysroot_style.then_some(&sdk_version),
+                    &roots,
+                    sdk_headers,
+                    crt_ft,
+                    atl_ft,
+                )?;
             }
 
             Ok(())
