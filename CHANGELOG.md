@@ -8,13 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Added
+- [PR#123](https://github.com/Jake-Shadle/xwin/pull/123) (a rework of [#119](https://github.com/Jake-Shadle/xwin/pull/119)) adds the ability to splat in the format understood by clang-cl `/winsysroot` option.
+
 ## [0.5.2] - 2024-05-06
 ### Changed
 - [PR#117](https://github.com/Jake-Shadle/xwin/pull/117) updated a few crates, notably `zip`.
 
 ## [0.5.1] - 2024-04-02
 ### Changed
-- [PR#116](https://github.com/Jake-Shadle/xwin/pull/116) (a rework of [#115](https://github.com/Jake-Shadle/xwin/pull/115>)) improves the speed of the `x86_64-unknown-linux-musl` binary by using `mimalloc`.
+- [PR#116](https://github.com/Jake-Shadle/xwin/pull/116) (a rework of [#115](https://github.com/Jake-Shadle/xwin/pull/115)) improves the speed of the `x86_64-unknown-linux-musl` binary by using `mimalloc`.
 
 ## [0.5.0] - 2023-11-13
 ### Changed
