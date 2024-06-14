@@ -45,7 +45,7 @@ You can download a prebuilt binary from the [Releases](https://github.com/Jake-S
 ### Common
 
 * `--accept-license` - Doesn't display the prompt to accept the license. You can also set the `XWIN_ACCEPT_LICENSE=1` environment variable
-* `--arch <arch>` - The architectures to include [default: x86_64]  [possible values: x86, x86_64, aarch, aarch64]. Note that I haven't fully tested aarch/64 nor x86 so there _might_ be issues with them, please file an issue if you encounter problems with them.
+* `--arch <arch>` - The architectures to include [default: `x86_64`]  [possible values: `x86`, `x86_64`, `aarch`, `aarch64`]. Note that I haven't fully tested aarch/64 nor x86 so there _might_ be issues with them, please file an issue if you encounter problems with them.
 * `--cache-dir <cache-dir>` - Specifies the cache directory used to persist downloaded items to disk. Defaults to `./.xwin-cache` if not specified.
 * `-L, --log-level <level>` - The log level for messages, only log messages at or above the level will be emitted [default: info] [possible values: off, error, warn, info, debug, trace].
 * `--variant <variant>...` - The variants to include [default: desktop]  [possible values: desktop, onecore, spectre]. Note that I haven't fully tested any variant except `desktop`, please file an issue if you try to use one of the others and run into issues. Note that there is another `store` variant that hasn't even been implemented due to it being weird and me not having a real project targeting it.
@@ -75,7 +75,7 @@ Fixes the packages to prune unneeded files and adds symlinks to address file cas
 #### Splat options
 
 * `--copy` - Copies files from the unpack directory to the splat directory instead of moving them, which preserves the original unpack directories but increases overall execution time and disk usage.
-* `--disable-symlinks` - By default, symlinks are added to both the CRT and WindowsSDK to address casing issues in general usage. For example, if you are compiling C/C++ code that does `#include <windows.h>`, it will break on a case-sensitive file system, as the actual path in the WindowsSDK is `Windows.h`. This also applies even if the C/C++ you are compiling uses correct casing for all CRT/SDK includes, as the internal headers also use incorrect casing in most cases
+* `--disable-symlinks` - By default, symlinks are added to both the CRT and `WindowsSDK` to address casing issues in general usage. For example, if you are compiling C/C++ code that does `#include <windows.h>`, it will break on a case-sensitive file system, as the actual path in the `WindowsSDK` is `Windows.h`. This also applies even if the C/C++ you are compiling uses correct casing for all CRT/SDK includes, as the internal headers also use incorrect casing in most cases
 * `--include-debug-libs` - The MSVCRT includes (non-redistributable) debug versions of the various libs that are generally uninteresting to keep for most usage
 * `--include-debug-symbols` - The MSVCRT includes PDB (debug symbols) files for several of the libraries that are generally uninteresting to keep for most usage
 * `--preserve-ms-arch-notation` - By default, we convert the MS specific `x64`, `arm`, and `arm64` target architectures to the more canonical `x86_64`, `aarch`, and `aarch64` of LLVM etc when creating directories/names. Passing this flag will preserve the MS names for those targets

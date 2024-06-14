@@ -5,6 +5,7 @@ use crate::{
 };
 use anyhow::{Context as _, Error};
 
+#[allow(dead_code)]
 pub enum Unpack {
     Present {
         output_dir: PathBuf,
