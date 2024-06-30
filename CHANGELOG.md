@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#129](https://github.com/Jake-Shadle/xwin/pull/129) fixed [#128](https://github.com/Jake-Shadle/xwin/issues/128) by adding the additional `onecoreuap` MSI package that contains headers that were previously (before SDK 10.0.26100) part of other MSI packages. Thanks [@bigfoodK](https://github.com/bigfoodK)!
+
 ## [0.6.0] - 2024-06-03
 ### Added
 - [PR#123](https://github.com/Jake-Shadle/xwin/pull/123) (a rework of [#119](https://github.com/Jake-Shadle/xwin/pull/119)) adds the ability to splat in the format understood by clang-cl `/winsysroot` option.
