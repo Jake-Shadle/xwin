@@ -577,6 +577,26 @@ fn get_sdk(
             target_arch: None,
         });
 
+        // https://github.com/Jake-Shadle/xwin/issues/128
+        let header_payload = sdk.payloads.iter().find(|payload| {
+            payload
+                .file_name
+                .ends_with("Windows SDK for Windows Store Apps Headers OnecoreUap-x86_en-us.msi")
+        });
+
+        if let Some(header_payload) = header_payload {
+            pruned.push(Payload {
+                filename: format!("{}_store_headers_onecoreuap.msi", sdk.id).into(),
+                sha256: header_payload.sha256.clone(),
+                url: header_payload.url.clone(),
+                size: header_payload.size,
+                install_size: None,
+                kind: PayloadKind::SdkHeaders,
+                variant: Some(Variant::Store),
+                target_arch: None,
+            });
+        }
+
         for arch in Arch::iter(arches) {
             if arch == Arch::X86 {
                 continue;
