@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.6.1] - 2024-06-30
 ### Fixed
 - [PR#129](https://github.com/Jake-Shadle/xwin/pull/129) fixed [#128](https://github.com/Jake-Shadle/xwin/issues/128) by adding the additional `onecoreuap` MSI package that contains headers that were previously (before SDK 10.0.26100) part of other MSI packages. Thanks [@bigfoodK](https://github.com/bigfoodK)!
 
@@ -174,7 +175,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation if downloading, unpacking, and splatting of the CRT and Windows SDK. This first pass focused on targeting x86_64 Desktop, so targeting the Windows Store or other architectures is not guaranteed to work.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.6.0...HEAD
+[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.6.1...HEAD
+[0.6.1]: https://github.com/Jake-Shadle/xwin/compare/0.6.0...0.6.1
 [0.6.0]: https://github.com/Jake-Shadle/xwin/compare/0.5.2...0.6.0
 [0.5.2]: https://github.com/Jake-Shadle/xwin/compare/0.5.1...0.5.2
 [0.5.1]: https://github.com/Jake-Shadle/xwin/compare/0.5.0...0.5.1
