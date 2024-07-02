@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.6.2] - 2024-07-02
 ### Fixed
 - [PR#131](https://github.com/Jake-Shadle/xwin/pull/131) resolved [#130](https://github.com/Jake-Shadle/xwin/issues/130) by adding detection of case-insensitive file systems, which then disables symlink creation since it is not needed, and breaks.
 
@@ -178,7 +179,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation if downloading, unpacking, and splatting of the CRT and Windows SDK. This first pass focused on targeting x86_64 Desktop, so targeting the Windows Store or other architectures is not guaranteed to work.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.6.1...HEAD
+[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.6.2...HEAD
+[0.6.2]: https://github.com/Jake-Shadle/xwin/compare/0.6.1...0.6.2
 [0.6.1]: https://github.com/Jake-Shadle/xwin/compare/0.6.0...0.6.1
 [0.6.0]: https://github.com/Jake-Shadle/xwin/compare/0.5.2...0.6.0
 [0.5.2]: https://github.com/Jake-Shadle/xwin/compare/0.5.1...0.5.2
