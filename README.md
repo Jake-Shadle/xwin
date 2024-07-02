@@ -50,7 +50,7 @@ You can download a prebuilt binary from the [Releases](https://github.com/Jake-S
 * `-L, --log-level <level>` - The log level for messages, only log messages at or above the level will be emitted [default: info] [possible values: off, error, warn, info, debug, trace].
 * `--variant <variant>...` - The variants to include [default: desktop]  [possible values: desktop, onecore, spectre]. Note that I haven't fully tested any variant except `desktop`, please file an issue if you try to use one of the others and run into issues. Note that there is another `store` variant that hasn't even been implemented due to it being weird and me not having a real project targeting it.
 * `--channel <channel>` - The product channel to use [default: release]
-* `--manifest-version <version>` - The manifest version to retrieve  [default: 16].
+* `--manifest-version <version>` - The manifest version to retrieve  [default: 17].
 * `--manifest` - Specifies a top level manifest to use, rather than downloading it from Microsoft. This can be used to ensure the output is reproducible.
 * `--sdk-version` - The specific SDK version to use. If not specified the latest SDK version in the manifest is used.
 * `--crt-version` - The specific CRT version to use. If not specified the latest CRT version in the manifest is used.
