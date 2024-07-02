@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#131](https://github.com/Jake-Shadle/xwin/pull/131) resolved [#130](https://github.com/Jake-Shadle/xwin/issues/130) by adding detection of case-insensitive file systems, which then disables symlink creation since it is not needed, and breaks.
+
 ## [0.6.1] - 2024-06-30
 ### Fixed
 - [PR#129](https://github.com/Jake-Shadle/xwin/pull/129) fixed [#128](https://github.com/Jake-Shadle/xwin/issues/128) by adding the additional `onecoreuap` MSI package that contains headers that were previously (before SDK 10.0.26100) part of other MSI packages. Thanks [@bigfoodK](https://github.com/bigfoodK)!
