@@ -562,6 +562,29 @@ fn get_sdk(
             .find(|payload| {
                 payload
                     .file_name
+                    .ends_with("Windows SDK OnecoreUap Headers x86-x86_en-us.msi")
+            })
+            .with_context(|| format!("unable to find headers for {}", sdk.id))?;
+
+        pruned.push(Payload {
+            filename: format!("{}_uap_headers.msi", sdk.id).into(),
+            sha256: header_payload.sha256.clone(),
+            url: header_payload.url.clone(),
+            size: header_payload.size,
+            // Unfortunately can't predetermine install size due to how many payloads there are
+            install_size: None,
+            kind: PayloadKind::SdkHeaders,
+            variant: None,
+            target_arch: None,
+        });
+
+
+        let header_payload = sdk
+            .payloads
+            .iter()
+            .find(|payload| {
+                payload
+                    .file_name
                     .ends_with("Windows SDK for Windows Store Apps Headers-x86_en-us.msi")
             })
             .with_context(|| format!("unable to find Windows SDK for Windows Store Apps Headers-x86_en-us.msi for {}", sdk.id))?;
