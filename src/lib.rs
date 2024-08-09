@@ -578,7 +578,6 @@ fn get_sdk(
             target_arch: None,
         });
 
-
         let header_payload = sdk
             .payloads
             .iter()
