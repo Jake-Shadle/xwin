@@ -8,11 +8,9 @@ targets = [
 all-features = true
 
 [advisories]
-version = 2
 ignore = []
 
 [licenses]
-version = 2
 allow = ["MIT", "Apache-2.0", "BSD-3-Clause", "ISC"]
 exceptions = [
   { allow = ["MPL-2.0"], name = "webpki-roots" },
