@@ -9,16 +9,16 @@ Usage: xwin [OPTIONS] <COMMAND>
 
 Commands:
   list      Displays a summary of the packages that would be downloaded
-  download  Downloads all the selected packages that aren't already present
-                in the download cache
+  download  Downloads all the selected packages that aren't already present in
+            the download cache
   unpack    Unpacks all of the downloaded packages to disk
   splat     Fixes the packages to prune unneeded files and adds symlinks to
-                address file casing issues and then spalts the final artifacts
-                into directories
-  minimize  Runs the specified build command, detecting all of the headers
-                and libraries used by the build, and generating a file that can
-                be used to filter future splat operations, and optionally move
-                only the user files to a new directory
+            address file casing issues and then spalts the final artifacts into
+            directories
+  minimize  Runs the specified build command, detecting all of the headers and
+            libraries used by the build, and generating a file that can be used
+            to filter future splat operations, and optionally move only the user
+            files to a new directory
   help      Print this message or the help of the given subcommand(s)
 
 Options:
@@ -101,4 +101,3 @@ Options:
 
   -V, --version
           Print version
-
