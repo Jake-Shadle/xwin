@@ -408,18 +408,14 @@ pub(crate) fn unpack(
                             Err(e) => return Err(e).transpose(),
                         };
 
-                        if let Some(camino::Utf8Component::Normal(first)) = dir
+                        if let Some(camino::Utf8Component::Normal(
+                            "Catalogs" | "bin" | "Source" | "SourceDir",
+                        )) = dir
                             .strip_prefix(&output_dir)
                             .ok()
                             .and_then(|rel| rel.components().next())
                         {
-                            match first {
-                                "Catalogs" | "bin" | "Source" | "SourceDir" => {
-                                    //tracing::debug!("ignoring {}/{}", dir, fname);
-                                    return None;
-                                }
-                                _ => {}
-                            }
+                            return None;
                         }
 
                         uncompressed += size;
