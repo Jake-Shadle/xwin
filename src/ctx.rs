@@ -180,7 +180,7 @@ impl Ctx {
         let crt_ft = parking_lot::Mutex::new(None);
         let atl_ft = parking_lot::Mutex::new(None);
 
-        let mut splat_config = match &ops {
+        let splat_config = match &ops {
             crate::Ops::Splat(config) => {
                 let splat_roots = crate::splat::prep_splat(
                     self.clone(),
@@ -217,23 +217,28 @@ impl Ctx {
 
         // Detect if the output root directory is case sensitive or not,
         // if it's not, disable symlinks as they won't work
-        if let Some((root, enable_symlinks)) = splat_config.as_mut().and_then(|(sr, c)| {
-            c.enable_symlinks
-                .then_some((&sr.root, &mut c.enable_symlinks))
-        }) {
+        let enable_symlinks = if let Some(root) = splat_config
+            .as_ref()
+            .and_then(|(sr, c)| c.enable_symlinks.then_some(&sr.root))
+        {
             let test_path = root.join("BIG.xwin");
             std::fs::write(&test_path, "").with_context(|| {
                 format!("failed to write case-sensitivity test file {test_path}")
             })?;
 
-            if std::fs::read(root.join("big.xwin")).is_ok() {
-                *enable_symlinks = false;
+            let enable_symlinks = if std::fs::read(root.join("big.xwin")).is_ok() {
                 tracing::warn!("detected splat root '{root}' is on a case-sensitive file system, disabling symlinks");
-            }
+                false
+            } else {
+                true
+            };
 
             // Will be ugly but won't harm anything if file is left
             let _ = std::fs::remove_file(test_path);
-        }
+            enable_symlinks
+        } else {
+            false
+        };
 
         let map = if let Some(map) = splat_config.as_ref().and_then(|(_, sp)| sp.map.as_ref()) {
             match std::fs::read_to_string(map) {
@@ -302,7 +307,7 @@ impl Ctx {
             return Ok(());
         };
 
-        let splat_links = |enable_symlinks: bool| -> anyhow::Result<()> {
+        let splat_links = || -> anyhow::Result<()> {
             if enable_symlinks {
                 let crt_ft = crt_ft.lock().take();
                 let atl_ft = atl_ft.lock().take();
@@ -322,7 +327,7 @@ impl Ctx {
 
         match ops {
             crate::Ops::Minimize(config) => {
-                splat_links(config.enable_symlinks)?;
+                splat_links()?;
                 let results = crate::minimize::minimize(self, config, roots, &sdk_version)?;
 
                 fn emit(name: &str, num: crate::minimize::FileNumbers) {
@@ -356,9 +361,9 @@ impl Ctx {
                 emit("sdk headers", results.sdk_headers);
                 emit("sdk libs", results.sdk_libs);
             }
-            crate::Ops::Splat(config) => {
+            crate::Ops::Splat(_config) => {
                 if map.is_none() {
-                    splat_links(config.enable_symlinks)?;
+                    splat_links()?;
                 }
             }
             _ => {}
