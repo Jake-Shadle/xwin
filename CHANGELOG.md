@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#136](https://github.com/Jake-Shadle/xwin/pull/136) fixed an issue introduced in [PR#131](https://github.com/Jake-Shadle/xwin/pull/131) where symlink disabling when a case-insensitive file system was detected was...not being respected. At all.
+
 ## [0.6.3] - 2024-08-09
 ### Fixed
 - [PR#134](https://github.com/Jake-Shadle/xwin/pull/134) added back onecoreuap headers that were moved from the main SDK header package in recent versions of the SDK. Thanks [@tomager](https://github.com/tomager)!
