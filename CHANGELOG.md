@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.6.5] - 2024-08-21
 ### Fixed
 - [PR#137](https://github.com/Jake-Shadle/xwin/pull/137) fixes the fix introduced in [PR#136](https://github.com/Jake-Shadle/xwin/pull/136).
 
@@ -190,7 +191,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation if downloading, unpacking, and splatting of the CRT and Windows SDK. This first pass focused on targeting x86_64 Desktop, so targeting the Windows Store or other architectures is not guaranteed to work.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.6.4...HEAD
+[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.6.5...HEAD
+[0.6.5]: https://github.com/Jake-Shadle/xwin/compare/0.6.4...0.6.5
 [0.6.4]: https://github.com/Jake-Shadle/xwin/compare/0.6.3...0.6.4
 [0.6.3]: https://github.com/Jake-Shadle/xwin/compare/0.6.2...0.6.3
 [0.6.2]: https://github.com/Jake-Shadle/xwin/compare/0.6.1...0.6.2

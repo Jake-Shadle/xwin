@@ -1679,7 +1679,7 @@ dependencies = [
 
 [[package]]
 name = "xwin"
-version = "0.6.4"
+version = "0.6.5"
 dependencies = [
  "anyhow",
  "bytes",
