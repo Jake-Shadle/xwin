@@ -20,7 +20,7 @@ jobs:
           - os: ubuntu-22.04
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
 
       # make sure all code has been formatted with rustfmt
@@ -40,7 +40,7 @@ jobs:
     name: Verify compiles
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       # Add the actual target we compile for in the test
       - run: rustup target add x86_64-pc-windows-msvc
@@ -66,7 +66,7 @@ jobs:
     name: Verify deterministic
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo fetch
       - name: cargo test build
@@ -78,7 +78,7 @@ jobs:
     name: Verify CLI
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo fetch
       - name: cargo test build
@@ -90,7 +90,7 @@ jobs:
     name: cargo-deny
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: EmbarkStudios/cargo-deny-action@v2
 
   publish-check:
@@ -106,7 +106,7 @@ jobs:
       AR_aarch64_unknown_linux_musl: llvm-ar
       CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-Clink-self-contained=yes -Clinker=rust-lld"
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           target: ${{ matrix.target }}
@@ -152,7 +152,7 @@ jobs:
         if: endsWith(matrix.target, '-linux-musl')
         run: sudo apt-get install -y musl-tools llvm
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - run: cargo fetch --target ${{ matrix.target }}
       - name: Release build
         shell: bash

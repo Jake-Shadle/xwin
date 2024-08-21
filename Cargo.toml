@@ -42,7 +42,7 @@ crossbeam-channel = "0.5"
 # Pretty progress bars
 indicatif = "0.17"
 # Decoding of MSI installer packages
-msi = "0.7"
+msi = "0.8"
 parking_lot = "0.12"
 # brrr
 rayon = "1.5"
