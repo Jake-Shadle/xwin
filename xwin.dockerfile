@@ -1,5 +1,5 @@
 # We'll just use the official Rust image rather than build our own from scratch
-FROM docker.io/library/rust:1.78.0-slim-bookworm
+FROM docker.io/library/rust:1.81.0-slim-bookworm
 
 ENV KEYRINGS /usr/local/share/keyrings
 
@@ -10,25 +10,25 @@ RUN set -eux; \
     curl --fail https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor > $KEYRINGS/llvm.gpg; \
     # wine
     curl --fail https://dl.winehq.org/wine-builds/winehq.key | gpg --dearmor > $KEYRINGS/winehq.gpg; \
-    echo "deb [signed-by=$KEYRINGS/llvm.gpg] http://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-18 main" > /etc/apt/sources.list.d/llvm.list; \
+    echo "deb [signed-by=$KEYRINGS/llvm.gpg] http://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-19 main" > /etc/apt/sources.list.d/llvm.list; \
     echo "deb [signed-by=$KEYRINGS/winehq.gpg] https://dl.winehq.org/wine-builds/debian/ bookworm main" > /etc/apt/sources.list.d/winehq.list;
 
 RUN set -eux; \
     dpkg --add-architecture i386; \
     # Skipping all of the "recommended" cruft reduces total images size by ~300MiB
     apt-get update && apt-get install --no-install-recommends -y \
-        clang-18 \
+        clang-19 \
         # llvm-ar
-        llvm-18 \
-        lld-18 \
+        llvm-19 \
+        lld-19 \
         # get a recent wine so we can run tests
         winehq-staging \
         # Unpack xwin
         tar; \
     # ensure that clang/clang++ are callable directly
-    ln -s clang-18 /usr/bin/clang && ln -s clang /usr/bin/clang++ && ln -s lld-18 /usr/bin/ld.lld; \
+    ln -s clang-19 /usr/bin/clang && ln -s clang /usr/bin/clang++ && ln -s lld-19 /usr/bin/ld.lld; \
     # We also need to setup symlinks ourselves for the MSVC shims because they aren't in the debian packages
-    ln -s clang-18 /usr/bin/clang-cl && ln -s llvm-ar-18 /usr/bin/llvm-lib && ln -s lld-link-18 /usr/bin/lld-link && ln -s llvm-rc-18 /usr/bin/llvm-rc; \
+    ln -s clang-19 /usr/bin/clang-cl && ln -s llvm-ar-19 /usr/bin/llvm-lib && ln -s lld-link-19 /usr/bin/lld-link && ln -s llvm-rc-19 /usr/bin/llvm-rc; \
     # Verify the symlinks are correct
     clang++ -v; \
     ld.lld -v; \
