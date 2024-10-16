@@ -17,8 +17,8 @@ pub mod util;
 
 pub use ctx::Ctx;
 pub use minimize::MinimizeConfig;
+pub use reqwest;
 pub use splat::SplatConfig;
-pub use ureq;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Arch {
@@ -37,7 +37,7 @@ impl std::str::FromStr for Arch {
             "x86_64" => Self::X86_64,
             "aarch" => Self::Aarch,
             "aarch64" => Self::Aarch64,
-            o => anyhow::bail!("unknown architecture '{}'", o),
+            o => anyhow::bail!("unknown architecture '{o}'"),
         })
     }
 }

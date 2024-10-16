@@ -22,16 +22,16 @@ exclude = [
 [features]
 # By default we use rustls for TLS
 default = ["rustls-tls"]
-rustls-tls = ["ureq/tls"]
+rustls-tls = ["reqwest/rustls-tls"]
 # If this feature is enabled we instead use the native TLS implementation for the
 # target platform
-native-tls = ["ureq/native-tls", "native-tls-crate/vendored"]
+native-tls = ["reqwest/native-tls", "native-tls-crate/vendored"]
 
 [dependencies]
 # Easy errors
 anyhow = "1.0"
 # Network/file buffers
-bytes = "1.0"
+bytes = "1.7"
 # CAB files are used in conjunction with MSI files for SDK packages
 cab = "0.6"
 # Nicer to use utf-8 paths
@@ -47,9 +47,9 @@ parking_lot = "0.12"
 # brrr
 rayon = "1.5"
 # Include scanning 
-regex = "1.0"
+regex = "1.11"
 # HTTP requests
-ureq = { version = "2.4", default-features = false, features = ["gzip"] }
+reqwest = { version = "0.12", default-features = false, features = ["gzip", "blocking"] }
 memchr = "2.6"
 native-tls-crate = { package = "native-tls", version = "0.2", optional = true }
 # SHA-256 verification
@@ -59,9 +59,9 @@ serde = { version = "1.0", features = ["derive"] }
 # JSON deserialization
 serde_json = "1.0"
 # Argument parsing
-clap = { version = "4.0", features = ["derive", "env", "wrap_help"] }
+clap = { version = "4.5", features = ["derive", "env", "wrap_help"] }
 # Easy management of temp files
-tempfile = "3.1"
+tempfile = "3.13"
 # We need to pin it to not get duplicates due to zip -> num_enum -> proc-macro-crate -> (WHY!?!?) toml_edit
 toml = "0.8"
 # Tracing logs
@@ -88,7 +88,7 @@ zip = { version = "2.1", default-features = false, features = ["deflate"] }
 mimalloc = { version = "0.1", default-features = false }
 
 [dev-dependencies]
-insta = "1.12"
+insta = "1.40"
 
 [profile.dev.package.insta]
 opt-level = 3
