@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#142](https://github.com/Jake-Shadle/xwin/pull/142) is an attempt to resolve [#141](https://github.com/Jake-Shadle/xwin/issues/141) by switching from `ureq` to `reqwest`.
+
 ## [0.6.5] - 2024-08-21
 ### Fixed
 - [PR#137](https://github.com/Jake-Shadle/xwin/pull/137) fixes the fix introduced in [PR#136](https://github.com/Jake-Shadle/xwin/pull/136).
