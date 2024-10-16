@@ -4,6 +4,7 @@ use crate::{
     Path, PathBuf, WorkItem,
 };
 use anyhow::{Context as _, Error};
+use reqwest::blocking::Client;
 
 #[allow(dead_code)]
 pub enum Unpack {
@@ -19,12 +20,12 @@ pub enum Unpack {
 pub struct Ctx {
     pub work_dir: PathBuf,
     pub tempdir: Option<tempfile::TempDir>,
-    pub client: ureq::Agent,
+    pub client: Client,
     pub draw_target: ProgressTarget,
 }
 
 impl Ctx {
-    pub fn with_temp(dt: ProgressTarget, client: ureq::Agent) -> Result<Self, Error> {
+    pub fn with_temp(dt: ProgressTarget, client: Client) -> Result<Self, Error> {
         let td = tempfile::TempDir::new()?;
 
         Ok(Self {
@@ -40,7 +41,7 @@ impl Ctx {
     pub fn with_dir(
         mut work_dir: PathBuf,
         dt: ProgressTarget,
-        client: ureq::Agent,
+        client: Client,
     ) -> Result<Self, Error> {
         work_dir.push("dl");
         std::fs::create_dir_all(&work_dir)?;
@@ -107,12 +108,9 @@ impl Ctx {
             }
         }
 
-        let res = self.client.get(url.as_ref()).call()?;
+        let mut res = self.client.get(url.as_ref()).send()?;
 
-        let content_length = res
-            .header("content-length")
-            .and_then(|header| header.parse().ok())
-            .unwrap_or_default();
+        let content_length = res.content_length().unwrap_or_default();
         progress.inc_length(content_length);
 
         let body = bytes::BytesMut::with_capacity(content_length as usize);
@@ -140,7 +138,7 @@ impl Ctx {
             inner: body.writer(),
         };
 
-        std::io::copy(&mut res.into_reader(), &mut pc)?;
+        res.copy_to(&mut pc)?;
 
         let body = pc.inner.into_inner().freeze();
 

@@ -275,14 +275,15 @@ fn main() -> Result<(), Error> {
     let draw_target = xwin::util::ProgressTarget::Stdout;
 
     let client = {
-        let mut builder = ureq::AgentBuilder::new().timeout_read(args.timeout);
+        let mut builder = reqwest::blocking::Client::builder().timeout(args.timeout);
 
         if let Some(proxy) = args.https_proxy {
-            let proxy = ureq::Proxy::new(proxy).context("failed to parse https proxy address")?;
+            let proxy =
+                reqwest::Proxy::all(proxy).context("failed to parse https proxy address")?;
             builder = builder.proxy(proxy);
         }
 
-        builder.build()
+        builder.build()?
     };
 
     let ctx = if args.temp {

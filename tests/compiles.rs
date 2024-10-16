@@ -3,7 +3,7 @@ fn verify_compiles() {
     let ctx = xwin::Ctx::with_dir(
         xwin::PathBuf::from(".xwin-cache/compile-test"),
         xwin::util::ProgressTarget::Hidden,
-        ureq::agent(),
+        reqwest::blocking::Client::new(),
     )
     .unwrap();
 
@@ -166,7 +166,7 @@ fn verify_compiles_minimized() {
     let ctx = xwin::Ctx::with_dir(
         xwin::PathBuf::from(".xwin-cache/compile-test-minimized"),
         xwin::util::ProgressTarget::Hidden,
-        ureq::agent(),
+        reqwest::blocking::Client::new(),
     )
     .unwrap();
 
