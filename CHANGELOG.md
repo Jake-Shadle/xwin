@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
 ### Fixed
-- [PR#143](https://github.com/Jake-Shadle/xwin/pull/142) is a second attempt to resolve [#141](https://github.com/Jake-Shadle/xwin/issues/141) by switching to a new `3.0.0-rc1` version of ureq that might not have the same issue.
+- [PR#143](https://github.com/Jake-Shadle/xwin/pull/142) is a second attempt to resolve [#141](https://github.com/Jake-Shadle/xwin/issues/141) by switching to a new `3.0.0-rc1` version of ureq that might not have the same issue, as well as adding support for retries of EOF I/O errors seen by users which can be configured via `--http-retry` or `XWIN_HTTP_RETRY`.
 
 ### Fixed (failed)
 - [PR#142](https://github.com/Jake-Shadle/xwin/pull/142) is an attempt to resolve [#141](https://github.com/Jake-Shadle/xwin/issues/141) by switching from `ureq` to `reqwest`.
