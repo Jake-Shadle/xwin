@@ -22,7 +22,7 @@ exclude = [
 [features]
 # By default we use rustls for TLS
 default = ["rustls-tls"]
-rustls-tls = ["reqwest/rustls-tls"]
+rustls-tls = ["ureq/rustls"]
 # If this feature is enabled we instead use the native TLS implementation for the
 # target platform
 native-tls = ["reqwest/native-tls", "native-tls-crate/vendored"]
@@ -49,7 +49,7 @@ rayon = "1.5"
 # Include scanning 
 regex = "1.11"
 # HTTP requests
-reqwest = { version = "0.12", default-features = false, features = ["gzip", "blocking"] }
+ureq = { version = "3.0.0-rc1", default-features = false, features = ["gzip", "socks-proxy"] }
 memchr = "2.6"
 native-tls-crate = { package = "native-tls", version = "0.2", optional = true }
 # SHA-256 verification

@@ -110,7 +110,11 @@ impl Ctx {
 
         let mut res = self.client.get(url.as_ref()).send()?;
 
-        let content_length = res.content_length().unwrap_or_default();
+        let content_length = res
+            .headers()
+            .get("content-length")
+            .and_then(|header| header.to_str().ok()?.parse().ok())
+            .unwrap_or_default();
         progress.inc_length(content_length);
 
         let body = bytes::BytesMut::with_capacity(content_length as usize);
@@ -138,7 +142,7 @@ impl Ctx {
             inner: body.writer(),
         };
 
-        res.copy_to(&mut pc)?;
+        std::io::copy(&mut res.into_body().as_reader(), &mut pc)?;
 
         let body = pc.inner.into_inner().freeze();
 
