@@ -229,6 +229,14 @@ impl Ctx {
                     tries -= 1;
                     body = b;
                     progress = prog;
+
+                    if tries > 0 {
+                        tracing::warn!(
+                            url = url.as_ref(),
+                            "HTTP GET failed to retrieve entire body, retrying"
+                        );
+                    }
+
                     continue;
                 }
                 Err(DownloadError::Ureq(err)) => {
