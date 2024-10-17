@@ -7,6 +7,7 @@ fn verify_deterministic() {
         PathBuf::from(".xwin-cache/deterministic"),
         xwin::util::ProgressTarget::Hidden,
         ureq::agent(),
+        0,
     )
     .unwrap();
 

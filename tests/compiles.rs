@@ -4,6 +4,7 @@ fn verify_compiles() {
         xwin::PathBuf::from(".xwin-cache/compile-test"),
         xwin::util::ProgressTarget::Hidden,
         ureq::agent(),
+        0,
     )
     .unwrap();
 
@@ -167,6 +168,7 @@ fn verify_compiles_minimized() {
         xwin::PathBuf::from(".xwin-cache/compile-test-minimized"),
         xwin::util::ProgressTarget::Hidden,
         ureq::agent(),
+        0,
     )
     .unwrap();
 

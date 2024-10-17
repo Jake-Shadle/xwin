@@ -84,6 +84,13 @@ Options:
           
           [env: HTTPS_PROXY]
 
+      --http-retry <HTTP_RETRY>
+          The number of times an HTTP get will be retried if it fails due to I/O
+          failures
+          
+          [env: XWIN_HTTP_RETRY]
+          [default: 0]
+
       --arch <ARCH>
           The architectures to include
           
