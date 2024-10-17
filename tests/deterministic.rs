@@ -6,7 +6,8 @@ fn verify_deterministic() {
     let ctx = xwin::Ctx::with_dir(
         PathBuf::from(".xwin-cache/deterministic"),
         xwin::util::ProgressTarget::Hidden,
-        reqwest::blocking::Client::new(),
+        ureq::agent(),
+        0,
     )
     .unwrap();
 

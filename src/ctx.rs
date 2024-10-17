@@ -4,7 +4,6 @@ use crate::{
     Path, PathBuf, WorkItem,
 };
 use anyhow::{Context as _, Error};
-use reqwest::blocking::Client;
 
 #[allow(dead_code)]
 pub enum Unpack {
@@ -20,12 +19,17 @@ pub enum Unpack {
 pub struct Ctx {
     pub work_dir: PathBuf,
     pub tempdir: Option<tempfile::TempDir>,
-    pub client: Client,
+    pub client: ureq::Agent,
     pub draw_target: ProgressTarget,
+    pub http_retry: u8,
 }
 
 impl Ctx {
-    pub fn with_temp(dt: ProgressTarget, client: Client) -> Result<Self, Error> {
+    pub fn with_temp(
+        dt: ProgressTarget,
+        client: ureq::Agent,
+        http_retry: u8,
+    ) -> Result<Self, Error> {
         let td = tempfile::TempDir::new()?;
 
         Ok(Self {
@@ -35,13 +39,15 @@ impl Ctx {
             tempdir: Some(td),
             client,
             draw_target: dt,
+            http_retry,
         })
     }
 
     pub fn with_dir(
         mut work_dir: PathBuf,
         dt: ProgressTarget,
-        client: Client,
+        client: ureq::Agent,
+        http_retry: u8,
     ) -> Result<Self, Error> {
         work_dir.push("dl");
         std::fs::create_dir_all(&work_dir)?;
@@ -55,6 +61,7 @@ impl Ctx {
             tempdir: None,
             client,
             draw_target: dt,
+            http_retry,
         })
     }
 
@@ -63,7 +70,7 @@ impl Ctx {
         url: impl AsRef<str>,
         path: &P,
         checksum: Option<Sha256>,
-        progress: indicatif::ProgressBar,
+        mut progress: indicatif::ProgressBar,
     ) -> Result<bytes::Bytes, Error>
     where
         P: AsRef<Path> + std::fmt::Debug,
@@ -108,21 +115,25 @@ impl Ctx {
             }
         }
 
-        let mut res = self.client.get(url.as_ref()).send()?;
-
-        let content_length = res.content_length().unwrap_or_default();
-        progress.inc_length(content_length);
-
-        let body = bytes::BytesMut::with_capacity(content_length as usize);
+        use bytes::BufMut;
 
         struct ProgressCopy {
             progress: indicatif::ProgressBar,
             inner: bytes::buf::Writer<bytes::BytesMut>,
+            failed: usize,
+            written: usize,
         }
 
         impl std::io::Write for ProgressCopy {
             fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-                self.progress.inc(buf.len() as u64);
+                self.written += buf.len();
+                if self.failed == 0 {
+                    self.progress.inc(buf.len() as u64);
+                } else if self.written > self.failed {
+                    self.progress.inc((self.written - self.failed) as u64);
+                    self.failed = 0;
+                }
+
                 self.inner.write(buf)
             }
 
@@ -131,32 +142,107 @@ impl Ctx {
             }
         }
 
-        use bytes::BufMut;
+        enum DownloadError {
+            Ureq(ureq::Error),
+            Io(std::io::Error),
+            Retry((bytes::BytesMut, indicatif::ProgressBar)),
+        }
 
-        let mut pc = ProgressCopy {
-            progress,
-            inner: body.writer(),
+        let try_download = |mut body: bytes::BytesMut,
+                            progress: indicatif::ProgressBar|
+         -> Result<bytes::BytesMut, DownloadError> {
+            let res = self
+                .client
+                .get(url.as_ref())
+                .call()
+                .map_err(DownloadError::Ureq)?;
+
+            let content_length = res
+                .headers()
+                .get("content-length")
+                .and_then(|header| header.to_str().ok()?.parse().ok())
+                .unwrap_or_default();
+
+            if body.capacity() > 0 {
+                if body.capacity() as u64 != content_length {
+                    tracing::warn!(url = url.as_ref(), "a previous HTTP GET had a content-length of {}, but we now received a content-length of {content_length}", body.capacity());
+
+                    if body.capacity() as u64 > content_length {
+                        progress.inc_length(body.capacity() as u64 - content_length);
+                    } else {
+                        body.reserve(content_length as usize - body.capacity());
+                    }
+                }
+            } else {
+                body.reserve(content_length as usize);
+                progress.inc_length(content_length);
+            }
+
+            let failed = body.len();
+            body.clear();
+
+            let mut pc = ProgressCopy {
+                progress,
+                inner: body.writer(),
+                failed,
+                written: 0,
+            };
+
+            let res = std::io::copy(&mut res.into_body().as_reader(), &mut pc);
+            let body = pc.inner.into_inner();
+
+            match res {
+                Ok(_) => Ok(body),
+                Err(ref err) if err.kind() == std::io::ErrorKind::UnexpectedEof => {
+                    Err(DownloadError::Retry((body, pc.progress)))
+                }
+                Err(err) => Err(DownloadError::Io(err)),
+            }
         };
 
-        res.copy_to(&mut pc)?;
+        let mut tries = self.http_retry + 1;
+        let total = tries;
+        let mut body = bytes::BytesMut::new();
 
-        let body = pc.inner.into_inner().freeze();
+        while tries > 0 {
+            match try_download(body, progress) {
+                Ok(body) => {
+                    let body = body.freeze();
 
-        if let Some(expected) = checksum {
-            let chksum = Sha256::digest(&body);
+                    if let Some(expected) = checksum {
+                        let chksum = Sha256::digest(&body);
 
-            anyhow::ensure!(
-                chksum == expected,
-                "checksum mismatch, expected {expected} != actual {chksum}"
-            );
+                        anyhow::ensure!(
+                            chksum == expected,
+                            "checksum mismatch, expected {expected} != actual {chksum}"
+                        );
+                    }
+
+                    if let Some(parent) = cache_path.parent() {
+                        std::fs::create_dir_all(parent)?;
+                    }
+
+                    std::fs::write(cache_path, &body)?;
+                    return Ok(body);
+                }
+                Err(DownloadError::Retry((b, prog))) => {
+                    tries -= 1;
+                    body = b;
+                    progress = prog;
+                    continue;
+                }
+                Err(DownloadError::Ureq(err)) => {
+                    return Err(err)
+                        .with_context(|| format!("HTTP GET request for {} failed", url.as_ref()));
+                }
+                Err(DownloadError::Io(err)) => {
+                    return Err(err)
+                        .with_context(|| format!("failed to retrieve body for {}", url.as_ref()));
+                }
+            }
         }
 
-        if let Some(parent) = cache_path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-
-        std::fs::write(cache_path, &body)?;
-        Ok(body)
+        anyhow::bail!("failed to retrieve {} after {total} tries due to I/O failures reading the response body, try using --http-retries to increase the retry count", url.as_ref());
     }
 
     #[allow(clippy::too_many_arguments)]

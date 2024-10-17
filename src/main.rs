@@ -230,6 +230,10 @@ pub struct Args {
     /// An HTTPS proxy to use
     #[arg(long, env = "HTTPS_PROXY")]
     https_proxy: Option<String>,
+    /// The number of times an HTTP get will be retried if it fails due to I/O
+    /// failures
+    #[arg(long, env = "XWIN_HTTP_RETRY", default_value = "0")]
+    http_retry: u8,
     /// The architectures to include
     #[arg(
         long,
@@ -275,25 +279,25 @@ fn main() -> Result<(), Error> {
     let draw_target = xwin::util::ProgressTarget::Stdout;
 
     let client = {
-        let mut builder = reqwest::blocking::Client::builder().timeout(args.timeout);
+        let mut builder = ureq::Config::new();
+        builder.timeouts.recv_body = Some(args.timeout);
 
         if let Some(proxy) = args.https_proxy {
-            let proxy =
-                reqwest::Proxy::all(proxy).context("failed to parse https proxy address")?;
-            builder = builder.proxy(proxy);
+            let proxy = ureq::Proxy::new(&proxy).context("failed to parse https proxy address")?;
+            builder.proxy = Some(proxy);
         }
 
-        builder.build()?
+        ureq::Agent::new_with_config(builder)
     };
 
     let ctx = if args.temp {
-        xwin::Ctx::with_temp(draw_target, client)?
+        xwin::Ctx::with_temp(draw_target, client, args.http_retry)?
     } else {
         let cache_dir = match &args.cache_dir {
             Some(cd) => cd.clone(),
             None => cwd.join(".xwin-cache"),
         };
-        xwin::Ctx::with_dir(cache_dir, draw_target, client)?
+        xwin::Ctx::with_dir(cache_dir, draw_target, client, args.http_retry)?
     };
 
     let ctx = std::sync::Arc::new(ctx);
