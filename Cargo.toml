@@ -25,7 +25,7 @@ default = ["rustls-tls"]
 rustls-tls = ["ureq/rustls"]
 # If this feature is enabled we instead use the native TLS implementation for the
 # target platform
-native-tls = ["reqwest/native-tls", "native-tls-crate/vendored"]
+native-tls = ["ureq/native-tls", "native-tls-crate/vendored"]
 
 [dependencies]
 # Easy errors
