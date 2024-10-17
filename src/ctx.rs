@@ -4,7 +4,6 @@ use crate::{
     Path, PathBuf, WorkItem,
 };
 use anyhow::{Context as _, Error};
-use reqwest::blocking::Client;
 
 #[allow(dead_code)]
 pub enum Unpack {
@@ -20,12 +19,12 @@ pub enum Unpack {
 pub struct Ctx {
     pub work_dir: PathBuf,
     pub tempdir: Option<tempfile::TempDir>,
-    pub client: Client,
+    pub client: ureq::Agent,
     pub draw_target: ProgressTarget,
 }
 
 impl Ctx {
-    pub fn with_temp(dt: ProgressTarget, client: Client) -> Result<Self, Error> {
+    pub fn with_temp(dt: ProgressTarget, client: ureq::Agent) -> Result<Self, Error> {
         let td = tempfile::TempDir::new()?;
 
         Ok(Self {
@@ -41,7 +40,7 @@ impl Ctx {
     pub fn with_dir(
         mut work_dir: PathBuf,
         dt: ProgressTarget,
-        client: Client,
+        client: ureq::Agent,
     ) -> Result<Self, Error> {
         work_dir.push("dl");
         std::fs::create_dir_all(&work_dir)?;
@@ -108,7 +107,7 @@ impl Ctx {
             }
         }
 
-        let mut res = self.client.get(url.as_ref()).send()?;
+        let res = self.client.get(url.as_ref()).call()?;
 
         let content_length = res
             .headers()
