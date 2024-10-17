@@ -11,9 +11,8 @@ all-features = true
 ignore = []
 
 [licenses]
-allow = ["MIT", "Apache-2.0", "BSD-3-Clause", "ISC"]
+allow = ["MIT", "Apache-2.0", "BSD-3-Clause", "ISC", "MPL-2.0"]
 exceptions = [
-  { allow = ["MPL-2.0"], name = "webpki-roots" },
   # ring uses code from multiple libraries but all with permissive licenses
   # https://tldrlegal.com/license/openssl-license-(openssl)
   { allow = ["ISC", "MIT", "OpenSSL"], name = "ring" },
