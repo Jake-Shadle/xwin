@@ -49,6 +49,7 @@ pub(crate) struct SplatRoots {
     pub root: PathBuf,
     pub crt: PathBuf,
     pub sdk: PathBuf,
+    pub vcrd: PathBuf,
     src: PathBuf,
 }
 
@@ -65,16 +66,18 @@ pub(crate) fn prep_splat(
 
     let root = crate::util::canonicalize(root)?;
 
-    let (crt_root, sdk_root) = if let Some(crt_version) = winroot {
+    let (crt_root, sdk_root, vcrd_root) = if let Some(crt_version) = winroot {
         let mut crt = root.join("VC/Tools/MSVC");
         crt.push(crt_version);
 
         let mut sdk = root.join("Windows Kits");
         sdk.push("10");
 
-        (crt, sdk)
+        let vcrd = root.join("VCR");
+
+        (crt, sdk, vcrd)
     } else {
-        (root.join("crt"), root.join("sdk"))
+        (root.join("crt"), root.join("sdk"), root.join("vcrd"))
     };
 
     if crt_root.exists() {
@@ -85,6 +88,11 @@ pub(crate) fn prep_splat(
     if sdk_root.exists() {
         std::fs::remove_dir_all(&sdk_root)
             .with_context(|| format!("unable to delete existing SDK directory {sdk_root}"))?;
+    }
+
+    if vcrd_root.exists() {
+        std::fs::remove_dir_all(&vcrd_root)
+            .with_context(|| format!("unable to delete existing VCR directory {vcrd_root}"))?;
     }
 
     std::fs::create_dir_all(&crt_root)
@@ -98,6 +106,7 @@ pub(crate) fn prep_splat(
         root,
         crt: crt_root,
         sdk: sdk_root,
+        vcrd: vcrd_root,
         src: src_root,
     })
 }
@@ -110,6 +119,7 @@ pub(crate) fn splat(
     tree: &crate::unpack::FileTree,
     map: Option<&crate::Map>,
     sdk_version: &str,
+    vcrd_version: Option<String>,
     arches: u32,
     variants: u32,
 ) -> Result<Option<SdkHeaders>, Error> {
@@ -396,6 +406,33 @@ pub(crate) fn splat(
             }
 
             mappings
+        },
+        PayloadKind::VcrDebug => if vcrd_version.is_some() {
+            let mut src = src.clone();
+            let mut target = roots.vcrd.clone();
+
+            src.push("SourceDir");
+            let dirname = match item.payload.target_arch.unwrap() {
+                Arch::Aarch | Arch::X86 => "System",
+                Arch::Aarch64 | Arch::X86_64 => "System64"
+            };
+            src.push(dirname);
+
+            target.push(vcrd_version.unwrap());
+            target.push(item.payload.target_arch.unwrap().as_str());
+
+            let tree = get_tree(&src)?;
+
+            vec![Mapping {
+                src,
+                target,
+                tree,
+                kind,
+                variant,
+                section: SectionKind::VcrDebug,
+            }]
+        } else {
+            vec![]
         }
     };
 
@@ -440,7 +477,8 @@ pub(crate) fn splat(
                             mapping.target.parent().unwrap().to_owned(),
                             &map.crt.libs,
                         )
-                    }
+                    },
+                    SectionKind::VcrDebug => (roots.vcrd.clone(), &map.vcrd.libs)
                 };
 
                 let mut dir_stack = vec![Dir {
@@ -588,7 +626,8 @@ pub(crate) fn splat(
                                 PayloadKind::CrtHeaders
                                 | PayloadKind::AtlHeaders
                                 | PayloadKind::Ucrt
-                                | PayloadKind::AtlLibs => {}
+                                | PayloadKind::AtlLibs
+                                | PayloadKind::VcrDebug => {}
 
                                 PayloadKind::SdkHeaders => {
                                     if let Some(sdk_headers) = &mut sdk_headers {

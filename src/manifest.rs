@@ -23,6 +23,19 @@ pub enum Chip {
     Neutral,
 }
 
+impl Chip {
+    #[inline]
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::X86 => "x86",
+            Self::X64 => "x64",
+            Self::Arm => "arm",
+            Self::Arm64 => "arm64",
+            Self::Neutral => "neutral"
+        }
+    }
+}
+
 #[derive(Copy, Clone, Deserialize, PartialEq, Eq, Debug)]
 pub enum ItemKind {
     /// Unused.
@@ -75,7 +88,7 @@ pub struct ManifestItem {
     pub payloads: Vec<Payload>,
     #[serde(default)]
     pub dependencies: BTreeMap<String, serde_json::Value>,
-    pub install_sizes: Option<InstallSizes>,
+    pub install_sizes: Option<InstallSizes>
 }
 
 impl PartialEq for ManifestItem {
@@ -165,10 +178,16 @@ pub fn get_package_manifest(
     let manifest: PkgManifest =
         serde_json::from_slice(&manifest_bytes).context("unable to parse manifest")?;
 
-    let mut packages = BTreeMap::new();
+    let mut packages : BTreeMap<String, ManifestItem> = BTreeMap::new();
 
     for pkg in manifest.packages {
-        packages.insert(pkg.id.clone(), pkg);
+        let pkgid = if pkg.id.starts_with("Microsoft.VisualCpp.RuntimeDebug") {//if packages.contains_key(pkg.id.as_str()) {
+            format!("{}.{}", pkg.id, pkg.chip.unwrap_or(Chip::Neutral).as_str().to_uppercase())
+        } else {
+            pkg.id.clone()
+        };
+
+        packages.insert(pkgid, pkg);
     }
 
     Ok(PackageManifest { packages })

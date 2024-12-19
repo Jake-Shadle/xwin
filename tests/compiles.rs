@@ -31,6 +31,7 @@ fn verify_compiles() {
         xwin::Arch::X86_64 as u32,
         xwin::Variant::Desktop as u32,
         false,
+        false,
         None,
         None,
     )
@@ -77,6 +78,7 @@ fn verify_compiles() {
                     .collect(),
                 pruned.crt_version.clone(),
                 pruned.sdk_version.clone(),
+                pruned.vcrd_version.clone(),
                 xwin::Arch::X86_64 as u32,
                 xwin::Variant::Desktop as u32,
                 op,
@@ -199,6 +201,7 @@ fn verify_compiles_minimized() {
         xwin::Arch::X86_64 as u32,
         xwin::Variant::Desktop as u32,
         false,
+        false,
         None,
         None,
     )
@@ -243,6 +246,7 @@ fn verify_compiles_minimized() {
             .collect(),
         pruned.crt_version,
         pruned.sdk_version,
+        pruned.vcrd_version,
         xwin::Arch::X86_64 as u32,
         xwin::Variant::Desktop as u32,
         op,

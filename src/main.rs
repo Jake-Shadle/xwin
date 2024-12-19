@@ -224,6 +224,9 @@ pub struct Args {
     /// Whether to include the Active Template Library (ATL) in the installation
     #[arg(long)]
     include_atl: bool,
+    /// Whether to include VCR debug libraries
+    #[arg(long)]
+    include_vcrd: bool,
     /// Specifies a timeout for how long a single download is allowed to take.
     #[arg(short, long, value_parser = parse_duration, default_value = "60s")]
     timeout: Duration,
@@ -323,6 +326,7 @@ fn main() -> Result<(), Error> {
         arches,
         variants,
         args.include_atl,
+        args.include_vcrd,
         args.sdk_version,
         args.crt_version,
     )?;
@@ -414,6 +418,12 @@ fn main() -> Result<(), Error> {
                 }
                 PayloadKind::SdkStoreLibs => "SDK.libs.store.all".to_owned(),
                 PayloadKind::Ucrt => "SDK.ucrt.all".to_owned(),
+                PayloadKind::VcrDebug => {
+                    format!(
+                        "VC.Runtime.debug.{}",
+                        pay.target_arch.map_or("all", |ta| ta.as_str())
+                    )
+                }
             };
 
             let pb = mp.add(
@@ -439,6 +449,7 @@ fn main() -> Result<(), Error> {
             work_items,
             pruned.crt_version,
             pruned.sdk_version,
+            pruned.vcrd_version,
             arches,
             variants,
             op,

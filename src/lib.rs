@@ -2,9 +2,9 @@
 
 use anyhow::{Context as _, Error};
 pub use camino::{Utf8Path as Path, Utf8PathBuf as PathBuf};
+use manifest::Chip;
 use std::{
-    collections::{BTreeMap, BTreeSet},
-    fmt,
+    collections::{BTreeMap, BTreeSet}, fmt::{self, Debug}
 };
 
 mod ctx;
@@ -183,11 +183,13 @@ pub enum PayloadKind {
     SdkLibs,
     SdkStoreLibs,
     Ucrt,
+    VcrDebug
 }
 
 pub struct PrunedPackageList {
     pub crt_version: String,
     pub sdk_version: String,
+    pub vcrd_version: Option<String>,
     pub payloads: Vec<Payload>,
 }
 
@@ -197,6 +199,7 @@ pub fn prune_pkg_list(
     arches: u32,
     variants: u32,
     include_atl: bool,
+    include_vcrd: bool,
     sdk_version: Option<String>,
     crt_version: Option<String>,
 ) -> Result<PrunedPackageList, Error> {
@@ -215,11 +218,77 @@ pub fn prune_pkg_list(
     )?;
     let sdk_version = get_sdk(pkgs, arches, sdk_version, &mut payloads)?;
 
+    let vcrd_version = if include_vcrd {
+        Some(get_vcrd(pkgs, arches,variants, &mut payloads)?)
+    } else {
+        None
+    };
+
     Ok(PrunedPackageList {
         crt_version,
         sdk_version,
+        vcrd_version,
         payloads,
     })
+}
+
+fn get_vcrd(
+    pkgs: &BTreeMap<String, manifest::ManifestItem>,
+    arches: u32,
+    variants: u32,
+    pruned: &mut Vec<Payload>
+) -> Result<String, Error> {
+    let mut vcrd_version : Option<String> = None;
+
+    // filter manifest items for vc runtime debug key
+    for (key, manifest_item) in pkgs.iter() {
+        // item keys are identical originally but replaced in get_package_manifest since BTreeMap does not support multiple keys
+        if key.starts_with("Microsoft.VisualCpp.RuntimeDebug.14") {
+            vcrd_version = Some(manifest_item.version.clone());
+            // use the msi payload (first payload entry)
+            if let Some(payload) = manifest_item.payloads.get(0) {
+                // identify target arch (aarch[64] is identified by file name because chip is x64)
+                let target_arch = if payload.file_name.contains("arm64") {
+                    Some(Arch::Aarch64)
+                } else if payload.file_name.contains("arm") {
+                    Some(Arch::Aarch)
+                } else {
+                    [
+                        (Chip::X64, Arch::X86_64),
+                        (Chip::X86, Arch::X86),
+                    ]
+                    .iter()
+                    .find_map(|(s, arch)| manifest_item.chip.unwrap().eq(s).then_some(*arch))
+                };
+
+                // skip archs that are not requested
+                if ! Arch::iter(arches).any(| arch | arch.eq(&target_arch.unwrap())) {
+                    continue;
+                }
+                
+                // skip if variant is not Desktop
+                if ! Variant::iter(variants).any(| variant | variant.eq("Desktop")) {
+                    continue;
+                }
+
+                // Add the payload to the pruned list
+                pruned.push(Payload {
+                    filename: format!("Microsoft.VCR.{}.debug.{}.msi", manifest_item.version, target_arch.unwrap().as_str()).into(),
+                    sha256: payload.sha256.clone(),
+                    url: payload.url.clone(),
+                    size: payload.size,
+                    kind: PayloadKind::VcrDebug,
+                    target_arch,
+                    variant: Some(Variant::Desktop),
+                    install_size: (manifest_item.payloads.len() == 1)
+                        .then_some(manifest_item)
+                        .and_then(|mi| mi.install_sizes.as_ref().and_then(|is| is.target_drive)),
+                });
+            }
+        }
+    }
+
+    Ok(vcrd_version.with_context(|| "failed to find vcrd version")?)
 }
 
 fn get_crt(
@@ -736,12 +805,14 @@ fn get_sdk(
 pub struct Map {
     pub crt: Block,
     pub sdk: Block,
+    pub vcrd: Block,
 }
 
 impl Map {
     fn clear(&mut self) {
         self.crt.clear();
         self.sdk.clear();
+        self.vcrd.clear();
     }
 }
 
@@ -764,6 +835,7 @@ pub enum SectionKind {
     CrtLib,
     SdkHeader,
     SdkLib,
+    VcrDebug
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Default)]
