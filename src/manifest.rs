@@ -88,7 +88,7 @@ pub struct ManifestItem {
     pub payloads: Vec<Payload>,
     #[serde(default)]
     pub dependencies: BTreeMap<String, serde_json::Value>,
-    pub install_sizes: Option<InstallSizes>
+    pub install_sizes: Option<InstallSizes>,
 }
 
 impl PartialEq for ManifestItem {
@@ -178,10 +178,11 @@ pub fn get_package_manifest(
     let manifest: PkgManifest =
         serde_json::from_slice(&manifest_bytes).context("unable to parse manifest")?;
 
-    let mut packages : BTreeMap<String, ManifestItem> = BTreeMap::new();
+    let mut packages = BTreeMap::new();
 
     for pkg in manifest.packages {
-        let pkgid = if pkg.id.starts_with("Microsoft.VisualCpp.RuntimeDebug") {//if packages.contains_key(pkg.id.as_str()) {
+        // built a unqiue key for vrcd to prevent overriding distinct packages
+        let pkgid = if pkg.id.starts_with("Microsoft.VisualCpp.RuntimeDebug") {
             format!("{}.{}", pkg.id, pkg.chip.unwrap_or(Chip::Neutral).as_str().to_uppercase())
         } else {
             pkg.id.clone()
