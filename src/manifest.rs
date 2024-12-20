@@ -179,16 +179,19 @@ pub fn get_package_manifest(
         serde_json::from_slice(&manifest_bytes).context("unable to parse manifest")?;
 
     let mut packages = BTreeMap::new();
+    let mut package_counts = BTreeMap::new();
 
     for pkg in manifest.packages {
-        // built a unqiue key for vrcd to prevent overriding distinct packages
-        let pkgid = if pkg.id.starts_with("Microsoft.VisualCpp.RuntimeDebug") {
-            format!("{}.{}", pkg.id, pkg.chip.unwrap_or(Chip::Neutral).as_str().to_uppercase())
+        // built a unqiue key for each duplicate id to prevent overriding distinct packages
+        let pkg_id = if packages.contains_key(&pkg.id) {
+            let count = package_counts.get(&pkg.id).unwrap_or(&0) + 1;
+            package_counts.insert(pkg.id.clone(), count);
+            format!("{}#{}", pkg.id, count)
         } else {
             pkg.id.clone()
         };
 
-        packages.insert(pkgid, pkg);
+        packages.insert(pkg_id, pkg);
     }
 
     Ok(PackageManifest { packages })

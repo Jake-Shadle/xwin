@@ -189,7 +189,7 @@ pub enum PayloadKind {
 pub struct PrunedPackageList {
     pub crt_version: String,
     pub sdk_version: String,
-    pub vcrd_version: Option<String>,
+    pub vcr_version: Option<String>,
     pub payloads: Vec<Payload>,
 }
 
@@ -199,7 +199,7 @@ pub fn prune_pkg_list(
     arches: u32,
     variants: u32,
     include_atl: bool,
-    include_vcrd: bool,
+    include_debug_runtime: bool,
     sdk_version: Option<String>,
     crt_version: Option<String>,
 ) -> Result<PrunedPackageList, Error> {
@@ -218,16 +218,14 @@ pub fn prune_pkg_list(
     )?;
     let sdk_version = get_sdk(pkgs, arches, sdk_version, &mut payloads)?;
 
-    let vcrd_version = if include_vcrd {
-        Some(get_vcrd(pkgs, arches,variants, &mut payloads)?)
-    } else {
-        None
-    };
+    let vcr_version = include_debug_runtime
+        .then(|| get_vcrd(pkgs, arches, &mut payloads).ok())
+        .flatten();
 
     Ok(PrunedPackageList {
         crt_version,
         sdk_version,
-        vcrd_version,
+        vcr_version,
         payloads,
     })
 }
@@ -235,11 +233,11 @@ pub fn prune_pkg_list(
 fn get_vcrd(
     pkgs: &BTreeMap<String, manifest::ManifestItem>,
     arches: u32,
-    variants: u32,
     pruned: &mut Vec<Payload>
 ) -> Result<String, Error> {
     let mut vcrd_version : Option<String> = None;
 
+    tracing::info!("getting vcrd");
     // determine target architecture for the vcrd package
     fn determine_vcrd_arch(manifest_item: &ManifestItem, payload: &manifest::Payload) -> Option<Arch> {
         if payload.file_name.contains("arm64") {
@@ -258,7 +256,7 @@ fn get_vcrd(
 
     pkgs.iter()
         // get all vc debug runtime items (key is renamed by manifest::get_package_manifest)
-        .filter(|(key, _)| key.starts_with("Microsoft.VisualCpp.RuntimeDebug.14"))
+        .filter(|(key, _)| key.starts_with("Microsoft.VisualCpp.RuntimeDebug"))
         // get the first payload (which contains the MSI)
         .filter_map(|(_, manifest_item)| {
             manifest_item.payloads.get(0).map(|payload| (manifest_item, payload))
@@ -269,17 +267,15 @@ fn get_vcrd(
             let target_arch = determine_vcrd_arch(manifest_item, payload);
             
             // skip if target arch is not requested
-            if ! Arch::iter(arches).any(| arch | arch.eq(&target_arch.unwrap())) {
-                return;
-            }
-            
-            // skip if variant is not desktop
-            if ! Variant::iter(variants).any(| variant | variant.eq("Desktop")) {
+            if target_arch.is_none_or(| target_arch | ! Arch::iter(arches).any(|arch| arch.eq(&target_arch))) {
                 return;
             }
 
             pruned.push(Payload {
-                filename: format_args!("Microsoft.VCR.{}.debug.{}.msi", manifest_item.version, target_arch.unwrap().as_str()).to_string().into(),
+                filename: format_args!(
+                    "Microsoft.VC.Runtime.Debug.{}.{}.msi", 
+                    manifest_item.version, 
+                    target_arch.unwrap().as_str()).to_string().into(),
                 sha256: payload.sha256.clone(),
                 url: payload.url.clone(),
                 size: payload.size,
@@ -292,7 +288,7 @@ fn get_vcrd(
             });
         });
 
-    Ok(vcrd_version.with_context(|| "failed to find vcrd version")?)
+    Ok(vcrd_version.with_context(|| "failed to find vcr debug version")?)
 }
 
 fn get_crt(

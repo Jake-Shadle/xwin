@@ -59,7 +59,7 @@ fn verify_deterministic() {
             .collect(),
         pruned.crt_version,
         pruned.sdk_version,
-        pruned.vcrd_version,
+        pruned.vcr_version,
         xwin::Arch::X86_64 as u32,
         xwin::Variant::Desktop as u32,
         op,
