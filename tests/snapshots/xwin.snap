@@ -74,7 +74,7 @@ Options:
           Whether to include the Active Template Library (ATL) in the
           installation
 
-      --include-vcrd
+      --include-debug-runtime
           Whether to include VCR debug libraries
 
   -t, --timeout <TIMEOUT>
