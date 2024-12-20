@@ -4,7 +4,8 @@ use anyhow::{Context as _, Error};
 pub use camino::{Utf8Path as Path, Utf8PathBuf as PathBuf};
 use manifest::{Chip, ManifestItem};
 use std::{
-    collections::{BTreeMap, BTreeSet}, fmt::{self, Debug}
+    collections::{BTreeMap, BTreeSet},
+    fmt::{self, Debug},
 };
 
 mod ctx;
@@ -183,7 +184,7 @@ pub enum PayloadKind {
     SdkLibs,
     SdkStoreLibs,
     Ucrt,
-    VcrDebug
+    VcrDebug,
 }
 
 pub struct PrunedPackageList {
@@ -233,24 +234,23 @@ pub fn prune_pkg_list(
 fn get_vcrd(
     pkgs: &BTreeMap<String, manifest::ManifestItem>,
     arches: u32,
-    pruned: &mut Vec<Payload>
+    pruned: &mut Vec<Payload>,
 ) -> Result<String, Error> {
-    let mut vcrd_version : Option<String> = None;
+    let mut vcrd_version: Option<String> = None;
 
-    tracing::info!("getting vcrd");
     // determine target architecture for the vcrd package
-    fn determine_vcrd_arch(manifest_item: &ManifestItem, payload: &manifest::Payload) -> Option<Arch> {
+    fn determine_vcrd_arch(
+        manifest_item: &ManifestItem,
+        payload: &manifest::Payload,
+    ) -> Option<Arch> {
         if payload.file_name.contains("arm64") {
             Some(Arch::Aarch64)
         } else if payload.file_name.contains("arm") {
             Some(Arch::Aarch)
         } else {
-            [
-                (Chip::X64, Arch::X86_64),
-                (Chip::X86, Arch::X86),
-            ]
-            .iter()
-            .find_map(|(s, arch)| manifest_item.chip.unwrap().eq(s).then_some(*arch))
+            [(Chip::X64, Arch::X86_64), (Chip::X86, Arch::X86)]
+                .iter()
+                .find_map(|(s, arch)| manifest_item.chip.unwrap().eq(s).then_some(*arch))
         }
     }
 
@@ -259,23 +259,31 @@ fn get_vcrd(
         .filter(|(key, _)| key.starts_with("Microsoft.VisualCpp.RuntimeDebug"))
         // get the first payload (which contains the MSI)
         .filter_map(|(_, manifest_item)| {
-            manifest_item.payloads.get(0).map(|payload| (manifest_item, payload))
+            manifest_item
+                .payloads
+                .get(0)
+                .map(|payload| (manifest_item, payload))
         })
         .for_each(|(manifest_item, payload)| {
             // set vcrd_version from manifest item
             vcrd_version = Some(manifest_item.version.clone());
             let target_arch = determine_vcrd_arch(manifest_item, payload);
-            
+
             // skip if target arch is not requested
-            if target_arch.is_none_or(| target_arch | ! Arch::iter(arches).any(|arch| arch.eq(&target_arch))) {
+            if target_arch
+                .is_none_or(|target_arch| !Arch::iter(arches).any(|arch| arch.eq(&target_arch)))
+            {
                 return;
             }
 
             pruned.push(Payload {
                 filename: format_args!(
-                    "Microsoft.VC.Runtime.Debug.{}.{}.msi", 
-                    manifest_item.version, 
-                    target_arch.unwrap().as_str()).to_string().into(),
+                    "Microsoft.VC.Runtime.Debug.{}.{}.msi",
+                    manifest_item.version,
+                    target_arch.unwrap().as_str()
+                )
+                .to_string()
+                .into(),
                 sha256: payload.sha256.clone(),
                 url: payload.url.clone(),
                 size: payload.size,
@@ -835,7 +843,7 @@ pub enum SectionKind {
     CrtLib,
     SdkHeader,
     SdkLib,
-    VcrDebug
+    VcrDebug,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Default)]

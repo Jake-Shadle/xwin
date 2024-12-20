@@ -31,7 +31,7 @@ impl Chip {
             Self::X64 => "x64",
             Self::Arm => "arm",
             Self::Arm64 => "arm64",
-            Self::Neutral => "neutral"
+            Self::Neutral => "neutral",
         }
     }
 }

@@ -406,33 +406,35 @@ pub(crate) fn splat(
             }
 
             mappings
-        },
-        PayloadKind::VcrDebug => if vcrd_version.is_some() {
-            let mut src = src.clone();
-            let mut target = roots.vcrd.clone();
+        }
+        PayloadKind::VcrDebug => {
+            if vcrd_version.is_some() {
+                let mut src = src.clone();
+                let mut target = roots.vcrd.clone();
 
-            src.push("SourceDir");
-            let dirname = match item.payload.target_arch.unwrap() {
-                Arch::Aarch | Arch::X86 => "System",
-                Arch::Aarch64 | Arch::X86_64 => "System64"
-            };
-            src.push(dirname);
+                src.push("SourceDir");
+                let dirname = match item.payload.target_arch.unwrap() {
+                    Arch::Aarch | Arch::X86 => "System",
+                    Arch::Aarch64 | Arch::X86_64 => "System64",
+                };
+                src.push(dirname);
 
-            target.push(vcrd_version.unwrap());
-            target.push(item.payload.target_arch.unwrap().as_str());
+                target.push(vcrd_version.unwrap());
+                target.push(item.payload.target_arch.unwrap().as_str());
 
-            let tree = get_tree(&src)?;
+                let tree = get_tree(&src)?;
 
-            vec![Mapping {
-                src,
-                target,
-                tree,
-                kind,
-                variant,
-                section: SectionKind::VcrDebug,
-            }]
-        } else {
-            vec![]
+                vec![Mapping {
+                    src,
+                    target,
+                    tree,
+                    kind,
+                    variant,
+                    section: SectionKind::VcrDebug,
+                }]
+            } else {
+                vec![]
+            }
         }
     };
 
@@ -477,8 +479,8 @@ pub(crate) fn splat(
                             mapping.target.parent().unwrap().to_owned(),
                             &map.crt.libs,
                         )
-                    },
-                    SectionKind::VcrDebug => (roots.vcrd.clone(), &map.vcrd.libs)
+                    }
+                    SectionKind::VcrDebug => (roots.vcrd.clone(), &map.vcrd.libs),
                 };
 
                 let mut dir_stack = vec![Dir {
