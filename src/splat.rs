@@ -413,13 +413,15 @@ pub(crate) fn splat(
                 let mut target = roots.vcrd.clone();
 
                 src.push("SourceDir");
-                let dirname = match item.payload.target_arch.unwrap() {
-                    Arch::Aarch | Arch::X86 => "System",
-                    Arch::Aarch64 | Arch::X86_64 => "System64",
+                if !item.payload.filename.to_string().contains("UCRT") {
+                    src.push(match item.payload.target_arch.unwrap() {
+                        Arch::Aarch | Arch::X86 => "System",
+                        Arch::Aarch64 | Arch::X86_64 => "System64",
+                    });
                 };
-                src.push(dirname);
 
                 target.push(vcrd_version.unwrap());
+                target.push("bin");
                 target.push(item.payload.target_arch.unwrap().as_str());
 
                 let tree = get_tree(&src)?;

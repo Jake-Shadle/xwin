@@ -419,8 +419,14 @@ fn main() -> Result<(), Error> {
                 PayloadKind::SdkStoreLibs => "SDK.libs.store.all".to_owned(),
                 PayloadKind::Ucrt => "SDK.ucrt.all".to_owned(),
                 PayloadKind::VcrDebug => {
+                    let prefix = match pay.filename.to_string().contains("UCRT") {
+                        true => "UCRT.Debug",
+                        false => "VC.Runtime.Debug"
+                    };
+
                     format!(
-                        "VC.Runtime.Debug.{}",
+                        "{}.{}",
+                        prefix,
                         pay.target_arch.map_or("all", |ta| ta.as_str())
                     )
                 }

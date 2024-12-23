@@ -256,7 +256,10 @@ fn get_vcrd(
 
     pkgs.iter()
         // get all vc debug runtime items (key is renamed by manifest::get_package_manifest)
-        .filter(|(key, _)| key.starts_with("Microsoft.VisualCpp.RuntimeDebug"))
+        .filter(|(key, _)| {
+            key.starts_with("Microsoft.VisualCpp.RuntimeDebug")
+                || key.starts_with("Microsoft.Windows.UniversalCRT.Tools.Msi")
+        })
         // get the first payload (which contains the MSI)
         .filter_map(|(_, manifest_item)| {
             manifest_item
@@ -265,8 +268,6 @@ fn get_vcrd(
                 .map(|payload| (manifest_item, payload))
         })
         .for_each(|(manifest_item, payload)| {
-            // set vcrd_version from manifest item
-            vcrd_version = Some(manifest_item.version.clone());
             let target_arch = determine_vcrd_arch(manifest_item, payload);
 
             // skip if target arch is not requested
@@ -276,9 +277,18 @@ fn get_vcrd(
                 return;
             }
 
+            let filename_prefix = if manifest_item.id.contains("UniversalCRT") {
+                "Microsoft.UCRT.Debug"
+            } else {
+                // set vcrd_version from manifest item
+                vcrd_version = Some(manifest_item.version.clone());
+                "Microsoft.VC.Runtime.Debug"
+            };
+
             pruned.push(Payload {
                 filename: format_args!(
-                    "Microsoft.VC.Runtime.Debug.{}.{}.msi",
+                    "{}.{}.{}.msi",
+                    filename_prefix,
                     manifest_item.version,
                     target_arch.unwrap().as_str()
                 )
