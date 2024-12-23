@@ -264,7 +264,7 @@ fn get_vcrd(
         .filter_map(|(_, manifest_item)| {
             manifest_item
                 .payloads
-                .get(0)
+                .first()
                 .map(|payload| (manifest_item, payload))
         })
         .for_each(|(manifest_item, payload)| {
@@ -306,7 +306,7 @@ fn get_vcrd(
             });
         });
 
-    Ok(vcrd_version.with_context(|| "failed to find vcr debug version")?)
+    vcrd_version.with_context(|| "failed to find vcr debug version")
 }
 
 fn get_crt(
