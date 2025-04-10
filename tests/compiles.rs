@@ -101,7 +101,9 @@ fn verify_compiles() {
         let includes = match style {
             Style::Default => {
                 cmd.env("RUSTFLAGS", format!("-C linker=lld-link -Lnative={od}/crt/lib/x86_64 -Lnative={od}/sdk/lib/um/x86_64 -Lnative={od}/sdk/lib/ucrt/x86_64"));
-                format!("-Wno-unused-command-line-argument -fuse-ld=lld-link /imsvc{od}/crt/include /imsvc{od}/sdk/include/ucrt /imsvc{od}/sdk/include/um /imsvc{od}/sdk/include/shared")
+                format!(
+                    "-Wno-unused-command-line-argument -fuse-ld=lld-link /imsvc{od}/crt/include /imsvc{od}/sdk/include/ucrt /imsvc{od}/sdk/include/um /imsvc{od}/sdk/include/shared"
+                )
             }
             Style::WinSysRoot => {
                 const SEP: char = '\x1F';
@@ -142,9 +144,11 @@ fn verify_compiles() {
         ]);
 
         let includes = format!(
-        "-Wno-unused-command-line-argument -fuse-ld=lld-link /vctoolsdir {od}/crt /winsdkdir {od}/sdk"
-    );
-        let libs = format!("-C linker=lld-link -Lnative={od}/crt/lib/x86_64 -Lnative={od}/sdk/lib/um/x86_64 -Lnative={od}/sdk/lib/ucrt/x86_64");
+            "-Wno-unused-command-line-argument -fuse-ld=lld-link /vctoolsdir {od}/crt /winsdkdir {od}/sdk"
+        );
+        let libs = format!(
+            "-C linker=lld-link -Lnative={od}/crt/lib/x86_64 -Lnative={od}/sdk/lib/um/x86_64 -Lnative={od}/sdk/lib/ucrt/x86_64"
+        );
 
         let cc_env = [
             ("CC_x86_64_pc_windows_msvc", "clang-cl"),
@@ -265,7 +269,9 @@ fn verify_compiles_minimized() {
     let includes = format!(
         "-Wno-unused-command-line-argument -fuse-ld=lld-link /vctoolsdir {od}/crt /winsdkdir {od}/sdk"
     );
-    let libs = format!("-C linker=lld-link -Lnative={od}/crt/lib/x86_64 -Lnative={od}/sdk/lib/um/x86_64 -Lnative={od}/sdk/lib/ucrt/x86_64");
+    let libs = format!(
+        "-C linker=lld-link -Lnative={od}/crt/lib/x86_64 -Lnative={od}/sdk/lib/um/x86_64 -Lnative={od}/sdk/lib/ucrt/x86_64"
+    );
 
     let cc_env = [
         ("CC_x86_64_pc_windows_msvc", "clang-cl"),
