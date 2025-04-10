@@ -74,6 +74,9 @@ Options:
           Whether to include the Active Template Library (ATL) in the
           installation
 
+      --include-debug-runtime
+          Whether to include VCR debug libraries
+
   -t, --timeout <TIMEOUT>
           Specifies a timeout for how long a single download is allowed to take
           

@@ -361,7 +361,11 @@ pub(crate) fn unpack(
                 cab_contents
             };
 
-            anyhow::ensure!(!cabs.is_empty(), "no cab files were referenced by the MSI");
+            anyhow::ensure!(
+                !cabs.is_empty(),
+                "no cab files were referenced by the MSI {}",
+                pkg.as_str()
+            );
 
             struct CabFile {
                 id: String,

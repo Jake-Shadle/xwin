@@ -2,9 +2,10 @@
 
 use anyhow::{Context as _, Error};
 pub use camino::{Utf8Path as Path, Utf8PathBuf as PathBuf};
+use manifest::{Chip, ManifestItem};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fmt,
+    fmt::{self, Debug},
 };
 
 mod ctx;
@@ -183,11 +184,13 @@ pub enum PayloadKind {
     SdkLibs,
     SdkStoreLibs,
     Ucrt,
+    VcrDebug,
 }
 
 pub struct PrunedPackageList {
     pub crt_version: String,
     pub sdk_version: String,
+    pub vcr_version: Option<String>,
     pub payloads: Vec<Payload>,
 }
 
@@ -197,6 +200,7 @@ pub fn prune_pkg_list(
     arches: u32,
     variants: u32,
     include_atl: bool,
+    include_debug_runtime: bool,
     sdk_version: Option<String>,
     crt_version: Option<String>,
 ) -> Result<PrunedPackageList, Error> {
@@ -215,11 +219,94 @@ pub fn prune_pkg_list(
     )?;
     let sdk_version = get_sdk(pkgs, arches, sdk_version, &mut payloads)?;
 
+    let vcr_version = include_debug_runtime
+        .then(|| get_vcrd(pkgs, arches, &mut payloads).ok())
+        .flatten();
+
     Ok(PrunedPackageList {
         crt_version,
         sdk_version,
+        vcr_version,
         payloads,
     })
+}
+
+fn get_vcrd(
+    pkgs: &BTreeMap<String, manifest::ManifestItem>,
+    arches: u32,
+    pruned: &mut Vec<Payload>,
+) -> Result<String, Error> {
+    let mut vcrd_version: Option<String> = None;
+
+    // determine target architecture for the vcrd package
+    fn determine_vcrd_arch(
+        manifest_item: &ManifestItem,
+        payload: &manifest::Payload,
+    ) -> Option<Arch> {
+        if payload.file_name.contains("arm64") {
+            Some(Arch::Aarch64)
+        } else if payload.file_name.contains("arm") {
+            Some(Arch::Aarch)
+        } else {
+            [(Chip::X64, Arch::X86_64), (Chip::X86, Arch::X86)]
+                .iter()
+                .find_map(|(s, arch)| manifest_item.chip.unwrap().eq(s).then_some(*arch))
+        }
+    }
+
+    pkgs.iter()
+        // get all vc debug runtime items (key is renamed by manifest::get_package_manifest)
+        .filter(|(key, _)| {
+            key.starts_with("Microsoft.VisualCpp.RuntimeDebug")
+                || key.starts_with("Microsoft.Windows.UniversalCRT.Tools.Msi")
+        })
+        // get the first payload (which contains the MSI)
+        .filter_map(|(_, manifest_item)| {
+            manifest_item
+                .payloads
+                .first()
+                .map(|payload| (manifest_item, payload))
+        })
+        .for_each(|(manifest_item, payload)| {
+            let target_arch = determine_vcrd_arch(manifest_item, payload);
+
+            // skip if target arch is not requested
+            if target_arch
+                .is_none_or(|target_arch| !Arch::iter(arches).any(|arch| arch.eq(&target_arch)))
+            {
+                return;
+            }
+
+            let filename_prefix = if manifest_item.id.contains("UniversalCRT") {
+                "Microsoft.UCRT.Debug"
+            } else {
+                // set vcrd_version from manifest item
+                vcrd_version = Some(manifest_item.version.clone());
+                "Microsoft.VC.Runtime.Debug"
+            };
+
+            pruned.push(Payload {
+                filename: format_args!(
+                    "{}.{}.{}.msi",
+                    filename_prefix,
+                    manifest_item.version,
+                    target_arch.unwrap().as_str()
+                )
+                .to_string()
+                .into(),
+                sha256: payload.sha256.clone(),
+                url: payload.url.clone(),
+                size: payload.size,
+                kind: PayloadKind::VcrDebug,
+                target_arch,
+                variant: Some(Variant::Desktop),
+                install_size: (manifest_item.payloads.len() == 1)
+                    .then_some(manifest_item)
+                    .and_then(|mi| mi.install_sizes.as_ref().and_then(|is| is.target_drive)),
+            });
+        });
+
+    vcrd_version.with_context(|| "failed to find vcr debug version")
 }
 
 fn get_crt(
@@ -736,12 +823,14 @@ fn get_sdk(
 pub struct Map {
     pub crt: Block,
     pub sdk: Block,
+    pub vcrd: Block,
 }
 
 impl Map {
     fn clear(&mut self) {
         self.crt.clear();
         self.sdk.clear();
+        self.vcrd.clear();
     }
 }
 
@@ -764,6 +853,7 @@ pub enum SectionKind {
     CrtLib,
     SdkHeader,
     SdkLib,
+    VcrDebug,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Default)]
