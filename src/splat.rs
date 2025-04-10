@@ -1,4 +1,4 @@
-use crate::{symlink, Arch, Ctx, Error, Path, PathBuf, PayloadKind, SectionKind, Variant};
+use crate::{Arch, Ctx, Error, Path, PathBuf, PayloadKind, SectionKind, Variant, symlink};
 use anyhow::Context as _;
 use rayon::prelude::*;
 use std::collections::BTreeMap;
@@ -552,7 +552,7 @@ pub(crate) fn splat(
                                     || stripped.ends_with("d_netcore")
                                     || stripped
                                         .strip_suffix(|c: char| c.is_ascii_digit())
-                                        .map_or(false, |fname| fname.ends_with('d'))
+                                        .is_some_and(|fname| fname.ends_with('d'))
                                 {
                                     tracing::debug!("skipping {fname}");
                                     continue;

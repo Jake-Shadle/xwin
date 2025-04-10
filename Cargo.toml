@@ -3,7 +3,7 @@ name = "xwin"
 version = "0.6.6-rc.2"
 description = "Allows downloading and repacking the MSVC CRT and Windows SDK for cross compilation"
 authors = ["Jake Shadle <jake.shadle@embark-studios.com>"]
-edition = "2021"
+edition = "2024"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/Jake-Shadle/xwin"
 homepage = "https://github.com/Jake-Shadle/xwin"
@@ -31,13 +31,13 @@ native-tls = ["ureq/native-tls", "native-tls-crate/vendored"]
 # Easy errors
 anyhow = "1.0"
 # Network/file buffers
-bytes = "1.7"
+bytes = "1.10"
 # CAB files are used in conjunction with MSI files for SDK packages
 cab = "0.6"
 # Nicer to use utf-8 paths
 camino = "1.0"
 # Easy CLI tables
-cli-table = { version = "0.4", default-features = false }
+cli-table = { version = "0.5", default-features = false }
 crossbeam-channel = "0.5"
 # Pretty progress bars
 indicatif = "0.17"
@@ -49,7 +49,7 @@ rayon = "1.5"
 # Include scanning 
 regex = "1.11"
 # HTTP requests
-ureq = { version = "3.0.0-rc1", default-features = false, features = ["gzip", "socks-proxy"] }
+ureq = { version = "3.0.0", default-features = false, features = ["gzip", "socks-proxy"] }
 memchr = "2.6"
 native-tls-crate = { package = "native-tls", version = "0.2", optional = true }
 # SHA-256 verification
@@ -61,8 +61,7 @@ serde_json = "1.0"
 # Argument parsing
 clap = { version = "4.5", features = ["derive", "env", "wrap_help"] }
 # Easy management of temp files
-tempfile = "3.13"
-# We need to pin it to not get duplicates due to zip -> num_enum -> proc-macro-crate -> (WHY!?!?) toml_edit
+tempfile = "3.19"
 toml = "0.8"
 # Tracing logs
 tracing = { version = "0.1", default-features = false, features = [
@@ -76,19 +75,19 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
     "json",
 ] }
 # Hashing
-twox-hash = "1.6"
+twox-hash = "2.1"
 # Determine the latest CRT and SDK versions
-versions = "6.2"
+versions = "7.0"
 walkdir = "2.3"
 # Unpacking of VSIX "packages"
-zip = { version = "2.1", default-features = false, features = ["deflate"] }
+zip = { version = "2.6", default-features = false, features = ["deflate"] }
 
 [target.'cfg(all(target_env = "musl", target_arch = "x86_64"))'.dependencies]
 # Faster allocator for musl builds
 mimalloc = { version = "0.1", default-features = false }
 
 [dev-dependencies]
-insta = "1.40"
+insta = "1.42"
 
 [profile.dev.package.insta]
 opt-level = 3

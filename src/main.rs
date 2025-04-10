@@ -261,7 +261,9 @@ fn main() -> Result<(), Error> {
     if !args.accept_license {
         // The license link is the same for every locale, but we should probably
         // retrieve it from the manifest in the future
-        println!("Do you accept the license at https://go.microsoft.com/fwlink/?LinkId=2086102 (yes | no)?");
+        println!(
+            "Do you accept the license at https://go.microsoft.com/fwlink/?LinkId=2086102 (yes | no)?"
+        );
 
         let mut accept = String::new();
         std::io::stdin().read_line(&mut accept)?;
@@ -279,15 +281,15 @@ fn main() -> Result<(), Error> {
     let draw_target = xwin::util::ProgressTarget::Stdout;
 
     let client = {
-        let mut builder = ureq::Config::new();
-        builder.timeouts.recv_body = Some(args.timeout);
+        let mut builder = ureq::config::Config::builder();
+        builder = builder.timeout_recv_body(Some(args.timeout));
 
         if let Some(proxy) = args.https_proxy {
             let proxy = ureq::Proxy::new(&proxy).context("failed to parse https proxy address")?;
-            builder.proxy = Some(proxy);
+            builder = builder.proxy(Some(proxy));
         }
 
-        ureq::Agent::new_with_config(builder)
+        builder.build().new_agent()
     };
 
     let ctx = if args.temp {
@@ -448,7 +450,7 @@ fn main() -> Result<(), Error> {
 }
 
 fn print_packages(payloads: &[xwin::Payload]) {
-    use cli_table::{format::Justify, Cell, Style, Table};
+    use cli_table::{Cell, Style, Table, format::Justify};
 
     let (dl, install) = payloads.iter().fold((0, 0), |(dl, install), payload| {
         (
@@ -590,9 +592,11 @@ mod test {
         // use internal `insta` function instead of the macro so we can pass in the
         // right module information from the crate and to gather up the errors instead of panicking directly on failures
         insta::_macro_support::assert_snapshot(
-            cmd_name.clone().into(),
-            help_text,
-            desc.manifest_path,
+            insta::_macro_support::SnapshotValue::FileText {
+                name: Some(cmd_name.as_str().into()),
+                content: help_text,
+            },
+            std::path::Path::new(&desc.manifest_path),
             "cli-cmd",
             desc.module_path,
             desc.file,
@@ -607,11 +611,7 @@ mod test {
                 continue;
             }
 
-            snapshot_test_cli_command(
-                app.clone(),
-                format!("{}-{}", cmd_name, app.get_name()),
-                desc,
-            );
+            snapshot_test_cli_command(app.clone(), format!("{cmd_name}-{}", app.get_name()), desc);
         }
     }
 }

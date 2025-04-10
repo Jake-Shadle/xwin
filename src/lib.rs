@@ -630,9 +630,9 @@ fn get_sdk(
                         .file_name
                         .strip_prefix("Installers\\Windows SDK Desktop Headers ")
                         .and_then(|fname| fname.strip_suffix("-x86_en-us.msi"))
-                        .map_or(false, |fname| fname == arch.as_ms_str())
+                        .is_some_and(|fname| fname == arch.as_ms_str())
                 })
-                .with_context(|| format!("unable to find {} headers for {}", arch, sdk.id))?;
+                .with_context(|| format!("unable to find {arch} headers for {}", sdk.id))?;
 
             pruned.push(Payload {
                 filename: format!("{}_{}_headers.msi", sdk.id, arch.as_ms_str()).into(),
@@ -660,7 +660,7 @@ fn get_sdk(
                         .file_name
                         .strip_prefix("Installers\\Windows SDK Desktop Libs ")
                         .and_then(|fname| fname.strip_suffix("-x86_en-us.msi"))
-                        .map_or(false, |arch_id| arch_id == arch.as_ms_str())
+                        .is_some_and(|arch_id| arch_id == arch.as_ms_str())
                 })
                 .with_context(|| format!("unable to find SDK libs for '{}'", arch))?;
 
