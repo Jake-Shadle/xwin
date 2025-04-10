@@ -70,7 +70,7 @@ Decompresses all of the downloaded package contents to disk. `download` is run a
 
 ### `xwin splat`
 
-Fixes the packages to prune unneeded files and adds symlinks to address file casing issues and then spalts the final artifacts into directories. This is the main command you will want to run as it also `download`s and `unpack`s automatically, providing the desired headers at the path specified to `--output` (`./.xwin-cache/splat`).
+Fixes the packages to prune unneeded files and adds symlinks to address file casing issues and then splats the final artifacts into directories. This is the main command you will want to run as it also `download`s and `unpack`s automatically, providing the desired headers at the path specified to `--output` (`./.xwin-cache/splat`).
 
 #### Splat options
 
