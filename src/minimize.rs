@@ -1,4 +1,4 @@
-use crate::{util::canonicalize, Ctx, Path, PathBuf, SectionKind};
+use crate::{Ctx, Path, PathBuf, SectionKind, util::canonicalize};
 use anyhow::Context as _;
 
 pub struct MinimizeConfig {
@@ -60,7 +60,7 @@ pub(crate) fn minimize(
                 "--manifest-path",
                 config.manifest_path.as_str(),
             ]);
-            if !clean.status().map_or(false, |s| s.success()) {
+            if !clean.status().is_ok_and(|s| s.success()) {
                 tracing::error!("failed to clean cargo target directory");
             }
 
@@ -100,7 +100,9 @@ pub(crate) fn minimize(
                 "-Wno-unused-command-line-argument -fuse-ld=lld-link /vctoolsdir {splat_root}/crt /winsdkdir {splat_root}/sdk"
             );
 
-            let mut libs = format!("-C linker=lld-link -Lnative={splat_root}/crt/lib/x86_64 -Lnative={splat_root}/sdk/lib/um/x86_64 -Lnative={splat_root}/sdk/lib/ucrt/x86_64");
+            let mut libs = format!(
+                "-C linker=lld-link -Lnative={splat_root}/crt/lib/x86_64 -Lnative={splat_root}/sdk/lib/um/x86_64 -Lnative={splat_root}/sdk/lib/ucrt/x86_64"
+            );
 
             let rust_flags_env = format!(
                 "CARGO_TARGET_{}_RUSTFLAGS",
@@ -144,7 +146,10 @@ pub(crate) fn minimize(
                         Ok(f) => break f,
                         Err(err) => {
                             if start.elapsed() > max {
-                                anyhow::bail!("failed to open strace output '{}' after waiting for {max:?}: {err}", strace_output_path.display());
+                                anyhow::bail!(
+                                    "failed to open strace output '{}' after waiting for {max:?}: {err}",
+                                    strace_output_path.display()
+                                );
                             }
 
                             std::thread::sleep(std::time::Duration::from_millis(10));
@@ -173,7 +178,7 @@ pub(crate) fn minimize(
                                 let available = match output.fill_buf() {
                                     Ok(n) => n,
                                     Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {
-                                        continue
+                                        continue;
                                     }
                                     Err(e) => anyhow::bail!(e),
                                 };

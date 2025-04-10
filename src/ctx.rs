@@ -1,7 +1,7 @@
 use crate::{
+    Path, PathBuf, WorkItem,
     splat::SdkHeaders,
     util::{ProgressTarget, Sha256},
-    Path, PathBuf, WorkItem,
 };
 use anyhow::{Context as _, Error};
 
@@ -87,28 +87,25 @@ impl Ctx {
             tracing::debug!("verifying existing cached dl file");
 
             match std::fs::read(&cache_path) {
-                Ok(contents) => match &checksum {
-                    Some(expected) => {
+                Ok(contents) => {
+                    if let Some(expected) = &checksum {
                         let chksum = Sha256::digest(&contents);
 
                         if chksum != *expected {
                             tracing::warn!(
-                                "checksum mismatch, expected {} != actual {}",
-                                expected,
-                                chksum
+                                "checksum mismatch, expected {expected} != actual {chksum}",
                             );
                         } else {
                             progress.inc_length(contents.len() as u64);
                             progress.inc(contents.len() as u64);
                             return Ok(contents.into());
                         }
-                    }
-                    None => {
+                    } else {
                         progress.inc_length(contents.len() as u64);
                         progress.inc(contents.len() as u64);
                         return Ok(contents.into());
                     }
-                },
+                }
                 Err(e) => {
                     tracing::warn!(error = %e, "failed to read cached file");
                 }
@@ -165,7 +162,11 @@ impl Ctx {
 
             if body.capacity() > 0 {
                 if body.capacity() as u64 != content_length {
-                    tracing::warn!(url = url.as_ref(), "a previous HTTP GET had a content-length of {}, but we now received a content-length of {content_length}", body.capacity());
+                    tracing::warn!(
+                        url = url.as_ref(),
+                        "a previous HTTP GET had a content-length of {}, but we now received a content-length of {content_length}",
+                        body.capacity()
+                    );
 
                     if body.capacity() as u64 > content_length {
                         progress.inc_length(body.capacity() as u64 - content_length);
@@ -236,8 +237,6 @@ impl Ctx {
                             "HTTP GET failed to retrieve entire body, retrying"
                         );
                     }
-
-                    continue;
                 }
                 Err(DownloadError::Ureq(err)) => {
                     return Err(err)
@@ -250,7 +249,10 @@ impl Ctx {
             }
         }
 
-        anyhow::bail!("failed to retrieve {} after {total} tries due to I/O failures reading the response body, try using --http-retries to increase the retry count", url.as_ref());
+        anyhow::bail!(
+            "failed to retrieve {} after {total} tries due to I/O failures reading the response body, try using --http-retries to increase the retry count",
+            url.as_ref()
+        );
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -320,7 +322,9 @@ impl Ctx {
             })?;
 
             let enable_symlinks = if std::fs::read(root.join("big.xwin")).is_ok() {
-                tracing::warn!("detected splat root '{root}' is on a case-sensitive file system, disabling symlinks");
+                tracing::warn!(
+                    "detected splat root '{root}' is on a case-sensitive file system, disabling symlinks"
+                );
                 false
             } else {
                 true

@@ -96,7 +96,7 @@ impl<'de> serde::Deserialize<'de> for Sha256 {
     {
         struct Visitor;
 
-        impl<'de> serde::de::Visitor<'de> for Visitor {
+        impl serde::de::Visitor<'_> for Visitor {
             type Value = Sha256;
 
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
