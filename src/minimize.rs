@@ -459,6 +459,7 @@ pub(crate) fn minimize(
                     SectionKind::SdkLib => (&sdk_lib_prefix, &mut map.sdk.libs),
                     SectionKind::CrtHeader => (&crt_hdr_prefix, &mut map.crt.headers),
                     SectionKind::CrtLib => (&crt_lib_prefix, &mut map.crt.libs),
+                    SectionKind::VcrDebug => (&roots.vcrd, &mut map.vcrd.libs),
                 };
 
                 let path = p

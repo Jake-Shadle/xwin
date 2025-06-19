@@ -8508,4 +8508,22 @@ sdk/lib/um/x86_64/xmllite.lib @ 2c28c1d8bf7ee709
 sdk/lib/um/x86_64/xolehlp.lib @ 3377c1f51841e8e8
 sdk/lib/um/x86_64/xpsdocumenttargetprint.lib @ b092dc09f560f13b
 sdk/lib/um/x86_64/xpsprint.lib @ 96ded17d1a8fdc8b
-
+vcrd/14.29.30135/bin/x86_64/Windows Kits/Catalogs/cat05254f60ea43b4e3959b17cdb03268c0.cat @ 2d47d20ae255713
+vcrd/14.29.30135/bin/x86_64/concrt140d.dll @ 2c7011eef30cb54f
+vcrd/14.29.30135/bin/x86_64/libomp140.x86_64.dll @ 5f58ba101aeef018
+vcrd/14.29.30135/bin/x86_64/libomp140d.x86_64.dll @ edb2e3e7f6bad7be
+vcrd/14.29.30135/bin/x86_64/mfc140d.dll @ cb8ed2039b83eb4f
+vcrd/14.29.30135/bin/x86_64/mfc140ud.dll @ b614945b7040fe9f
+vcrd/14.29.30135/bin/x86_64/mfcm140d.dll @ e7b8a3db5c98113b
+vcrd/14.29.30135/bin/x86_64/mfcm140ud.dll @ 876756dcc70415a7
+vcrd/14.29.30135/bin/x86_64/msvcp140_1d.dll @ a52ab6024a2f0454
+vcrd/14.29.30135/bin/x86_64/msvcp140_2d.dll @ 5cc553a4a4eb57fb
+vcrd/14.29.30135/bin/x86_64/msvcp140d.dll @ 4757d7fd2aee8649
+vcrd/14.29.30135/bin/x86_64/msvcp140d_atomic_wait.dll @ aba4e1013b0635d3
+vcrd/14.29.30135/bin/x86_64/msvcp140d_codecvt_ids.dll @ aed438c460a2b854
+vcrd/14.29.30135/bin/x86_64/ucrtbased.dll @ 32fae2c856bc22d
+vcrd/14.29.30135/bin/x86_64/vcamp140d.dll @ b6323fe5350b4bf4
+vcrd/14.29.30135/bin/x86_64/vccorlib140d.dll @ 2ac106809376b1ac
+vcrd/14.29.30135/bin/x86_64/vcomp140d.dll @ aefe84cf6f0a6bec
+vcrd/14.29.30135/bin/x86_64/vcruntime140_1d.dll @ af08fec901ebbfbf
+vcrd/14.29.30135/bin/x86_64/vcruntime140d.dll @ 14905e8b2386d0da

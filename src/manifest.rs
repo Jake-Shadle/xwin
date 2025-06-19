@@ -23,6 +23,19 @@ pub enum Chip {
     Neutral,
 }
 
+impl Chip {
+    #[inline]
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::X86 => "x86",
+            Self::X64 => "x64",
+            Self::Arm => "arm",
+            Self::Arm64 => "arm64",
+            Self::Neutral => "neutral",
+        }
+    }
+}
+
 #[derive(Copy, Clone, Deserialize, PartialEq, Eq, Debug)]
 pub enum ItemKind {
     /// Unused.
@@ -166,9 +179,19 @@ pub fn get_package_manifest(
         serde_json::from_slice(&manifest_bytes).context("unable to parse manifest")?;
 
     let mut packages = BTreeMap::new();
+    let mut package_counts = BTreeMap::new();
 
     for pkg in manifest.packages {
-        packages.insert(pkg.id.clone(), pkg);
+        // built a unqiue key for each duplicate id to prevent overriding distinct packages
+        let pkg_id = if packages.contains_key(&pkg.id) {
+            let count = package_counts.get(&pkg.id).unwrap_or(&0) + 1;
+            package_counts.insert(pkg.id.clone(), count);
+            format!("{}#{}", pkg.id, count)
+        } else {
+            pkg.id.clone()
+        };
+
+        packages.insert(pkg_id, pkg);
     }
 
     Ok(PackageManifest { packages })
