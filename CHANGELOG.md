@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.6.6] - 2025-06-19
 ### Fixed
 - [PR#143](https://github.com/Jake-Shadle/xwin/pull/142) is a second attempt to resolve [#141](https://github.com/Jake-Shadle/xwin/issues/141) by switching to a new `3.0.0-rc1` version of ureq that might not have the same issue, as well as adding support for retries for EOF I/O errors seen by users which can be configured via `--http-retry` or `XWIN_HTTP_RETRY`.
 
@@ -197,7 +198,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation if downloading, unpacking, and splatting of the CRT and Windows SDK. This first pass focused on targeting x86_64 Desktop, so targeting the Windows Store or other architectures is not guaranteed to work.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.6.5...HEAD
+[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.6.6...HEAD
+[0.6.6]: https://github.com/Jake-Shadle/xwin/compare/0.6.5...0.6.6
 [0.6.5]: https://github.com/Jake-Shadle/xwin/compare/0.6.4...0.6.5
 [0.6.4]: https://github.com/Jake-Shadle/xwin/compare/0.6.3...0.6.4
 [0.6.3]: https://github.com/Jake-Shadle/xwin/compare/0.6.2...0.6.3
