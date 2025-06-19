@@ -71,7 +71,7 @@ pub(crate) fn minimize(
             let strace_output_path = td.path().join("strace_output.txt");
 
             if config.preserve_strace {
-                let path = td.into_path();
+                let path = td.keep();
                 tracing::info!("strace output {}", path.display());
             }
 
