@@ -71,7 +71,7 @@ pub(crate) fn minimize(
             let strace_output_path = td.path().join("strace_output.txt");
 
             if config.preserve_strace {
-                let path = td.into_path();
+                let path = td.keep();
                 tracing::info!("strace output {}", path.display());
             }
 
@@ -214,10 +214,10 @@ pub(crate) fn minimize(
                             continue;
                         };
 
-                        // We can immediately skip file that were unable to be opened,
+                        // We can immediately skip files that were unable to be opened,
                         // but many file opens will be asynchronous so this won't
                         // catch all of them, but that's fine since we check for
-                        // the existence in the other thread
+                        // existence in the other thread
                         if open.1.contains("-1 NOENT (") {
                             continue;
                         }
@@ -278,12 +278,12 @@ pub(crate) fn minimize(
                             }
 
                             let Ok(md) = std::fs::metadata(&path) else {
-                                // clang will probe paths according to the include directories,
+                                // clang will probe paths according to the include directory ordering,
                                 // and while we filter on NOENT in the strace output, in many
-                                // cases the opens are async and this split over multiple lines,
+                                // cases the opens are async and thus will be split over multiple lines,
                                 // and while we _could_ keep a small buffer to pair the open results
-                                // with the original thread that queued it, it's just simpler to
-                                // just ignore paths that managed to get here that don't actually exist
+                                // with the original thread that queued it, it's simpler to just ignore
+                                // paths that managed to get here that don't actually exist
                                 return;
                             };
 
@@ -394,7 +394,7 @@ pub(crate) fn minimize(
     let mut additional_symlinks = 0;
 
     // For libraries, there are cases where strace doesn't actually detect
-    // all the symlinks from which they are rereferenced, so just be conservative
+    // all the symlinks from which they are referenced, so just be conservative
     // and add all of them
     for (p, sls) in symlinks {
         if let Some((_, symlinks)) = used_paths.get_mut(&p) {
