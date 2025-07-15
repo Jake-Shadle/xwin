@@ -92,14 +92,14 @@ fn download_cabs(
     let msi_filename = &msi.payload.filename;
 
     let mut msi_pkg = msi::Package::open(std::io::Cursor::new(msi_content.clone()))
-        .with_context(|| format!("invalid MSI for {}", msi_filename))?;
+        .with_context(|| format!("invalid MSI for {msi_filename}"))?;
 
     // The `Media` table contains the list of cabs by name, which we then need
     // to lookup in the list of payloads.
     // Columns: [DiskId, LastSequence, DiskPrompt, Cabinet, VolumeLabel, Source]
     let cab_files: Vec<_> = msi_pkg
         .select_rows(msi::Select::table("Media"))
-        .with_context(|| format!("{} does not contain a list of CAB files", msi_filename))?
+        .with_context(|| format!("{msi_filename} does not contain a list of CAB files"))?
         .filter_map(|row| {
             // Columns:
             // 0 - DiskId
