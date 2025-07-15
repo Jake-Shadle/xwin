@@ -292,6 +292,15 @@ fn main() -> Result<(), Error> {
             builder = builder.proxy(Some(proxy));
         }
 
+        #[cfg(feature = "native-tls")]
+        {
+            builder = builder.tls_config(
+                ureq::tls::TlsConfig::builder()
+                    .provider(ureq::tls::TlsProvider::NativeTls)
+                    .build(),
+            );
+        }
+
         builder.build().new_agent()
     };
 
