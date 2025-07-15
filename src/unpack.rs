@@ -239,7 +239,7 @@ pub(crate) fn unpack(
                 // that are reference by files. Ugh.
                 let mut directories: Vec<_> = msi
                     .select_rows(msi::Select::table("Directory"))
-                    .with_context(|| format!("MSI {} has no 'Directory' table", pkg))?
+                    .with_context(|| format!("MSI {pkg} has no 'Directory' table"))?
                     .map(|row| -> Result<_, _> {
                         // Columns:
                         // 0 - Directory (name)
@@ -378,7 +378,7 @@ pub(crate) fn unpack(
                 let mut uncompressed = 0u64;
                 let mut files: Vec<_> = msi
                     .select_rows(msi::Select::table("File"))
-                    .with_context(|| format!("MSI {} has no 'File' table", pkg))?
+                    .with_context(|| format!("MSI {pkg} has no 'File' table"))?
                     .filter_map(|row| -> Option<Result<_, Error>> {
                         // Columns:
                         // 0 - File Id (lookup in CAB)

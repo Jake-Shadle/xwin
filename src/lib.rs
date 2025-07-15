@@ -749,7 +749,7 @@ fn get_sdk(
                         .and_then(|fname| fname.strip_suffix("-x86_en-us.msi"))
                         .is_some_and(|arch_id| arch_id == arch.as_ms_str())
                 })
-                .with_context(|| format!("unable to find SDK libs for '{}'", arch))?;
+                .with_context(|| format!("unable to find SDK libs for '{arch}'"))?;
 
             pruned.push(Payload {
                 filename: format!("{}_libs_{}.msi", sdk.id, arch).into(),

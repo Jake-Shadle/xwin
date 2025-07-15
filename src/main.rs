@@ -15,7 +15,7 @@ fn setup_logger(json: bool, log_level: LevelFilter) -> Result<(), Error> {
 
     // If a user specifies a log level, we assume it only pertains to xwin,
     // if they want to trace other crates they can use the RUST_LOG env approach
-    env_filter = env_filter.add_directive(format!("xwin={}", log_level).parse()?);
+    env_filter = env_filter.add_directive(format!("xwin={log_level}").parse()?);
 
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
         .with_env_filter(env_filter)
@@ -547,9 +547,9 @@ fn load_manifest(
     let manifest = match manifest {
         Some(manifest_path) => {
             let manifest_content = std::fs::read_to_string(manifest_path)
-                .with_context(|| format!("failed to read path '{}'", manifest_path))?;
+                .with_context(|| format!("failed to read path '{manifest_path}'"))?;
             serde_json::from_str(&manifest_content)
-                .with_context(|| format!("failed to deserialize manifest in '{}'", manifest_path))?
+                .with_context(|| format!("failed to deserialize manifest in '{manifest_path}'"))?
         }
         None => xwin::manifest::get_manifest(ctx, manifest_version, channel, manifest_pb.clone())?,
     };

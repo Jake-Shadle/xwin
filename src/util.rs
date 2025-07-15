@@ -33,14 +33,14 @@ pub struct Sha256(pub [u8; 32]);
 
 impl fmt::Debug for Sha256 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }
 
 impl fmt::Display for Sha256 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for x in self.0 {
-            write!(f, "{:02x}", x)?;
+            write!(f, "{x:02x}")?;
         }
 
         Ok(())
