@@ -25,7 +25,7 @@ default = ["rustls-tls"]
 rustls-tls = ["ureq/rustls"]
 # If this feature is enabled we instead use the native TLS implementation for the
 # target platform
-native-tls = ["ureq/native-tls", "native-tls-crate/vendored"]
+native-tls = ["ureq/native-tls"]
 
 [dependencies]
 # Easy errors
@@ -62,7 +62,7 @@ serde_json = "1.0"
 clap = { version = "4.5", features = ["derive", "env", "wrap_help"] }
 # Easy management of temp files
 tempfile = "3.19"
-toml = "0.8"
+toml = "0.9"
 # Tracing logs
 tracing = { version = "0.1", default-features = false, features = [
     "attributes",
