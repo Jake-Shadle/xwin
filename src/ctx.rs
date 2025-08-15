@@ -487,9 +487,9 @@ impl Ctx {
 
         unpack_dir.push(".unpack");
 
-        if let Ok(unpack) = std::fs::read(&unpack_dir) {
-            if let Ok(um) = serde_json::from_slice::<crate::unpack::UnpackMeta>(&unpack) {
-                if payload.sha256 == um.sha256 {
+        if let Ok(unpack) = std::fs::read(&unpack_dir)
+            && let Ok(um) = serde_json::from_slice::<crate::unpack::UnpackMeta>(&unpack)
+                && payload.sha256 == um.sha256 {
                     tracing::debug!("already unpacked");
                     unpack_dir.pop();
                     return Ok(Unpack::Present {
@@ -499,8 +499,6 @@ impl Ctx {
                         num_files: um.num_files,
                     });
                 }
-            }
-        }
 
         unpack_dir.pop();
 
