@@ -366,6 +366,11 @@ impl Ctx {
                     return Ok(None);
                 }
 
+                let Some(payload_contents) = payload_contents else {
+                    wi.progress.abandon_with_message("MSI with no cabs");
+                    return Ok(None);
+                };
+
                 let ft = crate::unpack::unpack(self.clone(), &wi, payload_contents)?;
 
                 if let crate::Ops::Unpack = ops {

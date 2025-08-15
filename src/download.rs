@@ -30,7 +30,7 @@ pub(crate) fn download(
     ctx: Arc<Ctx>,
     pkgs: Arc<std::collections::BTreeMap<String, manifest::ManifestItem>>,
     item: &crate::WorkItem,
-) -> Result<PayloadContents, Error> {
+) -> Result<Option<PayloadContents>, Error> {
     item.progress.set_message("📥 downloading..");
 
     let contents = ctx.get_and_validate(
@@ -70,7 +70,7 @@ pub(crate) fn download(
 
             download_cabs(ctx, &cabs, item, contents)
         }
-        Some("vsix") => Ok(PayloadContents::Vsix(contents)),
+        Some("vsix") => Ok(Some(PayloadContents::Vsix(contents))),
         ext => anyhow::bail!("unknown extension {ext:?}"),
     };
 
@@ -86,7 +86,7 @@ fn download_cabs(
     cabs: &[Cab],
     msi: &crate::WorkItem,
     msi_content: bytes::Bytes,
-) -> Result<PayloadContents, Error> {
+) -> Result<Option<PayloadContents>, Error> {
     use rayon::prelude::*;
 
     let msi_filename = &msi.payload.filename;
@@ -136,6 +136,10 @@ fn download_cabs(
         })
         .collect();
 
+    if cab_files.is_empty() {
+        return Ok(None);
+    }
+
     let cabs = cab_files
         .into_par_iter()
         .map(
@@ -151,8 +155,8 @@ fn download_cabs(
         )
         .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(PayloadContents::Msi {
+    Ok(Some(PayloadContents::Msi {
         msi: msi_content,
         cabs,
-    })
+    }))
 }
