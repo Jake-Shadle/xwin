@@ -177,10 +177,11 @@ pub(crate) fn unpack(
                 }
 
                 if let Some(parent) = fs_path.parent()
-                    && !parent.exists() {
-                        std::fs::create_dir_all(parent)
-                            .with_context(|| format!("unable to create unpack dir '{parent}'"))?;
-                    }
+                    && !parent.exists()
+                {
+                    std::fs::create_dir_all(parent)
+                        .with_context(|| format!("unable to create unpack dir '{parent}'"))?;
+                }
 
                 let mut dest = std::fs::File::create(&fs_path).with_context(|| {
                     format!(
@@ -526,9 +527,10 @@ pub(crate) fn unpack(
                         let unpack_path = output_dir.join(&file.name);
 
                         if let Some(parent) = unpack_path.parent()
-                            && !parent.exists() {
-                                std::fs::create_dir_all(parent)?;
-                            }
+                            && !parent.exists()
+                        {
+                            std::fs::create_dir_all(parent)?;
+                        }
 
                         let unpacked_file = std::fs::File::create(&unpack_path)?;
 
