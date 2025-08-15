@@ -408,7 +408,7 @@ pub(crate) fn splat(
             mappings
         }
         PayloadKind::VcrDebug => {
-            if vcrd_version.is_some() {
+            if let Some(version) = vcrd_version {
                 let mut src = src.clone();
                 let mut target = roots.vcrd.clone();
 
@@ -420,7 +420,7 @@ pub(crate) fn splat(
                     });
                 };
 
-                target.push(vcrd_version.unwrap());
+                target.push(version);
                 target.push("bin");
                 target.push(item.payload.target_arch.unwrap().as_str());
 
@@ -588,18 +588,15 @@ pub(crate) fn splat(
                         if !include_debug_libs
                             && (mapping.kind == PayloadKind::CrtLibs
                                 || mapping.kind == PayloadKind::Ucrt)
+                            && let Some(stripped) = fname_str.strip_suffix(".lib")
+                            && (stripped.ends_with('d')
+                                || stripped.ends_with("d_netcore")
+                                || stripped
+                                    .strip_suffix(|c: char| c.is_ascii_digit())
+                                    .is_some_and(|fname| fname.ends_with('d')))
                         {
-                            if let Some(stripped) = fname_str.strip_suffix(".lib") {
-                                if stripped.ends_with('d')
-                                    || stripped.ends_with("d_netcore")
-                                    || stripped
-                                        .strip_suffix(|c: char| c.is_ascii_digit())
-                                        .is_some_and(|fname| fname.ends_with('d'))
-                                {
-                                    tracing::debug!("skipping {fname}");
-                                    continue;
-                                }
-                            }
+                            tracing::debug!("skipping {fname}");
+                            continue;
                         }
 
                         tar.push(fname);

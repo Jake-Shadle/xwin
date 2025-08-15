@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       # Add the actual target we compile for in the test
-      - run: rustup target add x86_64-pc-windows-msvc
+      - run: rustup target add x86_64-pc-windows-msvc aarch64-pc-windows-msvc
       - name: symlinks
         run: |
           set -eux

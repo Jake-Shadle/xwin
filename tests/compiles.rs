@@ -290,3 +290,172 @@ fn verify_compiles_minimized() {
 
     assert!(cmd.status().unwrap().success());
 }
+
+#[test]
+fn verify_compiles_aarch64() {
+    let ctx = xwin::Ctx::with_dir(
+        xwin::PathBuf::from(".xwin-cache/compiles-aarch64"),
+        xwin::util::ProgressTarget::Hidden,
+        ureq::agent(),
+        0,
+    )
+    .unwrap();
+
+    let ctx = std::sync::Arc::new(ctx);
+
+    let hidden = indicatif::ProgressBar::hidden();
+
+    // TODO: Bump to CI to 17 once github actions isn't using an ancient version,
+    // we could install in the action run, but not really worth it since I can
+    // test locally
+    let manifest_version = if std::env::var_os("CI").is_some() {
+        "16"
+    } else {
+        "17"
+    };
+
+    let manifest =
+        xwin::manifest::get_manifest(&ctx, manifest_version, "release", hidden.clone()).unwrap();
+    let pkg_manifest =
+        xwin::manifest::get_package_manifest(&ctx, &manifest, hidden.clone()).unwrap();
+
+    let pruned = xwin::prune_pkg_list(
+        &pkg_manifest,
+        xwin::Arch::Aarch64 as u32,
+        xwin::Variant::Desktop as u32,
+        false,
+        false,
+        None,
+        None,
+    )
+    .unwrap();
+
+    #[derive(Debug)]
+    enum Style {
+        Default,
+        WinSysRoot,
+    }
+
+    for style in [Style::Default, Style::WinSysRoot] {
+        let output_dir = ctx.work_dir.join(format!("{style:?}"));
+        if !output_dir.exists() {
+            std::fs::create_dir_all(&output_dir).unwrap();
+        }
+
+        if !cfg!(target_os = "windows") && matches!(style, Style::WinSysRoot) {
+            continue;
+        }
+
+        let op = xwin::Ops::Splat(xwin::SplatConfig {
+            include_debug_libs: false,
+            include_debug_symbols: false,
+            enable_symlinks: matches!(style, Style::Default),
+            preserve_ms_arch_notation: matches!(style, Style::WinSysRoot),
+            use_winsysroot_style: matches!(style, Style::WinSysRoot),
+            map: None,
+            copy: true,
+            output: output_dir.clone(),
+        });
+
+        ctx.clone()
+            .execute(
+                pkg_manifest.packages.clone(),
+                pruned
+                    .payloads
+                    .clone()
+                    .into_iter()
+                    .map(|payload| xwin::WorkItem {
+                        progress: hidden.clone(),
+                        payload: std::sync::Arc::new(payload),
+                    })
+                    .collect(),
+                pruned.crt_version.clone(),
+                pruned.sdk_version.clone(),
+                pruned.vcr_version.clone(),
+                xwin::Arch::Aarch64 as u32,
+                xwin::Variant::Desktop as u32,
+                op,
+            )
+            .unwrap();
+
+        if xwin::Path::new("tests/xwin-test/target").exists() {
+            std::fs::remove_dir_all("tests/xwin-test/target").expect("failed to remove target dir");
+        }
+
+        let mut cmd = std::process::Command::new("cargo");
+        cmd.args([
+            "build",
+            "--target",
+            "aarch64-pc-windows-msvc",
+            "--manifest-path",
+            "tests/xwin-test/Cargo.toml",
+        ]);
+
+        let od = xwin::util::canonicalize(&output_dir).unwrap();
+
+        let includes = match style {
+            Style::Default => {
+                cmd.env("RUSTFLAGS", format!("-C linker=lld-link -Lnative={od}/crt/lib/aarch64 -Lnative={od}/sdk/lib/um/aarch64 -Lnative={od}/sdk/lib/ucrt/aarch64"));
+                format!(
+                    "-Wno-unused-command-line-argument -fuse-ld=lld-link /imsvc{od}/crt/include /imsvc{od}/sdk/include/ucrt /imsvc{od}/sdk/include/um /imsvc{od}/sdk/include/shared"
+                )
+            }
+            Style::WinSysRoot => {
+                const SEP: char = '\x1F';
+                cmd.env("CARGO_ENCODED_RUSTFLAGS", format!("-C{SEP}linker=lld-link{SEP}-Lnative={od}/VC/Tools/MSVC/{crt_version}/Lib/x64{SEP}-Lnative={od}/Windows Kits/10/Lib/{sdk_version}/um/x64{SEP}-Lnative={od}/Windows Kits/10/Lib/{sdk_version}/ucrt/x64", crt_version = &pruned.crt_version, sdk_version = &pruned.sdk_version));
+
+                format!("-Wno-unused-command-line-argument -fuse-ld=lld-link /winsysroot {od}")
+            }
+        };
+
+        let cc_env = [
+            ("CC_aarch64_pc_windows_msvc", "clang-cl"),
+            ("CXX_aarch64_pc_windows_msvc", "clang-cl"),
+            ("AR_aarch64_pc_windows_msvc", "llvm-lib"),
+            ("CFLAGS_aarch64_pc_windows_msvc", &includes),
+            ("CXXFLAGS_aarch64_pc_windows_msvc", &includes),
+        ];
+
+        cmd.envs(cc_env);
+
+        assert!(cmd.status().unwrap().success());
+
+        // Ignore the /vctoolsdir /winsdkdir test below on CI since it fails, I'm assuming
+        // due to the clang version in GHA being outdated, but don't have the will to
+        // look into it now
+        if !matches!(style, Style::Default) || std::env::var("CI").is_ok() {
+            return;
+        }
+
+        std::fs::remove_dir_all("tests/xwin-test/target").expect("failed to remove target dir");
+
+        let mut cmd = std::process::Command::new("cargo");
+        cmd.args([
+            "build",
+            "--target",
+            "aarch64-pc-windows-msvc",
+            "--manifest-path",
+            "tests/xwin-test/Cargo.toml",
+        ]);
+
+        let includes = format!(
+            "-Wno-unused-command-line-argument -fuse-ld=lld-link /vctoolsdir {od}/crt /winsdkdir {od}/sdk"
+        );
+        let libs = format!(
+            "-C linker=lld-link -Lnative={od}/crt/lib/aarch64 -Lnative={od}/sdk/lib/um/aarch64 -Lnative={od}/sdk/lib/ucrt/aarch64"
+        );
+
+        let cc_env = [
+            ("CC_aarch4_pc_windows_msvc", "clang-cl"),
+            ("CXX_aarch64_pc_windows_msvc", "clang-cl"),
+            ("AR_aarch64_pc_windows_msvc", "llvm-lib"),
+            ("CFLAGS_aarch64_pc_windows_msvc", &includes),
+            ("CXXFLAGS_aarch64_pc_windows_msvc", &includes),
+            ("RUSTFLAGS", &libs),
+        ];
+
+        cmd.envs(cc_env);
+
+        assert!(cmd.status().unwrap().success());
+    }
+}

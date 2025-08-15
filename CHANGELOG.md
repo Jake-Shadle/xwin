@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#160](https://github.com/Jake-Shadle/xwin/pull/160) resolved [#126](https://github.com/Jake-Shadle/xwin/issues/126) by ignoring MSI installers that don't reference any cabinet files. Why do such utterly fucking useless installers exist? Because fuck me I guess.
+- [PR#159](https://github.com/Jake-Shadle/xwin/pull/159) fixed an issue where enabling native TLS was not actually doing anything. No one actually reported this not working which makes me think no one is using this feature. :)
+
 ## [0.6.6] - 2025-06-19
 ### Fixed
 - [PR#143](https://github.com/Jake-Shadle/xwin/pull/142) is a second attempt to resolve [#141](https://github.com/Jake-Shadle/xwin/issues/141) by switching to a new `3.0.0-rc1` version of ureq that might not have the same issue, as well as adding support for retries for EOF I/O errors seen by users which can be configured via `--http-retry` or `XWIN_HTTP_RETRY`.
