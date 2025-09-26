@@ -271,10 +271,13 @@ pub(crate) fn splat(
                 inc.push(sdk_version);
                 inc
             } else {
-                let mut target = roots.sdk.join("include");
+                let mut target = roots.sdk.clone();
 
                 if config.use_winsysroot_style {
+                    target.push("Include");
                     target.push(sdk_version);
+                } else {
+                    target.push("include");
                 }
 
                 target
@@ -292,10 +295,13 @@ pub(crate) fn splat(
         PayloadKind::SdkLibs => {
             src.push("lib/um");
 
-            let mut target = roots.sdk.join("lib");
+            let mut target = roots.sdk.clone();
 
             if config.use_winsysroot_style {
+                target.push("Lib");
                 target.push(sdk_version);
+            } else {
+                target.push("lib");
             }
 
             target.push("um");
@@ -322,10 +328,13 @@ pub(crate) fn splat(
         PayloadKind::SdkStoreLibs => {
             src.push("lib/um");
 
-            let mut target = roots.sdk.join("lib");
+            let mut target = roots.sdk.clone();
 
             if config.use_winsysroot_style {
+                target.push("Lib");
                 target.push(sdk_version);
+            } else {
+                target.push("lib");
             }
 
             target.push("um");
@@ -359,9 +368,12 @@ pub(crate) fn splat(
                 inc.push(sdk_version);
                 inc
             } else {
-                let mut target = roots.sdk.join("include");
+                let mut target = roots.sdk.clone();
                 if config.use_winsysroot_style {
+                    target.push("Include");
                     target.push(sdk_version);
+                } else {
+                    target.push("include");
                 }
                 target
             };
@@ -379,10 +391,13 @@ pub(crate) fn splat(
 
             src.push("lib/ucrt");
 
-            let mut target = roots.sdk.join("lib");
+            let mut target = roots.sdk.clone();
 
             if config.use_winsysroot_style {
+                target.push("Lib");
                 target.push(sdk_version);
+            } else {
+                target.push("lib");
             }
 
             target.push("ucrt");
