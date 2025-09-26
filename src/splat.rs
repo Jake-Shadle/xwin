@@ -274,6 +274,7 @@ pub(crate) fn splat(
                 let mut target = roots.sdk.join("include");
 
                 if config.use_winsysroot_style {
+                    target = roots.sdk.join("Include");
                     target.push(sdk_version);
                 }
 
@@ -295,6 +296,7 @@ pub(crate) fn splat(
             let mut target = roots.sdk.join("lib");
 
             if config.use_winsysroot_style {
+                target = roots.sdk.join("Lib");
                 target.push(sdk_version);
             }
 
@@ -325,6 +327,7 @@ pub(crate) fn splat(
             let mut target = roots.sdk.join("lib");
 
             if config.use_winsysroot_style {
+                target = roots.sdk.join("Lib");
                 target.push(sdk_version);
             }
 
@@ -361,6 +364,7 @@ pub(crate) fn splat(
             } else {
                 let mut target = roots.sdk.join("include");
                 if config.use_winsysroot_style {
+                    target = roots.sdk.join("Include");
                     target.push(sdk_version);
                 }
                 target
@@ -382,6 +386,7 @@ pub(crate) fn splat(
             let mut target = roots.sdk.join("lib");
 
             if config.use_winsysroot_style {
+                target = roots.sdk.join("Lib");
                 target.push(sdk_version);
             }
 
