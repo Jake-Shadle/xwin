@@ -324,7 +324,7 @@ impl Ctx {
 
             let enable_symlinks = if std::fs::read(root.join("big.xwin")).is_ok() {
                 tracing::warn!(
-                    "detected splat root '{root}' is on a case-sensitive file system, disabling symlinks"
+                    "detected splat root '{root}' is on a case-insensitive file system, disabling symlinks"
                 );
                 false
             } else {
