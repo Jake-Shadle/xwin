@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
 ### Changed
-- [PR#169](https://github.com/Jake-Shadle/xwin/pull/166) updated crates.
+- [PR#169](https://github.com/Jake-Shadle/xwin/pull/169) updated crates.
 
 ### Fixed
 - [PR#161](https://github.com/Jake-Shadle/xwin/pull/161) fixed the casing for `--winsysroot` splatting.
