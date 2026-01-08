@@ -1,6 +1,6 @@
 [package]
 name = "xwin"
-version = "0.6.7"
+version = "0.7.0"
 description = "Allows downloading and repacking the MSVC CRT and Windows SDK for cross compilation"
 authors = ["Jake Shadle <jake.shadle@embark-studios.com>"]
 edition = "2024"
