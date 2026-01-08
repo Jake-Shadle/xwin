@@ -40,9 +40,9 @@ camino = "1.0"
 cli-table = { version = "0.5", default-features = false }
 crossbeam-channel = "0.5"
 # Pretty progress bars
-indicatif = "0.17"
+indicatif = "0.18"
 # Decoding of MSI installer packages
-msi = "0.8"
+msi = "0.9"
 parking_lot = "0.12"
 # brrr
 rayon = "1.5"
@@ -80,7 +80,7 @@ twox-hash = "2.1"
 versions = "7.0"
 walkdir = "2.3"
 # Unpacking of VSIX "packages"
-zip = { version = "4.1", default-features = false, features = ["deflate-flate2"] }
+zip = { version = "7.0", default-features = false, features = ["deflate-flate2"] }
 
 [target.'cfg(all(target_env = "musl", target_arch = "x86_64"))'.dependencies]
 # Faster allocator for musl builds

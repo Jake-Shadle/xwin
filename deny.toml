@@ -11,11 +11,8 @@ all-features = true
 ignore = []
 
 [licenses]
-allow = ["MIT", "Apache-2.0", "BSD-3-Clause", "ISC"]
+allow = ["MIT", "Apache-2.0", "BSD-3-Clause", "ISC", "Unicode-3.0"]
 exceptions = [
-  # ring uses code from multiple libraries but all with permissive licenses
-  # https://tldrlegal.com/license/openssl-license-(openssl)
-  { allow = ["Unicode-3.0"], name = "unicode-ident" },
   { allow = ["CDLA-Permissive-2.0"], name = "webpki-roots" },
   { allow = ["CDLA-Permissive-2.0"], name = "webpki-root-certs" },
 ]
@@ -24,8 +21,6 @@ exceptions = [
 multiple-versions = "deny"
 deny = []
 skip = [
-  { crate = "regex-syntax@0.6.29", reason = "tracing-subscriber depends on 2 different versions :(" },
-  { crate = "regex-automata@0.1.10", reason = "tracing-subscriber depends on 2 different versions :(" },
   { crate = "getrandom@0.2.16", reason = "ring use this old version, lol" },
 ]
 skip-tree = []

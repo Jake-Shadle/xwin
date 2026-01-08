@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#169](https://github.com/Jake-Shadle/xwin/pull/169) updated crates.
+
+### Fixed
+- [PR#161](https://github.com/Jake-Shadle/xwin/pull/161) fixed the casing for `--winsysroot` splatting.
+
 ## [0.6.7] - 2025-08-15
 ### Fixed
 - [PR#160](https://github.com/Jake-Shadle/xwin/pull/160) resolved [#126](https://github.com/Jake-Shadle/xwin/issues/126) by ignoring MSI installers that don't reference any cabinet files. Why do such utterly fucking useless installers exist? Because fuck me I guess.
