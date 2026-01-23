@@ -26,6 +26,9 @@ rustls-tls = ["ureq/rustls"]
 # If this feature is enabled we instead use the native TLS implementation for the
 # target platform
 native-tls = ["ureq/native-tls"]
+# If this feature is enabled we use the platform's built-in certificate store
+# (ex. keychain, ca-certificates, Windows Certificate Store)
+platform-verifier = ["ureq/platform-verifier"]
 
 [dependencies]
 # Easy errors
