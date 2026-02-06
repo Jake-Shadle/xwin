@@ -291,19 +291,9 @@ fn main() -> Result<(), Error> {
             let proxy = ureq::Proxy::new(&proxy).context("failed to parse https proxy address")?;
             builder = builder.proxy(Some(proxy));
         }
-        // Mutated iff platform-verifier or native-tls features are enabled
-        #[allow(unused_mut)]
-        let mut tls_config = ureq::tls::TlsConfig::builder();
 
-        #[cfg(feature = "platform-verifier")]
-        {
-            tls_config = tls_config.root_certs(ureq::tls::RootCerts::PlatformVerifier);
-        }
-
-        #[cfg(feature = "native-tls")]
-        {
-            tls_config = tls_config.provider(ureq::tls::TlsProvider::NativeTls);
-        }
+        let tls_config =
+            ureq::tls::TlsConfig::builder().root_certs(ureq::tls::RootCerts::PlatformVerifier);
 
         builder = builder.tls_config(tls_config.build());
 

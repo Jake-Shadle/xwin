@@ -31,7 +31,7 @@ See this [blog post](https://jake-shadle.github.io/xwin/) for an in depth walk-t
 
 * `rustls` (default) - Uses [`rustls`](https://github.com/rustls/rustls) for TLS
 * `native-tls` - Uses [`native-tls`](https://github.com/sfackler/rust-native-tls) for TLS. Note that on platforms where OpenSSL is used it is always built from source.
-* `platform-verifier` - Uses the [`rustls-platform-verifier`](https://github.com/rustls/rustls-platform-verifier) with ureq to enable platform-specific keystores for TLS (ex. MacOS keychain, Windows Certificate Store, ca-certificates, etc.). This is useful for environments with HTTPS interception that load their certificates into the system certificate store.  
+* `platform-verifier` - Uses the [`rustls-platform-verifier`](https://github.com/rustls/rustls-platform-verifier) with ureq to enable platform-specific keystores for TLS. This is useful for environments with HTTPS interception that load their certificates into the system certificate store.  
 
 ### From tarball
 

@@ -20,15 +20,6 @@ exclude = [
 ]
 
 [features]
-# By default we use rustls for TLS
-default = ["rustls-tls"]
-rustls-tls = ["ureq/rustls"]
-# If this feature is enabled we instead use the native TLS implementation for the
-# target platform
-native-tls = ["ureq/native-tls"]
-# If this feature is enabled we use the platform's built-in certificate store
-# (ex. keychain, ca-certificates, Windows Certificate Store)
-platform-verifier = ["ureq/platform-verifier"]
 
 [dependencies]
 # Easy errors
@@ -51,10 +42,7 @@ parking_lot = "0.12"
 rayon = "1.5"
 # Include scanning 
 regex = "1.11"
-# HTTP requests
-ureq = { version = "3.0.0", default-features = false, features = ["gzip", "socks-proxy"] }
 memchr = "2.6"
-native-tls-crate = { package = "native-tls", version = "0.2", optional = true }
 # SHA-256 verification
 sha2 = "0.10"
 # Deserialization
@@ -84,6 +72,22 @@ versions = "7.0"
 walkdir = "2.3"
 # Unpacking of VSIX "packages"
 zip = { version = "7.0", default-features = false, features = ["deflate-flate2"] }
+
+# HTTP requests
+[dependencies.ureq]
+version = "3.0"
+default-features = false
+features = [
+    # Laziness to let ureq do the gzip decompression
+    "gzip",
+    # Ideally we would just use webpki-roots to have bundled certs, but some
+    # people are in corp environments that like to middle man HTTPS traffic
+    "platform-verifier",
+    # We use rustls for the TLS implementation
+    "rustls",
+    # Unfortunately many people are behind corp middle man proxies
+    "socks-proxy",
+]
 
 [target.'cfg(all(target_env = "musl", target_arch = "x86_64"))'.dependencies]
 # Faster allocator for musl builds
