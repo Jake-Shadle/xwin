@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.8.0] - 2026-02-06
 ### Removed
 - [PR#170](https://github.com/Jake-Shadle/xwin/pull/170) removed the `native-tls` and `rustls-tls` feature flags, `rustls` is now used as the TLS implementation unconditionally.
 
@@ -216,7 +217,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation if downloading, unpacking, and splatting of the CRT and Windows SDK. This first pass focused on targeting x86_64 Desktop, so targeting the Windows Store or other architectures is not guaranteed to work.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.7.0...HEAD
+[Unreleased]: https://github.com/Jake-Shadle/xwin/compare/0.8.0...HEAD
+[0.8.0]: https://github.com/Jake-Shadle/xwin/compare/0.7.0...0.8.0
 [0.7.0]: https://github.com/Jake-Shadle/xwin/compare/0.6.7...0.7.0
 [0.6.7]: https://github.com/Jake-Shadle/xwin/compare/0.6.6...0.6.7
 [0.6.6]: https://github.com/Jake-Shadle/xwin/compare/0.6.5...0.6.6
