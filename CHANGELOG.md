@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Removed
+- [PR#170](https://github.com/Jake-Shadle/xwin/pull/170) removed the `native-tls` and `rustls-tls` feature flags, `rustls` is now used as the TLS implementation unconditionally.
+
+### Changed
+- [PR#170](https://github.com/Jake-Shadle/xwin/pull/170) changed it so that [`rustls-platform-verifier`](https://github.com/rustls/rustls-platform-verifier) is used for certificate validation. Previously `webpki-roots` was used, but this meant hostile corporate networks that middle man HTTPS traffic would cause failures.
+
 ## [0.7.0] - 2026-01-08
 ### Changed
 - [PR#169](https://github.com/Jake-Shadle/xwin/pull/169) updated crates.
