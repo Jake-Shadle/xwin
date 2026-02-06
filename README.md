@@ -25,13 +25,6 @@ See this [blog post](https://jake-shadle.github.io/xwin/) for an in depth walk-t
 
 `cargo install xwin --locked`
 
-#### Features
-
-`xwin` provides two feature toggles used to decide which TLS implementation to use
-
-* `rustls` (default) - Uses [`rustls`](https://github.com/rustls/rustls) for TLS
-* `native-tls` - Uses [`native-tls`](https://github.com/sfackler/rust-native-tls) for TLS. Note that on platforms where OpenSSL is used it is always built from source.
-
 ### From tarball
 
 You can download a prebuilt binary from the [Releases](https://github.com/Jake-Shadle/xwin/releases).

@@ -2,8 +2,9 @@
 targets = [
   "x86_64-unknown-linux-musl",
   "x86_64-unknown-linux-gnu",
-  "x86_64-apple-darwin",
-  "aarch64-apple-darwin",
+  # Some people apparently use xwin on macs, but that's on them
+  # "x86_64-apple-darwin",
+  # "aarch64-apple-darwin",
 ]
 all-features = true
 
@@ -14,14 +15,13 @@ ignore = []
 allow = ["MIT", "Apache-2.0", "BSD-3-Clause", "ISC", "Unicode-3.0"]
 exceptions = [
   { allow = ["CDLA-Permissive-2.0"], name = "webpki-roots" },
-  { allow = ["CDLA-Permissive-2.0"], name = "webpki-root-certs" },
 ]
 
 [bans]
 multiple-versions = "deny"
 deny = []
 skip = [
-  { crate = "getrandom@0.2.16", reason = "ring use this old version, lol" },
+  { crate = "getrandom@0.2.17", reason = "ring use this old version, lol" },
 ]
 skip-tree = []
 
