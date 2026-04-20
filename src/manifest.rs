@@ -124,18 +124,26 @@ pub struct Manifest {
 /// link to the actual package manifest which describes all of the contents
 pub fn get_manifest(
     ctx: &Ctx,
-    version: &str,
-    channel: &str,
+    version: u8,
+    mut channel: &str,
     progress: indicatif::ProgressBar,
 ) -> Result<Manifest, anyhow::Error> {
-    let manifest_bytes = ctx.get_and_validate(
-        format!("https://aka.ms/vs/{version}/{channel}/channel"),
-        &format!("manifest_{version}.json"),
-        None,
-        progress,
-    )?;
+    // MS gonna MS
+    if version >= 18 {
+        if channel == "release" {
+            channel = "stable";
+        } else if channel == "pre" {
+            channel = "insiders";
+        }
+    }
 
-    let manifest: Manifest = serde_json::from_slice(&manifest_bytes)?;
+    let url = format!("https://aka.ms/vs/{version}/{channel}/channel");
+
+    let manifest_bytes =
+        ctx.get_and_validate(&url, &format!("manifest_{version}.json"), None, progress)?;
+
+    let manifest: Manifest = serde_json::from_slice(&manifest_bytes)
+        .with_context(|| format!("failed to deserialize manifest from {url}"))?;
 
     Ok(manifest)
 }

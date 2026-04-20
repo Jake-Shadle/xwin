@@ -1,3 +1,14 @@
+fn manifest_version() -> u8 {
+    // TODO: Bump to CI to 17 once github actions isn't using an ancient version,
+    // we could install in the action run, but not really worth it since I can
+    // test locally
+    if std::env::var_os("CI").is_some() {
+        16
+    } else {
+        18
+    }
+}
+
 #[test]
 fn verify_compiles() {
     let ctx = xwin::Ctx::with_dir(
@@ -12,17 +23,8 @@ fn verify_compiles() {
 
     let hidden = indicatif::ProgressBar::hidden();
 
-    // TODO: Bump to CI to 17 once github actions isn't using an ancient version,
-    // we could install in the action run, but not really worth it since I can
-    // test locally
-    let manifest_version = if std::env::var_os("CI").is_some() {
-        "16"
-    } else {
-        "17"
-    };
-
     let manifest =
-        xwin::manifest::get_manifest(&ctx, manifest_version, "release", hidden.clone()).unwrap();
+        xwin::manifest::get_manifest(&ctx, manifest_version(), "release", hidden.clone()).unwrap();
     let pkg_manifest =
         xwin::manifest::get_package_manifest(&ctx, &manifest, hidden.clone()).unwrap();
 
@@ -182,17 +184,8 @@ fn verify_compiles_minimized() {
 
     let hidden = indicatif::ProgressBar::hidden();
 
-    // TODO: Bump to CI to 17 once github actions isn't using an ancient version,
-    // we could install in the action run, but not really worth it since I can
-    // test locally
-    let manifest_version = if std::env::var_os("CI").is_some() {
-        "16"
-    } else {
-        "17"
-    };
-
     let manifest =
-        xwin::manifest::get_manifest(&ctx, manifest_version, "release", hidden.clone()).unwrap();
+        xwin::manifest::get_manifest(&ctx, manifest_version(), "release", hidden.clone()).unwrap();
     let pkg_manifest =
         xwin::manifest::get_package_manifest(&ctx, &manifest, hidden.clone()).unwrap();
 
@@ -305,17 +298,8 @@ fn verify_compiles_aarch64() {
 
     let hidden = indicatif::ProgressBar::hidden();
 
-    // TODO: Bump to CI to 17 once github actions isn't using an ancient version,
-    // we could install in the action run, but not really worth it since I can
-    // test locally
-    let manifest_version = if std::env::var_os("CI").is_some() {
-        "16"
-    } else {
-        "17"
-    };
-
     let manifest =
-        xwin::manifest::get_manifest(&ctx, manifest_version, "release", hidden.clone()).unwrap();
+        xwin::manifest::get_manifest(&ctx, manifest_version(), "release", hidden.clone()).unwrap();
     let pkg_manifest =
         xwin::manifest::get_package_manifest(&ctx, &manifest, hidden.clone()).unwrap();
 

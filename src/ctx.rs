@@ -466,10 +466,8 @@ impl Ctx {
                 emit("sdk headers", results.sdk_headers);
                 emit("sdk libs", results.sdk_libs);
             }
-            crate::Ops::Splat(_config) => {
-                if map.is_none() {
-                    splat_links()?;
-                }
+            crate::Ops::Splat(_config) if map.is_none() => {
+                splat_links()?;
             }
             _ => {}
         }
