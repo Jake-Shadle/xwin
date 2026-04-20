@@ -357,7 +357,7 @@ pub(crate) fn unpack(
                 }
 
                 // They are usually always sorted correctly, but you never know
-                cab_contents.sort_by(|a, b| a.sequence.cmp(&b.sequence));
+                cab_contents.sort_by_key(|a| a.sequence);
                 cab_contents
             };
 
@@ -436,7 +436,7 @@ pub(crate) fn unpack(
                     .collect::<Result<Vec<_>, Error>>()
                     .with_context(|| format!("unable to read 'File' metadata for {pkg}"))?;
 
-                files.sort_by(|a, b| a.sequence.cmp(&b.sequence));
+                files.sort_by_key(|a| a.sequence);
 
                 (files, uncompressed)
             };

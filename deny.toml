@@ -21,7 +21,7 @@ exceptions = [
 multiple-versions = "deny"
 deny = []
 skip = [
-  { crate = "getrandom@0.2.17", reason = "ring use this old version, lol" },
+  { crate = "getrandom@0.2.17", reason = "ring use this old version" },
 ]
 skip-tree = []
 

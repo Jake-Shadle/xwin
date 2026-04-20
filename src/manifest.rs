@@ -131,9 +131,9 @@ pub fn get_manifest(
     // MS gonna MS
     if version >= 18 {
         if channel == "release" {
-            channel = "stable"
+            channel = "stable";
         } else if channel == "pre" {
-            channel = "insiders"
+            channel = "insiders";
         }
     }
 
