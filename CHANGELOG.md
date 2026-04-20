@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#175](https://github.com/Jake-Shadle/xwin/pull/175) resolved [#174](https://github.com/Jake-Shadle/xwin/issues/174) by adjusting channel names when using version 18+ due to MS changing them for whatever reason.
+
 ## [0.8.0] - 2026-02-06
 ### Removed
 - [PR#170](https://github.com/Jake-Shadle/xwin/pull/170) removed the `native-tls` and `rustls-tls` feature flags, `rustls` is now used as the TLS implementation unconditionally.
