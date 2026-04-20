@@ -731,6 +731,26 @@ fn get_sdk(
                 variant: None,
                 target_arch: Some(arch),
             });
+
+            let header_payload = sdk.payloads.iter().find(|payload| {
+                payload
+                    .file_name
+                    .strip_prefix("Installers\\Windows SDK OnecoreUap Headers ")
+                    .and_then(|fname| fname.strip_suffix("-x86_en-us.msi"))
+                    .is_some_and(|fname| fname == arch.as_ms_str())
+            });
+            if let Some(header_payload) = header_payload {
+                pruned.push(Payload {
+                    filename: format!("{}_{}_uap_headers.msi", sdk.id, arch.as_ms_str()).into(),
+                    sha256: header_payload.sha256.clone(),
+                    url: header_payload.url.clone(),
+                    size: header_payload.size,
+                    install_size: None,
+                    kind: PayloadKind::SdkHeaders,
+                    variant: None,
+                    target_arch: Some(arch),
+                });
+            }
         }
     }
 
