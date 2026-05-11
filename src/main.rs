@@ -221,6 +221,9 @@ pub struct Args {
     /// instead of defaulting to the latest MSVCRT available in the the manifest
     #[arg(long)]
     crt_version: Option<String>,
+    /// If specified, include this .NET Framework SDK version
+    #[arg(long, value_name = "NETFXSDK_VERSION")]
+    netfxsdk_version: Option<String>,
     /// Whether to include the Active Template Library (ATL) in the installation
     #[arg(long)]
     include_atl: bool,
@@ -326,14 +329,17 @@ fn main() -> Result<(), Error> {
         .into_iter()
         .fold(0, |acc, var| acc | var as u32);
 
-    let pruned = xwin::prune_pkg_list(
+    let pruned = xwin::prune_pkg_list_with_config(
         &pkg_manifest,
-        arches,
-        variants,
-        args.include_atl,
-        args.include_debug_runtime,
-        args.sdk_version,
-        args.crt_version,
+        xwin::PruneConfig {
+            arches,
+            variants,
+            include_atl: args.include_atl,
+            include_debug_runtime: args.include_debug_runtime,
+            sdk_version: args.sdk_version,
+            crt_version: args.crt_version,
+            netfxsdk_version: args.netfxsdk_version,
+        },
     )?;
 
     let op = match args.cmd {
@@ -402,6 +408,11 @@ fn main() -> Result<(), Error> {
                         pay.variant.map_or("none", |v| v.as_str())
                     )
                 }
+                PayloadKind::NetFxSdk => pay
+                    .filename
+                    .file_stem()
+                    .and_then(|stem| stem.strip_prefix("netfxsdk_"))
+                    .map_or_else(|| "NETFXSDK".to_owned(), |version| format!("NETFXSDK.{version}")),
                 PayloadKind::AtlLibs => {
                     format!(
                         "ATL.libs.{}",
@@ -455,11 +466,12 @@ fn main() -> Result<(), Error> {
     mp.set_move_cursor(true);
 
     let res = std::thread::spawn(move || {
-        ctx.execute(
+        ctx.execute_with_netfxsdk(
             pkgs,
             work_items,
             pruned.crt_version,
             pruned.sdk_version,
+            pruned.netfxsdk_version,
             pruned.vcr_version,
             arches,
             variants,

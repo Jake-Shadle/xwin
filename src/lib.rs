@@ -180,6 +180,7 @@ pub enum PayloadKind {
     AtlLibs,
     CrtHeaders,
     CrtLibs,
+    NetFxSdk,
     SdkHeaders,
     SdkLibs,
     SdkStoreLibs,
@@ -190,8 +191,20 @@ pub enum PayloadKind {
 pub struct PrunedPackageList {
     pub crt_version: String,
     pub sdk_version: String,
+    pub netfxsdk_version: Option<String>,
     pub vcr_version: Option<String>,
     pub payloads: Vec<Payload>,
+}
+
+#[derive(Clone, Debug)]
+pub struct PruneConfig {
+    pub arches: u32,
+    pub variants: u32,
+    pub include_atl: bool,
+    pub include_debug_runtime: bool,
+    pub sdk_version: Option<String>,
+    pub crt_version: Option<String>,
+    pub netfxsdk_version: Option<String>,
 }
 
 /// Returns the list of packages that are actually needed for cross compilation
@@ -204,6 +217,35 @@ pub fn prune_pkg_list(
     sdk_version: Option<String>,
     crt_version: Option<String>,
 ) -> Result<PrunedPackageList, Error> {
+    prune_pkg_list_with_config(
+        pkg_manifest,
+        PruneConfig {
+            arches,
+            variants,
+            include_atl,
+            include_debug_runtime,
+            sdk_version,
+            crt_version,
+            netfxsdk_version: None,
+        },
+    )
+}
+
+/// Returns the selected package list using the supplied pruning configuration.
+pub fn prune_pkg_list_with_config(
+    pkg_manifest: &manifest::PackageManifest,
+    config: PruneConfig,
+) -> Result<PrunedPackageList, Error> {
+    let PruneConfig {
+        arches,
+        variants,
+        include_atl,
+        include_debug_runtime,
+        sdk_version,
+        crt_version,
+        netfxsdk_version,
+    } = config;
+
     // We only really need 2 core pieces from the manifest, the CRT (headers + libs)
     // and the Windows SDK
     let pkgs = &pkg_manifest.packages;
@@ -218,6 +260,12 @@ pub fn prune_pkg_list(
         crt_version,
     )?;
     let sdk_version = get_sdk(pkgs, arches, sdk_version, &mut payloads)?;
+    let netfxsdk_version = if let Some(netfxsdk_version) = netfxsdk_version {
+        get_netfxsdk(pkgs, &netfxsdk_version, &mut payloads)?;
+        Some(netfxsdk_version)
+    } else {
+        None
+    };
 
     let vcr_version = include_debug_runtime
         .then(|| get_vcrd(pkgs, arches, &mut payloads).ok())
@@ -226,6 +274,7 @@ pub fn prune_pkg_list(
     Ok(PrunedPackageList {
         crt_version,
         sdk_version,
+        netfxsdk_version,
         vcr_version,
         payloads,
     })
@@ -565,6 +614,48 @@ fn get_atl(
     Ok(())
 }
 
+fn get_netfxsdk(
+    pkgs: &BTreeMap<String, manifest::ManifestItem>,
+    version: &str,
+    pruned: &mut Vec<Payload>,
+) -> Result<(), Error> {
+    let component_id = format!("Microsoft.Net.Component.{version}.SDK");
+    let component = pkgs
+        .get(&component_id)
+        .with_context(|| format!("unable to find .NET Framework SDK component '{component_id}'"))?;
+
+    let package_id = format!("Microsoft.Net.{version}.SDK");
+    component
+        .dependencies
+        .get(&package_id)
+        .with_context(|| format!("'{component_id}' does not depend on '{package_id}'"))?;
+
+    let sdk = pkgs
+        .get(&package_id)
+        .with_context(|| format!("unable to find .NET Framework SDK package '{package_id}'"))?;
+
+    let msi = sdk
+        .payloads
+        .iter()
+        .find(|payload| payload.file_name.ends_with(".msi"))
+        .with_context(|| format!("unable to find .NET Framework SDK MSI in '{}'", sdk.id))?;
+
+    pruned.push(Payload {
+        filename: format!("netfxsdk_{version}.msi").into(),
+        sha256: msi.sha256.clone(),
+        url: msi.url.clone(),
+        size: msi.size,
+        install_size: (sdk.payloads.len() == 1)
+            .then_some(sdk)
+            .and_then(|mi| mi.install_sizes.as_ref().and_then(|is| is.target_drive)),
+        kind: PayloadKind::NetFxSdk,
+        target_arch: None,
+        variant: None,
+    });
+
+    Ok(())
+}
+
 fn get_latest_sdk_version<'keys>(
     keys: impl Iterator<Item = &'keys String>,
 ) -> Option<(String, versions::Version)> {
@@ -856,6 +947,7 @@ use serde::{Deserialize, Serialize, de};
 #[derive(Default)]
 pub struct Map {
     pub crt: Block,
+    pub netfxsdk: Block,
     pub sdk: Block,
     pub vcrd: Block,
 }
@@ -879,22 +971,28 @@ impl<'de> Deserialize<'de> for Map {
                 A: de::MapAccess<'de>,
             {
                 let mut crt = None;
+                let mut netfxsdk = None;
                 let mut sdk = None;
                 let mut vcrd = None;
 
                 while let Some((k, v)) = map.next_entry()? {
                     match k {
                         "crt" => crt = Some(v),
+                        "netfxsdk" => netfxsdk = Some(v),
                         "sdk" => sdk = Some(v),
                         "vcrd" => vcrd = Some(v),
                         unknown => {
-                            return Err(de::Error::unknown_field(unknown, &["crt", "sdk", "vcrd"]));
+                            return Err(de::Error::unknown_field(
+                                unknown,
+                                &["crt", "netfxsdk", "sdk", "vcrd"],
+                            ));
                         }
                     }
                 }
 
                 Ok(Map {
                     crt: crt.ok_or_else(|| de::Error::missing_field("crt"))?,
+                    netfxsdk: netfxsdk.unwrap_or_default(),
                     sdk: sdk.ok_or_else(|| de::Error::missing_field("sdk"))?,
                     vcrd: vcrd.ok_or_else(|| de::Error::missing_field("vcrd"))?,
                 })
@@ -915,6 +1013,7 @@ impl Serialize for Map {
         let mut s = serializer.serialize_map(None)?;
 
         s.serialize_entry("crt", &self.crt)?;
+        s.serialize_entry("netfxsdk", &self.netfxsdk)?;
         s.serialize_entry("sdk", &self.sdk)?;
         s.serialize_entry("vcrd", &self.vcrd)?;
 
@@ -925,6 +1024,7 @@ impl Serialize for Map {
 impl Map {
     fn clear(&mut self) {
         self.crt.clear();
+        self.netfxsdk.clear();
         self.sdk.clear();
         self.vcrd.clear();
     }
@@ -1005,6 +1105,8 @@ impl Block {
 pub enum SectionKind {
     CrtHeader,
     CrtLib,
+    NetFxSdkHeader,
+    NetFxSdkLib,
     SdkHeader,
     SdkLib,
     VcrDebug,
@@ -1117,7 +1219,9 @@ fn symlink_on_windows_too(original: &str, link: &Path) -> Result<(), Error> {
 
 #[cfg(test)]
 mod test {
-    use super::get_latest_sdk_version as glsv;
+    use super::{Map, PayloadKind, get_latest_sdk_version as glsv, get_netfxsdk};
+    use crate::{manifest, util::Sha256};
+    use std::collections::BTreeMap;
 
     #[test]
     fn sdk_versions() {
@@ -1143,5 +1247,79 @@ mod test {
             just_11[0],
             glsv(just_11.iter().chain(just_10.iter())).unwrap().0
         );
+    }
+
+    #[test]
+    fn netfxsdk_selects_component_dependency() {
+        let package_id = "Microsoft.Net.4.8.1.SDK";
+        let mut dependencies = BTreeMap::new();
+        dependencies.insert(package_id.to_owned(), serde_json::Value::Null);
+
+        let component_id = "Microsoft.Net.Component.4.8.1.SDK";
+        let component = manifest::ManifestItem {
+            id: component_id.to_owned(),
+            version: "4.8.1".to_owned(),
+            kind: manifest::ItemKind::Component,
+            chip: None,
+            payloads: Vec::new(),
+            dependencies,
+            install_sizes: None,
+        };
+        let sdk = manifest::ManifestItem {
+            id: package_id.to_owned(),
+            version: "4.8.1".to_owned(),
+            kind: manifest::ItemKind::Msi,
+            chip: None,
+            payloads: vec![manifest::Payload {
+                file_name: "netfxsdk.msi".to_owned(),
+                sha256: Sha256([0x42; 32]),
+                size: 1234,
+                url: "https://example.invalid/netfxsdk.msi".to_owned(),
+            }],
+            dependencies: BTreeMap::new(),
+            install_sizes: Some(manifest::InstallSizes {
+                target_drive: Some(5678),
+            }),
+        };
+
+        let packages = BTreeMap::from([
+            (component_id.to_owned(), component),
+            (package_id.to_owned(), sdk),
+        ]);
+        let mut selected = Vec::new();
+        get_netfxsdk(&packages, "4.8.1", &mut selected).unwrap();
+
+        assert_eq!(selected.len(), 1);
+        let payload = &selected[0];
+        assert_eq!(payload.filename, crate::Path::new("netfxsdk_4.8.1.msi"));
+        assert_eq!(payload.kind, PayloadKind::NetFxSdk);
+        assert_eq!(payload.size, 1234);
+        assert_eq!(payload.install_size, Some(5678));
+    }
+
+    #[test]
+    fn map_without_netfxsdk_remains_compatible() {
+        let legacy = r#"
+[crt.headers]
+[crt.libs]
+[sdk.headers]
+[sdk.libs]
+[vcrd.headers]
+[vcrd.libs]
+"#;
+
+        let mut map: Map = toml::from_str(legacy).unwrap();
+        assert!(map.netfxsdk.headers.filter.is_empty());
+        assert!(map.netfxsdk.libs.filter.is_empty());
+
+        map.netfxsdk
+            .headers
+            .filter
+            .insert("um/metahost.h".to_owned());
+        let serialized = toml::to_string_pretty(&map).unwrap();
+        assert!(serialized.contains("[netfxsdk.headers]"));
+
+        let roundtrip: Map = toml::from_str(&serialized).unwrap();
+        assert!(roundtrip.netfxsdk.headers.filter.contains("um/metahost.h"));
     }
 }

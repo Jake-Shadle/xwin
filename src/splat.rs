@@ -67,9 +67,18 @@ impl SdkHeaders {
     }
 }
 
+fn sdk_headers_root(section: SectionKind, target: &Path) -> Option<PathBuf> {
+    match section {
+        SectionKind::SdkHeader => Some(target.to_owned()),
+        SectionKind::NetFxSdkHeader => target.parent().map(|root| root.to_owned()),
+        _ => None,
+    }
+}
+
 pub(crate) struct SplatRoots {
     pub root: PathBuf,
     pub crt: PathBuf,
+    pub netfxsdk: PathBuf,
     pub sdk: PathBuf,
     pub vcrd: PathBuf,
     src: PathBuf,
@@ -79,6 +88,7 @@ pub(crate) fn prep_splat(
     ctx: std::sync::Arc<Ctx>,
     root: &Path,
     winroot: Option<&str>,
+    netfxsdk_version: Option<&str>,
 ) -> Result<SplatRoots, Error> {
     // Ensure we create the path first, you can't canonicalize a non-existant path
     if !root.exists() {
@@ -88,18 +98,28 @@ pub(crate) fn prep_splat(
 
     let root = crate::util::canonicalize(root)?;
 
-    let (crt_root, sdk_root, vcrd_root) = if let Some(crt_version) = winroot {
+    let (crt_root, netfxsdk_root, sdk_root, vcrd_root) = if let Some(crt_version) = winroot {
         let mut crt = root.join("VC/Tools/MSVC");
         crt.push(crt_version);
 
         let mut sdk = root.join("Windows Kits");
         sdk.push("10");
 
+        let mut netfxsdk = root.join("Windows Kits/NETFXSDK");
+        if let Some(netfxsdk_version) = netfxsdk_version {
+            netfxsdk.push(netfxsdk_version);
+        }
+
         let vcrd = root.join("VCR");
 
-        (crt, sdk, vcrd)
+        (crt, netfxsdk, sdk, vcrd)
     } else {
-        (root.join("crt"), root.join("sdk"), root.join("vcrd"))
+        (
+            root.join("crt"),
+            root.join("netfxsdk"),
+            root.join("sdk"),
+            root.join("vcrd"),
+        )
     };
 
     if crt_root.exists() {
@@ -110,6 +130,18 @@ pub(crate) fn prep_splat(
     if sdk_root.exists() {
         std::fs::remove_dir_all(&sdk_root)
             .with_context(|| format!("unable to delete existing SDK directory {sdk_root}"))?;
+    }
+
+    if netfxsdk_version.is_some() {
+        if netfxsdk_root.exists() {
+            std::fs::remove_dir_all(&netfxsdk_root).with_context(|| {
+                format!("unable to delete existing .NET Framework SDK directory {netfxsdk_root}")
+            })?;
+        }
+
+        std::fs::create_dir_all(&netfxsdk_root).with_context(|| {
+            format!("unable to create .NET Framework SDK directory {netfxsdk_root}")
+        })?;
     }
 
     if vcrd_root.exists() {
@@ -127,6 +159,7 @@ pub(crate) fn prep_splat(
     Ok(SplatRoots {
         root,
         crt: crt_root,
+        netfxsdk: netfxsdk_root,
         sdk: sdk_root,
         vcrd: vcrd_root,
         src: src_root,
@@ -141,6 +174,7 @@ pub(crate) fn splat(
     tree: &crate::unpack::FileTree,
     map: Option<&crate::Map>,
     sdk_version: &str,
+    netfxsdk_version: Option<String>,
     vcrd_version: Option<String>,
     arches: u32,
     variants: u32,
@@ -166,14 +200,22 @@ pub(crate) fn splat(
         src.pop();
     }
 
-    let get_tree = |src_path: &Path| -> Result<&crate::unpack::FileTree, Error> {
+    fn get_tree_path<'path>(
+        roots: &SplatRoots,
+        item_filename: &Path,
+        src_path: &'path Path,
+    ) -> Result<&'path Path, Error> {
         let src_path = src_path
             .strip_prefix(&roots.src)
             .context("incorrect src root")?;
-        let src_path = src_path
-            .strip_prefix(&item.payload.filename)
-            .context("incorrect src subdir")?;
 
+        src_path
+            .strip_prefix(item_filename)
+            .context("incorrect src subdir")
+    }
+
+    let get_tree = |src_path: &Path| -> Result<&crate::unpack::FileTree, Error> {
+        let src_path = get_tree_path(roots, &item.payload.filename, src_path)?;
         tree.subtree(src_path)
             .with_context(|| format!("missing expected subtree '{src_path}'"))
     };
@@ -282,6 +324,63 @@ pub(crate) fn splat(
                 variant,
                 section: SectionKind::CrtLib,
             }]
+        }
+        PayloadKind::NetFxSdk => {
+            let inc_src = src.join("include/um");
+            let inc_tree = get_tree(&inc_src)?;
+
+            let mut inc_target = roots.netfxsdk.clone();
+            if config.use_winsysroot_style {
+                inc_target.push("Include");
+            } else {
+                inc_target.push("include");
+            }
+            inc_target.push("um");
+
+            let mut mappings = vec![Mapping {
+                src: inc_src,
+                target: inc_target,
+                tree: inc_tree,
+                kind,
+                variant,
+                section: SectionKind::NetFxSdkHeader,
+            }];
+
+            let lib_src = src.join("lib/um");
+            let mut lib_target = roots.netfxsdk.clone();
+            if config.use_winsysroot_style {
+                lib_target.push("Lib");
+            } else {
+                lib_target.push("lib");
+            }
+            lib_target.push("um");
+
+            for arch in Arch::iter(arches) {
+                let mut src = lib_src.clone();
+                let mut target = lib_target.clone();
+                push_arch(&mut src, &mut target, arch);
+
+                let rel_src = get_tree_path(roots, &item.payload.filename, &src)?;
+                let Some(tree) = tree.subtree(rel_src) else {
+                    tracing::warn!(
+                        ".NET Framework SDK {} does not include {} libraries; skipping",
+                        netfxsdk_version.as_deref().unwrap_or("requested"),
+                        arch.as_ms_str()
+                    );
+                    continue;
+                };
+
+                mappings.push(Mapping {
+                    src,
+                    target,
+                    tree,
+                    kind,
+                    variant,
+                    section: SectionKind::NetFxSdkLib,
+                });
+            }
+
+            mappings
         }
         PayloadKind::SdkHeaders => {
             src.push("include");
@@ -510,6 +609,22 @@ pub(crate) fn splat(
                         )
                     }
                     SectionKind::SdkLib => (roots.sdk.join("lib"), &map.sdk.libs),
+                    SectionKind::NetFxSdkHeader => (
+                        roots.netfxsdk.join(if config.use_winsysroot_style {
+                            "Include"
+                        } else {
+                            "include"
+                        }),
+                        &map.netfxsdk.headers,
+                    ),
+                    SectionKind::NetFxSdkLib => (
+                        roots.netfxsdk.join(if config.use_winsysroot_style {
+                            "Lib"
+                        } else {
+                            "lib"
+                        }),
+                        &map.netfxsdk.libs,
+                    ),
                     SectionKind::CrtHeader => (mapping.target.clone(), &map.crt.headers),
                     SectionKind::CrtLib => {
                         (
@@ -598,8 +713,8 @@ pub(crate) fn splat(
         mappings
             .into_par_iter()
             .map(|mapping| -> Result<Option<SdkHeaders>, Error> {
-                let mut sdk_headers = (mapping.kind == PayloadKind::SdkHeaders)
-                    .then(|| SdkHeaders::new(mapping.target.clone()));
+                let mut sdk_headers =
+                    sdk_headers_root(mapping.section, &mapping.target).map(SdkHeaders::new);
 
                 let mut dir_stack = vec![Dir {
                     src: mapping.src,
@@ -667,17 +782,25 @@ pub(crate) fn splat(
                                 | PayloadKind::AtlLibs
                                 | PayloadKind::VcrDebug => {}
 
-                                PayloadKind::SdkHeaders => {
+                                PayloadKind::SdkHeaders | PayloadKind::NetFxSdk
+                                    if matches!(
+                                        mapping.section,
+                                        SectionKind::SdkHeader | SectionKind::NetFxSdkHeader
+                                    ) =>
+                                {
                                     if let Some(sdk_headers) = &mut sdk_headers {
                                         let rel_target_path =
                                             sdk_headers.get_relative_path(&tar)?;
 
                                         let rel_hash = calc_lower_hash(rel_target_path.as_str());
 
-                                        if sdk_headers.inner.insert(rel_hash, tar.clone()).is_some()
+                                        if let Some(existing) =
+                                            sdk_headers.inner.insert(rel_hash, tar.clone())
                                         {
                                             anyhow::bail!(
-                                                "found duplicate relative path when hashed"
+                                                "found duplicate relative path when hashed: '{}' collides with '{}'",
+                                                rel_target_path,
+                                                sdk_headers.get_relative_path(&existing)?
                                             );
                                         }
 
@@ -703,7 +826,14 @@ pub(crate) fn splat(
                                         symlink(fname_str, &tar)?;
                                     }
                                 }
-                                PayloadKind::SdkLibs | PayloadKind::SdkStoreLibs => {
+                                PayloadKind::SdkLibs
+                                | PayloadKind::SdkStoreLibs
+                                | PayloadKind::NetFxSdk
+                                    if matches!(
+                                        mapping.section,
+                                        SectionKind::SdkLib | SectionKind::NetFxSdkLib
+                                    ) =>
+                                {
                                     // The SDK libraries are just completely inconsistent, but
                                     // all usage I have ever seen just links them with lowercase
                                     // names, so we just fix all of them to be lowercase.
@@ -742,6 +872,7 @@ pub(crate) fn splat(
                                         symlink(fname_str, &tar)?;
                                     }
                                 }
+                                _ => unreachable!(),
                             }
 
                             Ok(())
@@ -824,6 +955,19 @@ pub(crate) fn splat(
                         if !title_case.exists() {
                             symlink("include", &title_case)?;
                         }
+                    }
+                }
+                PayloadKind::NetFxSdk if config.enable_symlinks => {
+                    let mut title_case = roots.netfxsdk.clone();
+                    title_case.push("Include");
+                    if !title_case.exists() {
+                        symlink("include", &title_case)?;
+                    }
+
+                    let mut title_case = roots.netfxsdk.clone();
+                    title_case.push("Lib");
+                    if !title_case.exists() {
+                        symlink("lib", &title_case)?;
                     }
                 }
                 _ => (),
@@ -1065,8 +1209,8 @@ fn calc_lower_hash(path: &str) -> u64 {
 }
 
 #[cfg(test)]
-mod test {
-    use super::angry_crt_alias;
+mod tests {
+    use super::*;
 
     /// The CRT runtime-selection flags emit SCREAMING `/DEFAULTLIB` directives;
     /// the debug variants (`/MTd`, `/MDd`) must get the same alias as their
@@ -1079,5 +1223,160 @@ mod test {
         assert_eq!(angry_crt_alias("msvcrtd.lib"), Some("MSVCRTD.lib"));
         assert_eq!(angry_crt_alias("oldnames.lib"), Some("OLDNAMES.lib"));
         assert_eq!(angry_crt_alias("vcruntime.lib"), None);
+    }
+
+    #[test]
+    fn netfxsdk_headers_are_relative_to_include_root() {
+        let root = PathBuf::from("/x/Windows Kits/NETFXSDK/4.8.1/Include");
+        let target = root.join("um");
+
+        let headers = SdkHeaders::new(
+            sdk_headers_root(SectionKind::NetFxSdkHeader, &target).expect("netfxsdk header root"),
+        );
+
+        assert_eq!(headers.root, root);
+        assert_eq!(
+            headers
+                .get_relative_path(&target.join("mscoree.h"))
+                .expect("relative path"),
+            Path::new("mscoree.h")
+        );
+    }
+
+    #[test]
+    fn netfxsdk_map_replay_preserves_regular_layout() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let temp = PathBuf::from_path_buf(temp.path().to_owned()).expect("utf8 tempdir");
+
+        let src_root = temp.join("work/unpack");
+        let package_root = src_root.join("netfxsdk_4.8.1.msi");
+        std::fs::create_dir_all(package_root.join("include/um")).expect("create include dir");
+        std::fs::create_dir_all(package_root.join("lib/um/x64")).expect("create lib dir");
+        std::fs::write(package_root.join("include/um/mscoree.h"), b"header").expect("write header");
+        std::fs::write(package_root.join("lib/um/x64/mscoree.lib"), b"lib").expect("write lib");
+
+        let out = temp.join("out");
+        let roots = SplatRoots {
+            root: out.clone(),
+            crt: out.join("VC/Tools/MSVC/14.44.17.14"),
+            netfxsdk: out.join("Windows Kits/NETFXSDK/4.8.1"),
+            sdk: out.join("Windows Kits/10"),
+            vcrd: out.join("VCR"),
+            src: src_root,
+        };
+
+        let config = SplatConfig {
+            include_debug_libs: false,
+            include_debug_symbols: false,
+            enable_symlinks: false,
+            preserve_ms_arch_notation: true,
+            use_winsysroot_style: false,
+            output: out,
+            map: None,
+            copy: true,
+        };
+
+        let tree = crate::unpack::FileTree {
+            files: Vec::new(),
+            dirs: vec![
+                (
+                    "include".into(),
+                    crate::unpack::FileTree {
+                        files: Vec::new(),
+                        dirs: vec![(
+                            "um".into(),
+                            crate::unpack::FileTree {
+                                files: vec![("mscoree.h".into(), 6)],
+                                dirs: Vec::new(),
+                            },
+                        )],
+                    },
+                ),
+                (
+                    "lib".into(),
+                    crate::unpack::FileTree {
+                        files: Vec::new(),
+                        dirs: vec![(
+                            "um".into(),
+                            crate::unpack::FileTree {
+                                files: Vec::new(),
+                                dirs: vec![(
+                                    "x64".into(),
+                                    crate::unpack::FileTree {
+                                        files: vec![("mscoree.lib".into(), 3)],
+                                        dirs: Vec::new(),
+                                    },
+                                )],
+                            },
+                        )],
+                    },
+                ),
+            ],
+        };
+
+        let item = crate::WorkItem {
+            progress: indicatif::ProgressBar::hidden(),
+            payload: std::sync::Arc::new(crate::Payload {
+                filename: "netfxsdk_4.8.1.msi".into(),
+                sha256: crate::util::Sha256([0; 32]),
+                url: String::new(),
+                size: 0,
+                install_size: None,
+                kind: PayloadKind::NetFxSdk,
+                target_arch: None,
+                variant: None,
+            }),
+        };
+
+        let mut map = crate::Map::default();
+        map.netfxsdk
+            .headers
+            .filter
+            .insert("um/mscoree.h".to_owned());
+        map.netfxsdk
+            .libs
+            .filter
+            .insert("um/x64/mscoree.lib".to_owned());
+
+        splat(
+            &config,
+            &roots,
+            &item,
+            &tree,
+            Some(&map),
+            "10.0.26100",
+            Some("4.8.1".to_owned()),
+            None,
+            Arch::X86_64 as u32,
+            Variant::Desktop as u32,
+        )
+        .expect("splat netfxsdk");
+
+        assert!(
+            roots.netfxsdk.join("include/um/mscoree.h").is_file(),
+            "mscoree.h should use the regular lowercase include layout"
+        );
+        assert!(
+            roots.netfxsdk.join("lib/um/x64/mscoree.lib").is_file(),
+            "mscoree.lib should be splatted"
+        );
+    }
+
+    #[test]
+    fn prep_splat_without_netfxsdk_preserves_existing_tree() {
+        let ctx = std::sync::Arc::new(
+            Ctx::with_temp(crate::util::ProgressTarget::Hidden, ureq::agent(), 0)
+                .expect("test context"),
+        );
+        let output = tempfile::tempdir().expect("output tempdir");
+        let output = PathBuf::from_path_buf(output.path().to_owned()).expect("utf8 output");
+        let marker = output.join("Windows Kits/NETFXSDK/4.8.1/preserve.txt");
+        std::fs::create_dir_all(marker.parent().expect("marker parent"))
+            .expect("create existing NetFxSDK tree");
+        std::fs::write(&marker, b"preserve").expect("write marker");
+
+        prep_splat(ctx, &output, Some("14.44.17.14"), None).expect("prepare splat");
+
+        assert!(marker.is_file(), "unrequested NetFxSDK tree was removed");
     }
 }
