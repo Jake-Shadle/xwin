@@ -3,6 +3,28 @@ use anyhow::Context as _;
 use rayon::prelude::*;
 use std::collections::BTreeMap;
 
+/// While _most_ of the CRT libs *stares at Microsoft.VisualC.STLCLR.dll* are
+/// lowercase, the runtime-library selection flags (`/MT`, `/MTd`, `/MD`, `/MDd`)
+/// make the compiler emit `/DEFAULTLIB` directives in SCREAMING case, so on a
+/// case-sensitive filesystem the linker asks for e.g. `LIBCMT.lib` rather than
+/// `libcmt.lib`. We add a symlink for the few CRT libs this applies to.
+///
+/// The debug variants (`libcmtd`/`msvcrtd`, selected by `/MTd`/`/MDd` and only
+/// splatted with `--include-debug-libs`) need the exact same alias as their
+/// release twins — see <https://github.com/Jake-Shadle/xwin/issues/166>.
+///
+/// This list is probably not complete, but that's what PRs are for.
+fn angry_crt_alias(fname: &str) -> Option<&'static str> {
+    match fname.strip_suffix(".lib") {
+        Some("libcmt") => Some("LIBCMT.lib"),
+        Some("libcmtd") => Some("LIBCMTD.lib"),
+        Some("msvcrt") => Some("MSVCRT.lib"),
+        Some("msvcrtd") => Some("MSVCRTD.lib"),
+        Some("oldnames") => Some("OLDNAMES.lib"),
+        _ => None,
+    }
+}
+
 #[derive(Clone)]
 pub struct SplatConfig {
     pub include_debug_libs: bool,
@@ -674,16 +696,7 @@ pub(crate) fn splat(
                                     }
                                 }
                                 PayloadKind::CrtLibs => {
-                                    // While _most_ of the libs *stares at Microsoft.VisualC.STLCLR.dll* are lower case,
-                                    // sometimes when they are specified as linker arguments, crates will link with
-                                    // SCREAMING as if they are angry at the linker, so fix this in the few "common" cases.
-                                    // This list is probably not complete, but that's what PRs are for
-                                    if let Some(angry_lib) = match fname_str.strip_suffix(".lib") {
-                                        Some("libcmt") => Some("LIBCMT.lib"),
-                                        Some("msvcrt") => Some("MSVCRT.lib"),
-                                        Some("oldnames") => Some("OLDNAMES.lib"),
-                                        _ => None,
-                                    } {
+                                    if let Some(angry_lib) = angry_crt_alias(fname_str) {
                                         tar.pop();
                                         tar.push(angry_lib);
 
@@ -1049,4 +1062,22 @@ fn calc_lower_hash(path: &str) -> u64 {
     }
 
     hasher.finish()
+}
+
+#[cfg(test)]
+mod test {
+    use super::angry_crt_alias;
+
+    /// The CRT runtime-selection flags emit SCREAMING `/DEFAULTLIB` directives;
+    /// the debug variants (`/MTd`, `/MDd`) must get the same alias as their
+    /// release twins. Regression test for #166.
+    #[test]
+    fn crt_debug_libs_get_screaming_alias() {
+        assert_eq!(angry_crt_alias("libcmt.lib"), Some("LIBCMT.lib"));
+        assert_eq!(angry_crt_alias("libcmtd.lib"), Some("LIBCMTD.lib"));
+        assert_eq!(angry_crt_alias("msvcrt.lib"), Some("MSVCRT.lib"));
+        assert_eq!(angry_crt_alias("msvcrtd.lib"), Some("MSVCRTD.lib"));
+        assert_eq!(angry_crt_alias("oldnames.lib"), Some("OLDNAMES.lib"));
+        assert_eq!(angry_crt_alias("vcruntime.lib"), None);
+    }
 }
