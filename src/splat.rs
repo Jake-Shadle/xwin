@@ -16,11 +16,113 @@ pub struct SplatConfig {
     //pub isolated: bool,
 }
 
+/// The KMDF and UMDF headers and libraries are versioned independently of the
+/// kit itself, and every version ships side by side in the same package, so we
+/// only splat one of them
+#[derive(Clone, Default)]
+pub struct WdfVersions {
+    pub kmdf: Option<String>,
+    pub umdf: Option<String>,
+}
+
+impl WdfVersions {
+    #[inline]
+    fn get(&self, framework: &str) -> Option<&str> {
+        match framework {
+            "kmdf" => self.kmdf.as_deref(),
+            "umdf" => self.umdf.as_deref(),
+            _ => None,
+        }
+    }
+}
+
+/// The SDK and WDK libraries are just completely inconsistently cased, but all
+/// usage I have ever seen just links them with lowercase names, so we fix all of
+/// them to be lowercase.
+///
+/// Note that we need to not only fix the name but also the extension, as for some
+/// inexplicable reason about half of them use an uppercase L for the extension.
+/// WTF. This also applies to the tlb files, so at least they are consistently
+/// inconsistent.
+///
+/// We also need to support SCREAMING case for the library names due to...reasons
+/// <https://github.com/microsoft/windows-rs/blob/a27a74784ccf304ab362bf2416f5f44e98e5eecd/src/bindings.rs#L3772>
+fn add_lib_casing_symlinks(fname: &str, tar: &mut PathBuf) -> Result<(), Error> {
+    if fname.contains(|c: char| c.is_ascii_uppercase()) {
+        tar.pop();
+        tar.push(fname.to_ascii_lowercase());
+
+        symlink(fname, tar)?;
+    }
+
+    if tar.extension() == Some("lib") {
+        tar.pop();
+        tar.push(fname.to_ascii_uppercase());
+        tar.set_extension("lib");
+
+        symlink(fname, tar)?;
+    }
+
+    Ok(())
+}
+
+/// Finds a subdirectory ignoring case, returning the name it actually has on disk
+///
+/// The WDK packages spell the same architecture directory `x64` in one and
+/// `ARM64` in the other, so the casing can't be assumed
+fn find_dir_ignoring_case<'ft>(
+    tree: &'ft crate::unpack::FileTree,
+    name: &str,
+) -> Option<&'ft Path> {
+    tree.dirs.iter().find_map(|(dir, _)| {
+        dir.as_str()
+            .eq_ignore_ascii_case(name)
+            .then(|| dir.as_path())
+    })
+}
+
+/// Determines which of the side by side WDF versions in `tree` to splat, either
+/// the one the user asked for, or the highest one available
+fn select_wdf_version(
+    tree: &crate::unpack::FileTree,
+    framework: &str,
+    requested: Option<&str>,
+) -> Result<PathBuf, Error> {
+    if let Some(requested) = requested {
+        if !tree.dirs.iter().any(|(dir, _)| dir == requested) {
+            let mut available: Vec<_> = tree.dirs.iter().map(|(dir, _)| dir.as_str()).collect();
+            available.sort_unstable();
+
+            anyhow::bail!(
+                "{framework} version '{requested}' is not present in the WDK, \
+                 available versions are {available:?}"
+            );
+        }
+
+        return Ok(requested.into());
+    }
+
+    tree.dirs
+        .iter()
+        // Note these need to be compared as versions, not strings, otherwise
+        // eg umdf 1.9 sorts above 1.11
+        .filter_map(|(dir, _)| Some((versions::Version::new(dir.as_str())?, dir)))
+        .max_by(|a, b| a.0.cmp(&b.0))
+        .map(|(_, dir)| dir.clone())
+        .with_context(|| format!("unable to find any {framework} version in the WDK"))
+}
+
 /// There is a massive amount of duplication between SDK headers for the Desktop
 /// and Store variants, so we keep track of them so we only splat one unique file
 pub(crate) struct SdkHeaders {
     pub(crate) inner: BTreeMap<u64, PathBuf>,
+    /// The directory the recorded headers are included relative to, or the parent
+    /// of several such directories when [`Self::grouped`] is set
     pub(crate) root: PathBuf,
+    /// Set when `root` holds several include directories that share a single
+    /// namespace, ie the SDK's `um`, `shared` and `winrt`, which are all passed
+    /// to the compiler together and are expected to be consistent with each other
+    grouped: bool,
 }
 
 impl SdkHeaders {
@@ -28,6 +130,17 @@ impl SdkHeaders {
         Self {
             inner: BTreeMap::new(),
             root,
+            grouped: true,
+        }
+    }
+
+    /// Like [`Self::new`], but for a root that _is_ the include directory, rather
+    /// than the parent of several of them
+    fn for_include_dir(root: PathBuf) -> Self {
+        Self {
+            inner: BTreeMap::new(),
+            root,
+            grouped: false,
         }
     }
 
@@ -37,11 +150,27 @@ impl SdkHeaders {
 
         // Skip the first directory, which directly follows the "include", as it
         // is the one that includes are actually relative to
-        if let Some(first) = rel.iter().next() {
+        if self.grouped
+            && let Some(first) = rel.iter().next()
+        {
             rel = rel.strip_prefix(first)?;
         }
 
         Ok(rel)
+    }
+
+    /// Registers a splatted header so that the include scanning done once
+    /// everything has been splatted can find it, keyed by the lowercased form of
+    /// the path it would be included by
+    fn record(&mut self, target: &Path) -> Result<(), Error> {
+        let rel_hash = calc_lower_hash(self.get_relative_path(target)?.as_str());
+
+        anyhow::ensure!(
+            self.inner.insert(rel_hash, target.to_owned()).is_none(),
+            "found duplicate relative path when hashed"
+        );
+
+        Ok(())
     }
 }
 
@@ -50,6 +179,7 @@ pub(crate) struct SplatRoots {
     pub crt: PathBuf,
     pub sdk: PathBuf,
     pub vcrd: PathBuf,
+    pub wdk: PathBuf,
     src: PathBuf,
 }
 
@@ -66,7 +196,7 @@ pub(crate) fn prep_splat(
 
     let root = crate::util::canonicalize(root)?;
 
-    let (crt_root, sdk_root, vcrd_root) = if let Some(crt_version) = winroot {
+    let (crt_root, sdk_root, vcrd_root, wdk_root) = if let Some(crt_version) = winroot {
         let mut crt = root.join("VC/Tools/MSVC");
         crt.push(crt_version);
 
@@ -74,10 +204,16 @@ pub(crate) fn prep_splat(
         sdk.push("10");
 
         let vcrd = root.join("VCR");
+        let wdk = root.join("WDK");
 
-        (crt, sdk, vcrd)
+        (crt, sdk, vcrd, wdk)
     } else {
-        (root.join("crt"), root.join("sdk"), root.join("vcrd"))
+        (
+            root.join("crt"),
+            root.join("sdk"),
+            root.join("vcrd"),
+            root.join("wdk"),
+        )
     };
 
     if crt_root.exists() {
@@ -95,10 +231,18 @@ pub(crate) fn prep_splat(
             .with_context(|| format!("unable to delete existing VCR directory {vcrd_root}"))?;
     }
 
+    if wdk_root.exists() {
+        std::fs::remove_dir_all(&wdk_root)
+            .with_context(|| format!("unable to delete existing WDK directory {wdk_root}"))?;
+    }
+
     std::fs::create_dir_all(&crt_root)
         .with_context(|| format!("unable to create CRT directory {crt_root}"))?;
     std::fs::create_dir_all(&sdk_root)
         .with_context(|| format!("unable to create SDK directory {sdk_root}"))?;
+    // Note the WDK root is intentionally not created here, it is created on
+    // demand while splatting so that we don't leave an empty directory behind
+    // for the common case of not acquiring the WDK at all
 
     let src_root = ctx.work_dir.join("unpack");
 
@@ -107,6 +251,7 @@ pub(crate) fn prep_splat(
         crt: crt_root,
         sdk: sdk_root,
         vcrd: vcrd_root,
+        wdk: wdk_root,
         src: src_root,
     })
 }
@@ -120,9 +265,10 @@ pub(crate) fn splat(
     map: Option<&crate::Map>,
     sdk_version: &str,
     vcrd_version: Option<String>,
+    wdf_versions: &WdfVersions,
     arches: u32,
     variants: u32,
-) -> Result<Option<SdkHeaders>, Error> {
+) -> Result<Vec<SdkHeaders>, Error> {
     struct Mapping<'ft> {
         src: PathBuf,
         target: PathBuf,
@@ -167,6 +313,29 @@ pub(crate) fn splat(
 
     let variant = item.payload.variant;
     let kind = item.payload.kind;
+
+    // Maps a lower cased library name to the casing that the kit itself uses when
+    // linking it, see the nupkg unpacking for why this is needed
+    let canonical_lib_names: BTreeMap<String, String> = if kind == PayloadKind::Wdk {
+        let path = roots
+            .src
+            .join(&item.payload.filename)
+            .join(crate::unpack::CANONICAL_LIB_NAMES);
+
+        match std::fs::read_to_string(&path) {
+            Ok(contents) => contents
+                .lines()
+                .filter(|line| !line.is_empty())
+                .map(|name| (name.to_ascii_lowercase(), name.to_owned()))
+                .collect(),
+            Err(err) => {
+                tracing::debug!("unable to read {path}: {err}");
+                BTreeMap::new()
+            }
+        }
+    } else {
+        BTreeMap::new()
+    };
 
     let mappings = match kind {
         PayloadKind::CrtHeaders | PayloadKind::AtlHeaders => {
@@ -453,6 +622,132 @@ pub(crate) fn splat(
                 vec![]
             }
         }
+        PayloadKind::Wdk => {
+            let target_arch = item
+                .payload
+                .target_arch
+                .context("WDK didn't specify an architecture")?;
+
+            let inc_root = src.join("include");
+            let lib_root = src.join("lib");
+
+            let mut mappings = Vec::new();
+
+            // The headers are architecture independent, but each per-architecture
+            // package ships a complete copy of them, so we only splat them from
+            // one of the payloads, otherwise they would all race to write the
+            // exact same files
+            if Arch::iter(arches).next() == Some(target_arch) {
+                // `km` is the entire point of the WDK, but `shared` and `um` are
+                // just driver specific additions to their SDK counterparts, so
+                // don't hard fail if a future package drops them
+                for (dir, required) in [("km", true), ("shared", false), ("um", false)] {
+                    let src = inc_root.join(dir);
+
+                    let tree = match get_tree(&src) {
+                        Ok(tree) => tree,
+                        Err(err) => {
+                            if required {
+                                return Err(err);
+                            }
+
+                            tracing::debug!("WDK has no '{dir}' headers");
+                            continue;
+                        }
+                    };
+
+                    mappings.push(Mapping {
+                        target: roots.wdk.join("include").join(dir),
+                        src,
+                        tree,
+                        kind,
+                        variant,
+                        section: SectionKind::WdkHeader,
+                    });
+                }
+
+                for framework in ["kmdf", "umdf"] {
+                    let versions = inc_root.join("wdf").join(framework);
+                    let requested = wdf_versions.get(framework);
+                    let version = select_wdf_version(get_tree(&versions)?, framework, requested)?;
+
+                    let src = versions.join(&version);
+                    let tree = get_tree(&src)?;
+
+                    mappings.push(Mapping {
+                        target: roots.wdk.join("include/wdf").join(framework).join(version),
+                        src,
+                        tree,
+                        kind,
+                        variant,
+                        section: SectionKind::WdkHeader,
+                    });
+                }
+            }
+
+            // The architecture directory is spelled `x64` in the x64 package but
+            // `ARM64` in the arm64 one, so it has to be looked up rather than
+            // assumed. The target always uses xwin's own notation
+            let push_wdk_arch = |src: &mut PathBuf, target: &mut PathBuf| -> Result<(), Error> {
+                let arch_dir = find_dir_ignoring_case(get_tree(src)?, target_arch.as_ms_str())
+                    .with_context(|| {
+                        format!("the WDK has no '{target_arch}' directory in '{src}'")
+                    })?;
+
+                src.push(arch_dir);
+                target.push(if config.preserve_ms_arch_notation {
+                    target_arch.as_ms_str()
+                } else {
+                    target_arch.as_str()
+                });
+
+                Ok(())
+            };
+
+            for dir in ["km", "um"] {
+                let mut src = lib_root.join(dir);
+                let mut target = roots.wdk.join("lib").join(dir);
+
+                push_wdk_arch(&mut src, &mut target)?;
+
+                let tree = get_tree(&src)?;
+
+                mappings.push(Mapping {
+                    src,
+                    target,
+                    tree,
+                    kind,
+                    variant,
+                    section: SectionKind::WdkLib,
+                });
+            }
+
+            // Note the wdf libraries are laid out as <framework>/<arch>/<version>,
+            // rather than the <framework>/<version> of the headers
+            for framework in ["kmdf", "umdf"] {
+                let mut versions = lib_root.join("wdf").join(framework);
+                let mut target = roots.wdk.join("lib/wdf").join(framework);
+
+                push_wdk_arch(&mut versions, &mut target)?;
+
+                let requested = wdf_versions.get(framework);
+                let version = select_wdf_version(get_tree(&versions)?, framework, requested)?;
+
+                let src = versions.join(&version);
+                let tree = get_tree(&src)?;
+
+                mappings.push(Mapping {
+                    target: target.join(version),
+                    src,
+                    tree,
+                    kind,
+                    variant,
+                    section: SectionKind::WdkLib,
+                });
+            }
+
+            mappings
+        }
     };
 
     let mut results = Vec::new();
@@ -498,6 +793,8 @@ pub(crate) fn splat(
                         )
                     }
                     SectionKind::VcrDebug => (roots.vcrd.clone(), &map.vcrd.libs),
+                    SectionKind::WdkHeader => (roots.wdk.join("include"), &map.wdk.headers),
+                    SectionKind::WdkLib => (roots.wdk.join("lib"), &map.wdk.libs),
                 };
 
                 let mut dir_stack = vec![Dir {
@@ -576,8 +873,22 @@ pub(crate) fn splat(
         mappings
             .into_par_iter()
             .map(|mapping| -> Result<Option<SdkHeaders>, Error> {
-                let mut sdk_headers = (mapping.kind == PayloadKind::SdkHeaders)
-                    .then(|| SdkHeaders::new(mapping.target.clone()));
+                // Note the root is the directory the includes are relative _to_,
+                // ie the parent of the `um`/`shared`/`km`/<wdf version> directory
+                // that ends up on the include path
+                let mut sdk_headers = match mapping.section {
+                    SectionKind::SdkHeader if mapping.kind == PayloadKind::SdkHeaders => {
+                        Some(SdkHeaders::new(mapping.target.clone()))
+                    }
+                    // Unlike the SDK, every WDK header mapping is exactly one
+                    // include directory, and they are _not_ interchangeable, eg
+                    // `km/ucm/1.0/UcmManager.h` and `um/ucm/1.0/UcmManager.h` are
+                    // different files that are never on the same include path
+                    SectionKind::WdkHeader => {
+                        Some(SdkHeaders::for_include_dir(mapping.target.clone()))
+                    }
+                    _ => None,
+                };
 
                 let mut dir_stack = vec![Dir {
                     src: mapping.src,
@@ -645,19 +956,35 @@ pub(crate) fn splat(
                                 | PayloadKind::AtlLibs
                                 | PayloadKind::VcrDebug => {}
 
+                                // The WDK headers have exactly the same casing
+                                // problems as the SDK ones, and are fixed up the
+                                // same way, just in their own namespace as the
+                                // two kits ship headers with the same names
+                                PayloadKind::Wdk => {
+                                    if let Some(wdk_headers) = &mut sdk_headers {
+                                        wdk_headers.record(&tar)?;
+                                    } else {
+                                        add_lib_casing_symlinks(fname_str, &mut tar)?;
+
+                                        // Every WDK library is lower cased on disk,
+                                        // but is linked by a name that neither
+                                        // lower nor upper casing can produce, eg
+                                        // `WdfLdr.lib`
+                                        if let Some(canonical) =
+                                            canonical_lib_names.get(&fname_str.to_ascii_lowercase())
+                                            && canonical != fname_str
+                                        {
+                                            tar.pop();
+                                            tar.push(canonical);
+
+                                            symlink(fname_str, &tar)?;
+                                        }
+                                    }
+                                }
+
                                 PayloadKind::SdkHeaders => {
                                     if let Some(sdk_headers) = &mut sdk_headers {
-                                        let rel_target_path =
-                                            sdk_headers.get_relative_path(&tar)?;
-
-                                        let rel_hash = calc_lower_hash(rel_target_path.as_str());
-
-                                        if sdk_headers.inner.insert(rel_hash, tar.clone()).is_some()
-                                        {
-                                            anyhow::bail!(
-                                                "found duplicate relative path when hashed"
-                                            );
-                                        }
+                                        sdk_headers.record(&tar)?;
 
                                         if let Some(additional_name) = match fname_str {
                                             // https://github.com/zeromq/libzmq/blob/3070a4b2461ec64129062907d915ed665d2ac126/src/precompiled.hpp#L73
@@ -691,20 +1018,7 @@ pub(crate) fn splat(
                                     }
                                 }
                                 PayloadKind::SdkLibs | PayloadKind::SdkStoreLibs => {
-                                    // The SDK libraries are just completely inconsistent, but
-                                    // all usage I have ever seen just links them with lowercase
-                                    // names, so we just fix all of them to be lowercase.
-                                    // Note that we need to not only fix the name but also the
-                                    // extension, as for some inexplicable reason about half of
-                                    // them use an uppercase L for the extension. WTF. This also
-                                    // applies to the tlb files, so at least they are consistently
-                                    // inconsistent
-                                    if fname_str.contains(|c: char| c.is_ascii_uppercase()) {
-                                        tar.pop();
-                                        tar.push(fname_str.to_ascii_lowercase());
-
-                                        symlink(fname_str, &tar)?;
-                                    }
+                                    add_lib_casing_symlinks(fname_str, &mut tar)?;
 
                                     // There is also this: https://github.com/time-rs/time/blob/v0.3.2/src/utc_offset.rs#L454
                                     // And this: https://github.com/webrtc-rs/util/blob/main/src/ifaces/ffi/windows/mod.rs#L33
@@ -715,16 +1029,6 @@ pub(crate) fn splat(
                                     } {
                                         tar.pop();
                                         tar.push(additional_name);
-
-                                        symlink(fname_str, &tar)?;
-                                    }
-
-                                    // We also need to support SCREAMING case for the library names
-                                    // due to...reasons https://github.com/microsoft/windows-rs/blob/a27a74784ccf304ab362bf2416f5f44e98e5eecd/src/bindings.rs#L3772
-                                    if tar.extension() == Some("lib") {
-                                        tar.pop();
-                                        tar.push(fname_str.to_ascii_uppercase());
-                                        tar.set_extension("lib");
 
                                         symlink(fname_str, &tar)?;
                                     }
@@ -822,7 +1126,7 @@ pub(crate) fn splat(
 
     let headers = results.into_iter().collect::<Result<Vec<_>, _>>()?;
 
-    Ok(headers.into_iter().find_map(|headers| headers))
+    Ok(headers.into_iter().flatten().collect())
 }
 
 pub(crate) fn finalize_splat(
@@ -830,14 +1134,63 @@ pub(crate) fn finalize_splat(
     sdk_version: Option<&str>,
     roots: &SplatRoots,
     sdk_headers: Vec<SdkHeaders>,
+    wdk_headers: Vec<SdkHeaders>,
     crt_headers: Option<crate::unpack::FileTree>,
     atl_headers: Option<crate::unpack::FileTree>,
 ) -> Result<(), Error> {
-    let mut files: std::collections::HashMap<
-        _,
-        Header<'_>,
+    // The CRT and ATL headers aren't splatted into their own namespace, but they
+    // do include SDK headers, so they need to be scanned as well
+    let crt_include = roots.crt.join("include");
+    let mut extra_scan = Vec::new();
+
+    for (label, headers) in [("CRT", &crt_headers), ("ATL", &atl_headers)] {
+        if let Some(tree) = headers
+            .as_ref()
+            .and_then(|hdrs| hdrs.subtree(Path::new("include")))
+        {
+            extra_scan.push((label, crt_include.clone(), tree));
+        }
+    }
+
+    fixup_include_casing(ctx, "SDK", &sdk_headers, &extra_scan)?;
+
+    // The WDK is fixed up entirely separately from the SDK, as the two kits ship
+    // headers with the same names but different contents, eg `d3dkmddi.h`, and
+    // they are never on the same include path
+    if !wdk_headers.is_empty() {
+        fixup_include_casing(ctx, "WDK", &wdk_headers, &[])?;
+    }
+
+    // There is a um/gl directory, but of course there is an include for GL/
+    // instead, so fix that as well :p
+    if let Some(_sdk_version) = sdk_version {
+        // let mut target = roots.sdk.join("Include");
+        // target.push(sdk_version);
+        // target.push("um/GL");
+        // symlink("gl", &target)?;
+    } else if roots.sdk.join("include/um/gl").exists() {
+        // Guarded as the SDK headers aren't necessarily part of the same splat,
+        // eg when only acquiring the WDK
+        symlink("gl", &roots.sdk.join("include/um/GL"))?;
+    }
+
+    Ok(())
+}
+
+/// Scans every splatted header of a kit for the includes it actually uses, and
+/// adds a symlink for each one that doesn't match the casing of the file on disk,
+/// which is the entire reason this program has to exist
+fn fixup_include_casing(
+    ctx: &Ctx,
+    kit: &str,
+    kit_headers: &[SdkHeaders],
+    extra_scan: &[(&str, PathBuf, &crate::unpack::FileTree)],
+) -> Result<(), Error> {
+    type FileMap<'root> = std::collections::HashMap<
+        u64,
+        Header<'root>,
         std::hash::BuildHasherDefault<twox_hash::XxHash64>,
-    > = Default::default();
+    >;
 
     struct Header<'root> {
         root: &'root SdkHeaders,
@@ -858,7 +1211,19 @@ pub(crate) fn finalize_splat(
         Ok(())
     }
 
-    for hdrs in &sdk_headers {
+    // Headers that share a root are all reachable from a single include path and
+    // so share one namespace, but distinct roots must be kept apart, as the same
+    // relative path can name completely different files in each of them
+    let mut namespaces: Vec<(&Path, FileMap<'_>)> = Vec::new();
+
+    for hdrs in kit_headers {
+        let files = if let Some(ind) = namespaces.iter().position(|(root, _)| *root == hdrs.root) {
+            &mut namespaces[ind].1
+        } else {
+            namespaces.push((&hdrs.root, Default::default()));
+            &mut namespaces.last_mut().unwrap().1
+        };
+
         for (k, v) in &hdrs.inner {
             if let Some(existing) = files.get(k) {
                 // We already have a file with the same path, if they're the same
@@ -867,7 +1232,7 @@ pub(crate) fn finalize_splat(
                 tracing::debug!("skipped {v}, a matching path already exists");
             } else {
                 files.insert(
-                    k,
+                    *k,
                     Header {
                         root: hdrs,
                         path: v.clone(),
@@ -883,10 +1248,12 @@ pub(crate) fn finalize_splat(
         std::hash::BuildHasherDefault<twox_hash::XxHash64>,
     > = Default::default();
 
+    let all_files = || namespaces.iter().flat_map(|(_, files)| files.values());
+
     // Many headers won't necessarily be referenced internally by an all
     // lower case filename, even when that is common from outside the sdk
     // for basically all files (eg windows.h, psapi.h etc)
-    includes.extend(files.values().filter_map(|fpath| {
+    includes.extend(all_files().filter_map(|fpath| {
         fpath
             .root
             .get_relative_path(&fpath.path)
@@ -907,22 +1274,26 @@ pub(crate) fn finalize_splat(
 
     let regex = regex::bytes::Regex::new(r#"#include\s+(?:"|<)([^">]+)(?:"|>)?"#).unwrap();
 
-    let pb =
-        indicatif::ProgressBar::with_draw_target(Some(files.len() as u64), ctx.draw_target.into())
-            .with_style(
-                indicatif::ProgressStyle::default_bar()
-                    .template(
-                        "{spinner:.green} {prefix:.bold} [{elapsed}] {wide_bar:.green} {pos}/{len}",
-                    )?
-                    .progress_chars("█▇▆▅▄▃▂▁  "),
-            );
+    let num_files = all_files().count() as u64;
+
+    let pb = indicatif::ProgressBar::with_draw_target(Some(num_files), ctx.draw_target.into())
+        .with_style(
+            indicatif::ProgressStyle::default_bar()
+                .template(
+                    "{spinner:.green} {prefix:.bold} [{elapsed}] {wide_bar:.green} {pos}/{len}",
+                )?
+                .progress_chars("█▇▆▅▄▃▂▁  "),
+        );
 
     pb.set_prefix("symlinks");
-    pb.set_message("🔍 SDK includes");
+    pb.set_message(format!("🔍 {kit} includes"));
 
     // Scan all of the files in the include directory for includes so that
-    // we can add symlinks to at least make the SDK headers internally consistent
-    for file in files.values() {
+    // we can add symlinks to at least make the kit's headers internally consistent
+    //
+    // Note the includes are collected across every namespace, as they reference
+    // each other, eg the WDK's kernel mode headers include ones from `shared`
+    for file in all_files() {
         // Of course, there are files with non-utf8 encoding :p
         let contents =
             std::fs::read(&file.path).with_context(|| format!("unable to read {}", file.path))?;
@@ -947,45 +1318,14 @@ pub(crate) fn finalize_splat(
         pb.inc(1);
     }
 
-    if let Some(crt) = crt_headers
-        .as_ref()
-        .and_then(|crt| crt.subtree(Path::new("include")))
-    {
-        pb.set_message("🔍 CRT includes");
-        let cr = roots.crt.join("include");
+    for (label, root, tree) in extra_scan {
+        pb.set_message(format!("🔍 {label} includes"));
 
-        for (path, _) in &crt.files {
+        for (path, _) in &tree.files {
             // Of course, there are files with non-utf8 encoding :p
-            let path = cr.join(path);
+            let path = root.join(path);
             let contents =
-                std::fs::read(&path).with_context(|| format!("unable to read CRT {path}"))?;
-
-            for caps in regex.captures_iter(&contents) {
-                let rel_path = std::str::from_utf8(&caps[1]).with_context(|| {
-                    format!("{path} contained an include with non-utf8 characters")
-                })?;
-
-                if !includes.contains_key(Path::new(rel_path)) {
-                    includes.insert(PathBuf::from(rel_path), false);
-                }
-            }
-
-            pb.inc(1);
-        }
-    }
-
-    if let Some(atl) = atl_headers
-        .as_ref()
-        .and_then(|atl| atl.subtree(Path::new("include")))
-    {
-        pb.set_message("🔍 ATL includes");
-        let cr = roots.crt.join("include");
-
-        for (path, _) in &atl.files {
-            // Of course, there are files with non-utf8 encoding :p
-            let path = cr.join(path);
-            let contents =
-                std::fs::read(&path).with_context(|| format!("unable to read ATL {path}"))?;
+                std::fs::read(&path).with_context(|| format!("unable to read {label} {path}"))?;
 
             for caps in regex.captures_iter(&contents) {
                 let rel_path = std::str::from_utf8(&caps[1]).with_context(|| {
@@ -1003,36 +1343,36 @@ pub(crate) fn finalize_splat(
 
     pb.finish();
 
-    for (include, is_sdk) in includes {
+    for (include, from_kit) in includes {
         let lower_hash = calc_lower_hash(include.as_str());
 
-        match files.get(&lower_hash) {
-            Some(disk_file) => match (disk_file.path.file_name(), include.file_name()) {
-                (Some(disk_name), Some(include_name)) if disk_name != include_name => {
-                    let mut link = disk_file.path.clone();
-                    link.pop();
-                    link.push(include_name);
-                    symlink(disk_name, &link)?;
-                }
-                _ => {}
-            },
-            None => {
-                if is_sdk {
-                    tracing::debug!("SDK include for '{include}' was not found in the SDK headers");
-                }
+        // An include can only ever resolve to a file in one namespace, but which
+        // one depends on the include path of whatever is being compiled, so we
+        // fix up the casing everywhere it is found
+        let mut found = false;
+
+        for (_root, files) in &namespaces {
+            let Some(disk_file) = files.get(&lower_hash) else {
+                continue;
+            };
+
+            found = true;
+
+            if let (Some(disk_name), Some(include_name)) =
+                (disk_file.path.file_name(), include.file_name())
+                && disk_name != include_name
+            {
+                let mut link = disk_file.path.clone();
+                link.pop();
+                link.push(include_name);
+
+                symlink(disk_name, &link)?;
             }
         }
-    }
 
-    // There is a um/gl directory, but of course there is an include for GL/
-    // instead, so fix that as well :p
-    if let Some(_sdk_version) = sdk_version {
-        // let mut target = roots.sdk.join("Include");
-        // target.push(sdk_version);
-        // target.push("um/GL");
-        // symlink("gl", &target)?;
-    } else {
-        symlink("gl", &roots.sdk.join("include/um/GL"))?;
+        if !found && from_kit {
+            tracing::debug!("{kit} include for '{include}' was not found in the {kit} headers");
+        }
     }
 
     Ok(())

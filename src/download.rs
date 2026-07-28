@@ -20,6 +20,9 @@ pub(crate) struct CabContents {
 
 pub(crate) enum PayloadContents {
     Vsix(bytes::Bytes),
+    /// A nuget package, which like a vsix is just a zip file, but with an
+    /// entirely different internal layout
+    Nupkg(bytes::Bytes),
     Msi {
         msi: bytes::Bytes,
         cabs: Vec<CabContents>,
@@ -36,16 +39,19 @@ pub(crate) fn download(
     let contents = ctx.get_and_validate(
         &item.payload.url,
         &item.payload.filename,
-        Some(item.payload.sha256.clone()),
+        Some(item.payload.checksum.clone()),
         item.progress.clone(),
     )?;
 
     let pc = match item.payload.filename.extension() {
         Some("msi") => {
+            // MSIs always come from a VS manifest, which is always sha-256
+            let msi_sha256 = item.payload.checksum.as_sha256();
+
             let cabs: Vec<_> = match pkgs.values().find(|mi| {
                 mi.payloads
                     .iter()
-                    .any(|mi_payload| mi_payload.sha256 == item.payload.sha256)
+                    .any(|mi_payload| Some(&mi_payload.sha256) == msi_sha256)
             }) {
                 Some(mi) => mi
                     .payloads
@@ -71,6 +77,7 @@ pub(crate) fn download(
             download_cabs(ctx, &cabs, item, contents)
         }
         Some("vsix") => Ok(Some(PayloadContents::Vsix(contents))),
+        Some("nupkg") => Ok(Some(PayloadContents::Nupkg(contents))),
         ext => anyhow::bail!("unknown extension {ext:?}"),
     };
 
@@ -144,8 +151,12 @@ fn download_cabs(
         .into_par_iter()
         .map(
             |(cab_name, chksum, url, sequence)| -> Result<CabContents, Error> {
-                let cab_contents =
-                    ctx.get_and_validate(url, &cab_name, Some(chksum), msi.progress.clone())?;
+                let cab_contents = ctx.get_and_validate(
+                    url,
+                    &cab_name,
+                    Some(chksum.into()),
+                    msi.progress.clone(),
+                )?;
                 Ok(CabContents {
                     path: cab_name,
                     content: cab_contents,

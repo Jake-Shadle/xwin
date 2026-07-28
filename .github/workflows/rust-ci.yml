@@ -62,6 +62,27 @@ jobs:
       - name: cargo test
         run: cargo test --release verify_compiles
 
+  check_driver_compiles:
+    name: Verify driver compiles
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: symlinks
+        run: |
+          set -eux
+          sudo ln -s clang-14 /usr/bin/clang-cl
+          sudo ln -s llvm-ar-14 /usr/bin/llvm-lib
+          sudo ln -s lld-link-14 /usr/bin/lld-link
+          sudo ln -s lld-14 /usr/bin/ld.lld
+          clang-cl -v
+          lld-link --version
+      - run: cargo fetch
+      - name: cargo test build
+        run: cargo build --tests --release
+      - name: cargo test
+        run: cargo test --release verify_driver_compiles
+
   check_deterministic:
     name: Verify deterministic
     runs-on: ubuntu-22.04

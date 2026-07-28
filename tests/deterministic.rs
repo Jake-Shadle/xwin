@@ -60,6 +60,7 @@ fn verify_deterministic() {
         pruned.crt_version,
         pruned.sdk_version,
         pruned.vcr_version,
+        Default::default(),
         xwin::Arch::X86_64 as u32,
         xwin::Variant::Desktop as u32,
         op,

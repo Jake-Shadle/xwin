@@ -460,6 +460,10 @@ pub(crate) fn minimize(
                     SectionKind::CrtHeader => (&crt_hdr_prefix, &mut map.crt.headers),
                     SectionKind::CrtLib => (&crt_lib_prefix, &mut map.crt.libs),
                     SectionKind::VcrDebug => (&roots.vcrd, &mut map.vcrd.libs),
+                    // Note that minimization doesn't currently classify any WDK paths,
+                    // as it drives a regular cargo build, which never compiles a driver
+                    SectionKind::WdkHeader => (&roots.wdk, &mut map.wdk.headers),
+                    SectionKind::WdkLib => (&roots.wdk, &mut map.wdk.libs),
                 };
 
                 let path = p

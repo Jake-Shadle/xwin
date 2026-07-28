@@ -1,10 +1,15 @@
 use crate::{Ctx, Error, Path, PathBuf, download::PayloadContents};
 use anyhow::Context as _;
 
+/// The name of the file, written to the root of an unpack directory, that records
+/// the canonical casing of library names that can't be derived from the files
+/// themselves. See the nupkg unpacking for details.
+pub(crate) const CANONICAL_LIB_NAMES: &str = "canonical-lib-names.txt";
+
 #[derive(serde::Serialize, serde::Deserialize)]
 pub(crate) struct UnpackMeta {
-    #[serde(serialize_with = "crate::util::serialize_sha256")]
-    pub(crate) sha256: crate::util::Sha256,
+    #[serde(serialize_with = "crate::util::serialize_checksum")]
+    pub(crate) checksum: crate::util::Checksum,
     pub(crate) compressed: u64,
     pub(crate) decompressed: u64,
     pub(crate) num_files: u32,
@@ -61,10 +66,7 @@ impl FileTree {
         let mut tree = self;
 
         for comp in path.iter() {
-            match tree.dirs.iter().find(|dir| dir.0 == comp) {
-                Some(t) => tree = &t.1,
-                None => return None,
-            }
+            tree = &tree.dirs.iter().find(|dir| dir.0 == comp)?.1;
         }
 
         Some(tree)
@@ -203,6 +205,150 @@ pub(crate) fn unpack(
                 tree.push(tree_path, decompressed);
 
                 total_compressed += file.compressed_size();
+            }
+
+            (tree, total_compressed)
+        }
+        PayloadContents::Nupkg(nupkg) => {
+            let mut tree = FileTree::new();
+
+            let mut zip = zip::ZipArchive::new(std::io::Cursor::new(nupkg))
+                .with_context(|| format!("invalid zip {pkg}"))?;
+
+            // The WDK nuget packages put the entire `Windows Kits\10` content
+            // root under `c`, so `c/Include/<sdk version>/km/wdm.h` etc. We only
+            // want the headers and libraries, the rest of the package is windows
+            // executables and msbuild plumbing that is useless when cross compiling
+            //
+            // We normalize the paths to match what the MSI unpacking produces,
+            // ie lowercase `include`/`lib` with the interstitial SDK version
+            // directory removed, so that the splat stage can treat every payload
+            // the same
+            fn normalize(name: &str) -> Option<PathBuf> {
+                let rest = name.strip_prefix("c/")?;
+                let (root, mut rest) = rest.split_once('/')?;
+
+                let root = match root {
+                    "Include" => "include",
+                    "Lib" => "lib",
+                    _ => return None,
+                };
+
+                // Drop the SDK version directory, exactly as the MSI directory
+                // table walking does. Note this only applies to the directory
+                // directly below the root, the wdf headers and libs are also
+                // versioned, but by the KMDF/UMDF version, which we need to keep
+                if let Some((first, remainder)) = rest.split_once('/')
+                    && first.starts_with(|c: char| c.is_ascii_digit())
+                {
+                    rest = remainder;
+                }
+
+                let mut normalized = PathBuf::from(root);
+
+                for comp in rest.split('/') {
+                    normalized.push(comp);
+                }
+
+                Some(normalized)
+            }
+
+            let mut to_extract = Vec::new();
+            let mut build_files = Vec::new();
+            let mut total_uncompressed = 0;
+
+            for findex in 0..zip.len() {
+                let file = zip.by_index_raw(findex)?;
+
+                if file.is_dir() {
+                    continue;
+                }
+
+                let name = file.name();
+
+                if let Some(path) = normalize(name) {
+                    to_extract.push((findex, path));
+                    total_uncompressed += file.size();
+                } else if name.starts_with("c/build/")
+                    && (name.ends_with(".props") || name.ends_with(".targets"))
+                {
+                    build_files.push(findex);
+                }
+            }
+
+            item.progress.set_length(total_uncompressed);
+
+            let mut total_compressed = 0;
+
+            for (findex, tree_path) in to_extract {
+                let mut file = zip.by_index(findex).unwrap();
+                let fs_path = output_dir.join(&tree_path);
+
+                if let Some(parent) = fs_path.parent()
+                    && !parent.exists()
+                {
+                    std::fs::create_dir_all(parent)
+                        .with_context(|| format!("unable to create unpack dir '{parent}'"))?;
+                }
+
+                let mut dest = std::fs::File::create(&fs_path).with_context(|| {
+                    format!(
+                        "unable to create {fs_path} to decompress {} from {pkg}",
+                        file.name(),
+                    )
+                })?;
+
+                let decompressed = std::io::copy(&mut file, &mut dest).with_context(|| {
+                    format!(
+                        "unable to decompress {} from {pkg} to {fs_path}",
+                        file.name(),
+                    )
+                })?;
+
+                item.progress.inc(decompressed);
+                tree.push(&tree_path, decompressed);
+
+                total_compressed += file.compressed_size();
+            }
+
+            // Every library in the package is named in lower case, but the msbuild
+            // props that drive real driver builds link them by their "canonical"
+            // casing, eg `WdfLdr.lib` and `BufferOverflowFastFailK.lib`, which no
+            // amount of guessing can recover. So we scrape those props for the
+            // names and record them next to the unpacked files, and the splat
+            // stage adds a symlink for each one.
+            //
+            // Note this is written outside of the `include`/`lib` directories so
+            // that it is never itself splatted
+            {
+                let regex = regex::bytes::Regex::new(r"[A-Za-z0-9_.\-]+\.lib").unwrap();
+                let mut names = std::collections::BTreeSet::new();
+
+                for findex in build_files {
+                    let mut file = zip.by_index(findex)?;
+                    let mut contents = Vec::new();
+                    std::io::copy(&mut file, &mut contents)?;
+
+                    for found in regex.find_iter(&contents) {
+                        let Ok(name) = std::str::from_utf8(found.as_bytes()) else {
+                            continue;
+                        };
+
+                        // Only the ones that can't be recovered by simply lower or
+                        // upper casing are interesting
+                        if name != name.to_ascii_lowercase() && name != name.to_ascii_uppercase() {
+                            names.insert(name.to_owned());
+                        }
+                    }
+                }
+
+                if !names.is_empty() {
+                    let names: Vec<_> = names.into_iter().collect();
+                    let path = output_dir.join(CANONICAL_LIB_NAMES);
+
+                    std::fs::write(&path, names.join("\n"))
+                        .with_context(|| format!("failed to write {path}"))?;
+                }
             }
 
             (tree, total_compressed)
@@ -581,7 +727,7 @@ pub(crate) fn unpack(
     ctx.finish_unpack(
         output_dir,
         UnpackMeta {
-            sha256: item.payload.sha256.clone(),
+            checksum: item.payload.checksum.clone(),
             compressed,
             decompressed,
             num_files,

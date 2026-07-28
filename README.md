@@ -47,6 +47,11 @@ You can download a prebuilt binary from the [Releases](https://github.com/Jake-S
 * `--manifest` - Specifies a top level manifest to use, rather than downloading it from Microsoft. This can be used to ensure the output is reproducible.
 * `--sdk-version` - The specific SDK version to use. If not specified the latest SDK version in the manifest is used.
 * `--crt-version` - The specific CRT version to use. If not specified the latest CRT version in the manifest is used.
+* `--include-atl` - Includes the [Active Template Library](https://learn.microsoft.com/en-us/cpp/atl/active-template-library-atl-concepts) headers and libraries.
+* `--include-debug-runtime` - Includes the (non-redistributable) debug versions of the VC runtime.
+* `--include-wdk` - Includes the [Windows Driver Kit](#windows-driver-kit), for building kernel mode drivers.
+* `--wdk-version` - The specific WDK version to use. If not specified the newest WDK matching the SDK version is used. Run `xwin list --wdk-versions` to see what is available.
+* `--kmdf-version` / `--umdf-version` - The specific KMDF/UMDF version to splat. If not specified the newest one in the WDK is used.
 * `--timeout` - Specifies a timeout for long a single HTTP get request is allowed to take. The default is 60s.
 
 ### Env vars
@@ -120,6 +125,73 @@ This moves all of the unpacked files which aren't pruned to their canonical loca
          └── x86_64
 ```
 
+### Windows Driver Kit
+
+Passing `--include-wdk` additionally acquires the [Windows Driver Kit](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk), which provides the headers and libraries needed to compile and link kernel mode drivers.
+
+Unlike the CRT and Windows SDK, the WDK is not in the Visual Studio manifest at all, the only driver related package there is a small Visual Studio integration extension containing no headers or libraries. It is instead acquired from the [`Microsoft.Windows.WDK.x64`](https://www.nuget.org/packages/Microsoft.Windows.WDK.x64) / `Microsoft.Windows.WDK.ARM64` nuget packages, which has two consequences:
+
+* Only `x86_64` and `aarch64` are available, there are no `x86` or `aarch` packages. Requesting those architectures logs a warning and produces no WDK output for them.
+* Only kits from `10.0.26100` onwards are published, older ones are only available via the WDK installer, which has no discovery API.
+
+By default the newest WDK matching the resolved SDK version is used, as the two are released in lockstep and the WDK's own package metadata declares a dependency on the exact SDK build it pairs with. `xwin list --wdk-versions` shows every published version, which one is the default, and which pair with your SDK:
+
+```txt
++----------------------------------+-----------+---------------------------------+
+| Version                          | Kit build |                                 |
++----------------------------------+-----------+---------------------------------+
+| 10.0.26090.12-preview.ge-release | 26090     | prerelease                      |
++----------------------------------+-----------+---------------------------------+
+|                  10.0.26100.4204 | 26100     | matches SDK 10.0.26100          |
++----------------------------------+-----------+---------------------------------+
+|                  10.0.26100.6584 | 26100     | default, matches SDK 10.0.26100 |
++----------------------------------+-----------+---------------------------------+
+|                  10.0.28000.2526 | 28000     |                                 |
++----------------------------------+-----------+---------------------------------+
+```
+
+Note that `list --wdk-versions` neither downloads the WDK nor requires `--include-wdk`, so it doesn't prompt for the WDK license. Prerelease versions are never chosen as the default, but can be requested explicitly with `--wdk-version`.
+
+The WDK ships under its own terms (the Microsoft pre-release license terms for the Windows Driver Kit and Windows Hardware Lab Kit), separate from the Visual Studio ones, so a second acceptance prompt is shown unless `--accept-license`/`XWIN_ACCEPT_LICENSE` is set. Those terms are only published as a file inside the package rather than at a permanent URL, so the prompt links nuget's copy of that exact file for the version that was resolved.
+
+The WDK is splatted to its own root, as its `km`, `shared` and `um` headers are _not_ interchangeable with the SDK's, eg both kits ship a different `d3dkmddi.h`, and `km/ucm/1.0/UcmManager.h` and `um/ucm/1.0/UcmManager.h` are different files. Only the newest KMDF and UMDF are splatted unless `--kmdf-version`/`--umdf-version` say otherwise. The msbuild plumbing, tools and test certificates in the package are all pruned, as they are Windows executables that are useless when cross compiling.
+
+```txt
+.xwin-cache/splat/wdk
+├── include
+│  ├── km
+│  ├── shared
+│  ├── um
+│  └── wdf
+│     ├── kmdf
+│     │  └── 1.35
+│     └── umdf
+│        └── 2.35
+└── lib
+   ├── km
+   │  └── x86_64
+   ├── um
+   │  └── x86_64
+   └── wdf
+      ├── kmdf
+      │  └── x86_64
+      │     └── 1.35
+      └── umdf
+         └── x86_64
+            └── 2.35
+```
+
+Note that the architecture macros normally set by the WDK's msbuild props are not set by the compiler, so a kernel mode compile needs them passed explicitly, eg for `x86_64`:
+
+```sh
+clang-cl --target=x86_64-pc-windows-msvc /c /kernel \
+  -D_AMD64_ -DAMD64 -D_WIN64 -D_KERNEL_MODE \
+  /imsvc .xwin-cache/splat/wdk/include/km \
+  /imsvc .xwin-cache/splat/wdk/include/shared \
+  /imsvc .xwin-cache/splat/wdk/include/wdf/kmdf/1.35 \
+  ...
+```
+
 ### `xwin minimize`
 
 This is an advanced command that performs a `splat` before performing a build on a cargo manifest using strace to capture all of the headers and libraries that are used throughout the build and dumping them to a [map](#map-file). This command can also output the final splat to disk, or the map file can be used with `splat` to only splat the files and symlinks described in it.
@@ -167,8 +239,11 @@ The format is extremely simple
 │  │     └── <path> - The same path as one of the filters
 │  │        └── <names> - Array of symlinks to create in the same directory as the parent path
 │  ├── libs *
-└── sdk *
+├── sdk *
+└── wdk *
 ```
+
+Note that `minimize` never emits `wdk` entries, as it drives a regular cargo build, which never compiles a driver. A hand written map can still filter the WDK.
 
 ### Example
 

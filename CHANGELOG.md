@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Added
+- Added `--include-wdk`, which acquires the Windows Driver Kit and splats it to a `wdk` root, providing the headers and libraries needed to compile and link kernel mode drivers. The WDK isn't in the Visual Studio manifest, so it is retrieved from the `Microsoft.Windows.WDK.{x64,ARM64}` nuget packages, and is therefore only available for `x86_64`/`aarch64` and kits from `10.0.26100` onwards. By default the WDK matching the resolved SDK version is used.
+- Added `--wdk-version`, `--kmdf-version` and `--umdf-version` to pin the WDK and the side by side KMDF/UMDF versions splatted from it.
+- Added `xwin list --wdk-versions`, which lists every WDK version published to nuget, marking the one that would be acquired and the ones matching the SDK.
+- The WDK has its own license terms, so `--include-wdk` shows a second acceptance prompt, linking the terms published for the exact version that was resolved. `--accept-license`/`XWIN_ACCEPT_LICENSE` covers both.
+
+### Changed
+- Payload checksums are now either sha-256 or sha-512, as nuget publishes the latter. This changes the format of the `.unpack` metadata file, causing a one time re-unpack of any already unpacked payloads.
+
 ## [0.9.0] - 2026-04-20
 ### Fixed
 - [PR#175](https://github.com/Jake-Shadle/xwin/pull/175) resolved [#174](https://github.com/Jake-Shadle/xwin/issues/174) by adjusting channel names when using version 18+ due to MS changing them for whatever reason.

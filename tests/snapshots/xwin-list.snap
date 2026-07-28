@@ -8,12 +8,18 @@ Note that this is not a full list as the SDK uses MSI files for many packages,
 so they would need to be downloaded and inspected to determine which CAB files
 must also be downloaded to get the content needed.
 
-Usage: list
+Usage: list [OPTIONS]
 
 Options:
+      --wdk-versions
+          Lists every WDK version published to nuget instead of the packages,
+          marking the one that would be acquired.
+          
+          Unlike the CRT and SDK, the WDK versions are not in the manifest, so
+          this queries nuget.
+
   -h, --help
           Print help (see a summary with '-h')
 
   -V, --version
           Print version
-

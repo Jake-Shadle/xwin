@@ -77,6 +77,25 @@ Options:
       --include-debug-runtime
           Whether to include VCR debug libraries
 
+      --include-wdk
+          Whether to include the Windows Driver Kit (WDK), which provides the
+          headers and libraries needed to build kernel mode drivers.
+          
+          Note the WDK is acquired from nuget rather than the VS manifest, and
+          is only published for x86_64 and aarch64.
+
+      --wdk-version <WDK_VERSION>
+          If specified, this is the version of the WDK that the user wishes to
+          use instead of defaulting to the latest WDK published to nuget
+
+      --kmdf-version <KMDF_VERSION>
+          If specified, this is the KMDF version to use instead of defaulting to
+          the latest one available in the WDK
+
+      --umdf-version <UMDF_VERSION>
+          If specified, this is the UMDF version to use instead of defaulting to
+          the latest one available in the WDK
+
   -t, --timeout <TIMEOUT>
           Specifies a timeout for how long a single download is allowed to take
           
@@ -107,7 +126,7 @@ Options:
           [possible values: desktop, onecore, spectre]
 
   -h, --help
-          Print help
+          Print help (see a summary with '-h')
 
   -V, --version
           Print version

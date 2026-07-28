@@ -12,13 +12,14 @@ mod ctx;
 mod download;
 pub mod manifest;
 mod minimize;
+pub mod nuget;
 mod splat;
 mod unpack;
 pub mod util;
 
 pub use ctx::Ctx;
 pub use minimize::MinimizeConfig;
-pub use splat::SplatConfig;
+pub use splat::{SplatConfig, WdfVersions};
 pub use ureq;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -157,8 +158,9 @@ pub struct WorkItem {
 pub struct Payload {
     /// The "suggested" filename for the payload when stored on disk
     pub filename: PathBuf,
-    /// The sha-256 checksum of the payload
-    pub sha256: util::Sha256,
+    /// The checksum of the payload, used to both validate the download and to
+    /// key the unpack cache
+    pub checksum: util::Checksum,
     /// The url from which to acquire the payload
     pub url: String,
     /// The total download size
@@ -185,6 +187,9 @@ pub enum PayloadKind {
     SdkStoreLibs,
     Ucrt,
     VcrDebug,
+    /// The Windows Driver Kit, headers and libs both, as they come in a single
+    /// package per architecture
+    Wdk,
 }
 
 pub struct PrunedPackageList {
@@ -294,7 +299,7 @@ fn get_vcrd(
                 )
                 .to_string()
                 .into(),
-                sha256: payload.sha256.clone(),
+                checksum: payload.sha256.clone().into(),
                 url: payload.url.clone(),
                 size: payload.size,
                 kind: PayloadKind::VcrDebug,
@@ -356,7 +361,7 @@ fn get_crt(
             } else {
                 payload.file_name.clone().into()
             },
-            sha256: payload.sha256.clone(),
+            checksum: payload.sha256.clone().into(),
             url: payload.url.clone(),
             size: payload.size,
             kind,
@@ -505,7 +510,7 @@ fn get_atl(
             } else {
                 payload.file_name.clone().into()
             },
-            sha256: payload.sha256.clone(),
+            checksum: payload.sha256.clone().into(),
             url: payload.url.clone(),
             size: payload.size,
             kind,
@@ -633,7 +638,7 @@ fn get_sdk(
 
         pruned.push(Payload {
             filename: format!("{}_headers.msi", sdk.id).into(),
-            sha256: header_payload.sha256.clone(),
+            checksum: header_payload.sha256.clone().into(),
             url: header_payload.url.clone(),
             size: header_payload.size,
             install_size: None,
@@ -653,7 +658,7 @@ fn get_sdk(
         if let Some(header_payload) = header_payload {
             pruned.push(Payload {
                 filename: format!("{}_uap_headers.msi", sdk.id).into(),
-                sha256: header_payload.sha256.clone(),
+                checksum: header_payload.sha256.clone().into(),
                 url: header_payload.url.clone(),
                 size: header_payload.size,
                 install_size: None,
@@ -675,7 +680,7 @@ fn get_sdk(
 
         pruned.push(Payload {
             filename: format!("{}_store_headers.msi", sdk.id).into(),
-            sha256: header_payload.sha256.clone(),
+            checksum: header_payload.sha256.clone().into(),
             url: header_payload.url.clone(),
             size: header_payload.size,
             install_size: None,
@@ -694,7 +699,7 @@ fn get_sdk(
         if let Some(header_payload) = header_payload {
             pruned.push(Payload {
                 filename: format!("{}_store_headers_onecoreuap.msi", sdk.id).into(),
-                sha256: header_payload.sha256.clone(),
+                checksum: header_payload.sha256.clone().into(),
                 url: header_payload.url.clone(),
                 size: header_payload.size,
                 install_size: None,
@@ -723,7 +728,7 @@ fn get_sdk(
 
             pruned.push(Payload {
                 filename: format!("{}_{}_headers.msi", sdk.id, arch.as_ms_str()).into(),
-                sha256: header_payload.sha256.clone(),
+                checksum: header_payload.sha256.clone().into(),
                 url: header_payload.url.clone(),
                 size: header_payload.size,
                 install_size: None,
@@ -753,7 +758,7 @@ fn get_sdk(
 
             pruned.push(Payload {
                 filename: format!("{}_libs_{}.msi", sdk.id, arch).into(),
-                sha256: lib.sha256.clone(),
+                checksum: lib.sha256.clone().into(),
                 url: lib.url.clone(),
                 size: lib.size,
                 install_size: None,
@@ -780,7 +785,7 @@ fn get_sdk(
 
         pruned.push(Payload {
             filename: format!("{}_store_libs.msi", sdk.id).into(),
-            sha256: lib_payload.sha256.clone(),
+            checksum: lib_payload.sha256.clone().into(),
             url: lib_payload.url.clone(),
             size: lib_payload.size,
             install_size: None,
@@ -806,7 +811,7 @@ fn get_sdk(
 
         pruned.push(Payload {
             filename: "ucrt.msi".into(),
-            sha256: msi.sha256.clone(),
+            checksum: msi.sha256.clone().into(),
             url: msi.url.clone(),
             size: msi.size,
             install_size: None,
@@ -824,6 +829,7 @@ pub struct Map {
     pub crt: Block,
     pub sdk: Block,
     pub vcrd: Block,
+    pub wdk: Block,
 }
 
 impl Map {
@@ -831,6 +837,7 @@ impl Map {
         self.crt.clear();
         self.sdk.clear();
         self.vcrd.clear();
+        self.wdk.clear();
     }
 }
 
@@ -854,6 +861,8 @@ pub enum SectionKind {
     SdkHeader,
     SdkLib,
     VcrDebug,
+    WdkHeader,
+    WdkLib,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Default)]

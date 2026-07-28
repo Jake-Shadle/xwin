@@ -74,7 +74,15 @@ pub enum Command {
     /// Note that this is not a full list as the SDK uses MSI files for many
     /// packages, so they would need to be downloaded and inspected to determine
     /// which CAB files must also be downloaded to get the content needed.
-    List,
+    List {
+        /// Lists every WDK version published to nuget instead of the packages,
+        /// marking the one that would be acquired.
+        ///
+        /// Unlike the CRT and SDK, the WDK versions are not in the manifest, so
+        /// this queries nuget.
+        #[arg(long)]
+        wdk_versions: bool,
+    },
     /// Downloads all the selected packages that aren't already present in
     /// the download cache
     Download,
@@ -227,6 +235,28 @@ pub struct Args {
     /// Whether to include VCR debug libraries
     #[arg(long)]
     include_debug_runtime: bool,
+    /// Whether to include the Windows Driver Kit (WDK), which provides the
+    /// headers and libraries needed to build kernel mode drivers.
+    ///
+    /// Note the WDK is acquired from nuget rather than the VS manifest, and is
+    /// only published for x86_64 and aarch64.
+    // This is help text rather than rustdoc, so the architectures are spelled the
+    // way they are passed to --arch, without the backticks doc_markdown wants
+    #[allow(clippy::doc_markdown)]
+    #[arg(long)]
+    include_wdk: bool,
+    /// If specified, this is the version of the WDK that the user wishes to use
+    /// instead of defaulting to the latest WDK published to nuget
+    #[arg(long, requires = "include_wdk")]
+    wdk_version: Option<String>,
+    /// If specified, this is the KMDF version to use instead of defaulting to the
+    /// latest one available in the WDK
+    #[arg(long, requires = "include_wdk")]
+    kmdf_version: Option<String>,
+    /// If specified, this is the UMDF version to use instead of defaulting to the
+    /// latest one available in the WDK
+    #[arg(long, requires = "include_wdk")]
+    umdf_version: Option<String>,
     /// Specifies a timeout for how long a single download is allowed to take.
     #[arg(short, long, value_parser = parse_duration, default_value = "60s")]
     timeout: Duration,
@@ -257,6 +287,22 @@ pub struct Args {
     cmd: Command,
 }
 
+fn accept_license(url: &str) -> Result<(), Error> {
+    println!("Do you accept the license at {url} (yes | no)?");
+
+    let mut accept = String::new();
+    std::io::stdin().read_line(&mut accept)?;
+
+    match accept.trim() {
+        "yes" => {
+            println!("license accepted!");
+            Ok(())
+        }
+        "no" => anyhow::bail!("license not accepted"),
+        other => anyhow::bail!("unknown response to license request {other}"),
+    }
+}
+
 fn main() -> Result<(), Error> {
     let args = Args::parse();
     setup_logger(args.json, args.level)?;
@@ -264,18 +310,7 @@ fn main() -> Result<(), Error> {
     if !args.accept_license {
         // The license link is the same for every locale, but we should probably
         // retrieve it from the manifest in the future
-        println!(
-            "Do you accept the license at https://go.microsoft.com/fwlink/?LinkId=2086102 (yes | no)?"
-        );
-
-        let mut accept = String::new();
-        std::io::stdin().read_line(&mut accept)?;
-
-        match accept.trim() {
-            "yes" => println!("license accepted!"),
-            "no" => anyhow::bail!("license not accepted"),
-            other => anyhow::bail!("unknown response to license request {other}"),
-        }
+        accept_license("https://go.microsoft.com/fwlink/?LinkId=2086102")?;
     }
 
     let cwd = PathBuf::from_path_buf(std::env::current_dir().context("unable to retrieve cwd")?)
@@ -326,7 +361,7 @@ fn main() -> Result<(), Error> {
         .into_iter()
         .fold(0, |acc, var| acc | var as u32);
 
-    let pruned = xwin::prune_pkg_list(
+    let mut pruned = xwin::prune_pkg_list(
         &pkg_manifest,
         arches,
         variants,
@@ -336,8 +371,39 @@ fn main() -> Result<(), Error> {
         args.crt_version,
     )?;
 
+    // Listing the available WDK versions doesn't acquire anything, so it needs
+    // neither --include-wdk nor the WDK license to be accepted
+    if let Command::List { wdk_versions: true } = args.cmd {
+        let (versions, selected) = xwin::nuget::list_versions(&ctx, arches, &pruned.sdk_version)?;
+
+        print_wdk_versions(&versions, selected.as_deref(), &pruned.sdk_version);
+        return Ok(());
+    }
+
+    // The WDK isn't in the VS manifest at all, it comes from nuget, so it is
+    // resolved separately and just appended to the payloads to acquire
+    if args.include_wdk {
+        let wdk = xwin::nuget::get_wdk(&ctx, arches, args.wdk_version, &pruned.sdk_version)?;
+
+        tracing::debug!("using WDK {}", wdk.version);
+
+        // The WDK ships under its own terms, which are neither the Visual Studio
+        // ones accepted above nor available until we know which version we
+        // resolved, so it gets its own prompt
+        if !args.accept_license {
+            accept_license(&wdk.license_url)?;
+        }
+
+        pruned.payloads.extend(wdk.payloads);
+    }
+
+    let wdf_versions = xwin::WdfVersions {
+        kmdf: args.kmdf_version,
+        umdf: args.umdf_version,
+    };
+
     let op = match args.cmd {
-        Command::List => {
+        Command::List { .. } => {
             print_packages(&pruned.payloads);
             return Ok(());
         }
@@ -423,6 +489,9 @@ fn main() -> Result<(), Error> {
                 }
                 PayloadKind::SdkStoreLibs => "SDK.libs.store.all".to_owned(),
                 PayloadKind::Ucrt => "SDK.ucrt.all".to_owned(),
+                PayloadKind::Wdk => {
+                    format!("WDK.{}", pay.target_arch.map_or("all", |ta| ta.as_str()))
+                }
                 PayloadKind::VcrDebug => {
                     let prefix = match pay.filename.to_string().contains("UCRT") {
                         true => "UCRT.Debug",
@@ -461,6 +530,7 @@ fn main() -> Result<(), Error> {
             pruned.crt_version,
             pruned.sdk_version,
             pruned.vcr_version,
+            wdf_versions,
             arches,
             variants,
             op,
@@ -469,6 +539,51 @@ fn main() -> Result<(), Error> {
     .join();
 
     res.unwrap()
+}
+
+fn print_wdk_versions(
+    versions: &[xwin::nuget::WdkVersion],
+    selected: Option<&str>,
+    sdk_version: &str,
+) {
+    use cli_table::{Cell, Style, Table, format::Justify};
+
+    let sdk_build = sdk_version.split('.').nth(2);
+
+    let table = versions
+        .iter()
+        .map(|version| {
+            let mut notes = Vec::new();
+
+            if Some(version.version.as_str()) == selected {
+                notes.push("default".to_owned());
+            }
+
+            if version.build.as_deref() == sdk_build {
+                notes.push(format!("matches SDK {sdk_version}"));
+            }
+
+            if version.prerelease {
+                notes.push("prerelease".to_owned());
+            }
+
+            vec![
+                version.version.clone().cell().justify(Justify::Right),
+                version.build.clone().unwrap_or_default().cell(),
+                notes.join(", ").cell(),
+            ]
+        })
+        .collect::<Vec<_>>()
+        .table()
+        .title(vec![
+            "Version".cell().bold(true),
+            "Kit build".cell().bold(true),
+            "".cell(),
+        ]);
+
+    let _ = cli_table::print_stdout(table);
+
+    println!("Pass --wdk-version <version> to use one other than the default.");
 }
 
 fn print_packages(payloads: &[xwin::Payload]) {
