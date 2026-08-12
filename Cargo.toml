@@ -40,7 +40,7 @@ msi = "0.10"
 parking_lot = "0.12"
 # brrr
 rayon = "1.5"
-# Include scanning 
+# Include scanning
 regex = "1.11"
 memchr = "2.6"
 # SHA-256 verification
@@ -71,7 +71,7 @@ twox-hash = { version = "2.1", default-features = false, features = ["xxhash64"]
 versions = "7.0"
 walkdir = "2.3"
 # Unpacking of VSIX "packages"
-zip = { version = "7.0", default-features = false, features = ["deflate-flate2"] }
+zip = { version = "8.0", default-features = false, features = ["deflate-flate2"] }
 
 # HTTP requests
 [dependencies.ureq]
