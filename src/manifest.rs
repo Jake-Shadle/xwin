@@ -72,6 +72,7 @@ impl<'de> Deserialize<'de> for Chip {
     where
         D: de::Deserializer<'de>,
     {
+        #[allow(clippy::enum_glob_use)]
         use Chip::*;
 
         let s: std::borrow::Cow<'de, str> = de::Deserialize::deserialize(deserializer)?;
@@ -146,6 +147,7 @@ impl<'de> Deserialize<'de> for ItemKind {
     where
         D: de::Deserializer<'de>,
     {
+        #[allow(clippy::enum_glob_use)]
         use ItemKind::*;
 
         let s: std::borrow::Cow<'de, str> = de::Deserialize::deserialize(deserializer)?;

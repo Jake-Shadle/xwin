@@ -128,10 +128,7 @@ impl FileTree {
         let mut tree = self;
 
         for comp in path.iter() {
-            match tree.dirs.iter().find(|dir| dir.0 == comp) {
-                Some(t) => tree = &t.1,
-                None => return None,
-            }
+            tree = &tree.dirs.iter().find(|dir| dir.0 == comp)?.1;
         }
 
         Some(tree)

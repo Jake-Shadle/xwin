@@ -111,7 +111,7 @@ fn verify_compiles() {
             }
             Style::WinSysRoot => {
                 const SEP: char = '\x1F';
-                cmd.env("CARGO_ENCODED_RUSTFLAGS", format!("-C{SEP}linker=lld-link{SEP}-Lnative={od}/VC/Tools/MSVC/{crt_version}/Lib/x64{SEP}-Lnative={od}/Windows Kits/10/Lib/{sdk_version}/um/x64{SEP}-Lnative={od}/Windows Kits/10/Lib/{sdk_version}/ucrt/x64", crt_version = &pruned.crt_version, sdk_version = &pruned.sdk_version));
+                cmd.env("CARGO_ENCODED_RUSTFLAGS", format!("-C{SEP}linker=lld-link{SEP}-Lnative={od}/VC/Tools/MSVC/{crt_version}/Lib/x64{SEP}-Lnative={od}/Windows Kits/10/Lib/{sdk_version}/um/x64{SEP}-Lnative={od}/Windows Kits/10/Lib/{sdk_version}/ucrt/x64", crt_version = pruned.crt_version, sdk_version = pruned.sdk_version));
 
                 format!("-Wno-unused-command-line-argument -fuse-ld=lld-link /winsysroot {od}")
             }
@@ -386,7 +386,7 @@ fn verify_aarch64_compiles() {
             }
             Style::WinSysRoot => {
                 const SEP: char = '\x1F';
-                cmd.env("CARGO_ENCODED_RUSTFLAGS", format!("-C{SEP}linker=lld-link{SEP}-Lnative={od}/VC/Tools/MSVC/{crt_version}/Lib/x64{SEP}-Lnative={od}/Windows Kits/10/Lib/{sdk_version}/um/x64{SEP}-Lnative={od}/Windows Kits/10/Lib/{sdk_version}/ucrt/x64", crt_version = &pruned.crt_version, sdk_version = &pruned.sdk_version));
+                cmd.env("CARGO_ENCODED_RUSTFLAGS", format!("-C{SEP}linker=lld-link{SEP}-Lnative={od}/VC/Tools/MSVC/{crt_version}/Lib/x64{SEP}-Lnative={od}/Windows Kits/10/Lib/{sdk_version}/um/x64{SEP}-Lnative={od}/Windows Kits/10/Lib/{sdk_version}/ucrt/x64", crt_version = pruned.crt_version, sdk_version = pruned.sdk_version));
 
                 format!("-Wno-unused-command-line-argument -fuse-ld=lld-link /winsysroot {od}")
             }
