@@ -115,13 +115,6 @@ impl<'de> serde::Deserialize<'de> for Sha256 {
     }
 }
 
-pub(crate) fn serialize_sha256<S>(hash: &Sha256, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    serializer.serialize_str(&hash.to_string())
-}
-
 impl Sha256 {
     pub fn digest(buffer: &[u8]) -> Self {
         use sha2::Digest;

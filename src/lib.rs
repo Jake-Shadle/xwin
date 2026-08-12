@@ -819,11 +819,75 @@ fn get_sdk(
     Ok(sdk_version.to_string())
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Default)]
+use serde::{Deserialize, Serialize, de};
+
+#[derive(Default)]
 pub struct Map {
     pub crt: Block,
     pub sdk: Block,
     pub vcrd: Block,
+}
+
+impl<'de> Deserialize<'de> for Map {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct V;
+
+        impl<'de> de::Visitor<'de> for V {
+            type Value = Map;
+
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("xwin::Map")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::MapAccess<'de>,
+            {
+                let mut crt = None;
+                let mut sdk = None;
+                let mut vcrd = None;
+
+                while let Some((k, v)) = map.next_entry()? {
+                    match k {
+                        "crt" => crt = Some(v),
+                        "sdk" => sdk = Some(v),
+                        "vcrd" => vcrd = Some(v),
+                        unknown => {
+                            return Err(de::Error::unknown_field(unknown, &["crt", "sdk", "vcrd"]));
+                        }
+                    }
+                }
+
+                Ok(Map {
+                    crt: crt.ok_or_else(|| de::Error::missing_field("crt"))?,
+                    sdk: sdk.ok_or_else(|| de::Error::missing_field("sdk"))?,
+                    vcrd: vcrd.ok_or_else(|| de::Error::missing_field("vcrd"))?,
+                })
+            }
+        }
+
+        deserializer.deserialize_map(V)
+    }
+}
+
+impl Serialize for Map {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        let mut s = serializer.serialize_map(None)?;
+
+        s.serialize_entry("crt", &self.crt)?;
+        s.serialize_entry("sdk", &self.sdk)?;
+        s.serialize_entry("vcrd", &self.vcrd)?;
+
+        s.end()
+    }
 }
 
 impl Map {
@@ -834,10 +898,68 @@ impl Map {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Default)]
+#[derive(Default)]
 pub struct Block {
     pub headers: Section,
     pub libs: Section,
+}
+
+impl<'de> Deserialize<'de> for Block {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct V;
+
+        impl<'de> de::Visitor<'de> for V {
+            type Value = Block;
+
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("xwin::Block")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::MapAccess<'de>,
+            {
+                let mut headers = None;
+                let mut libs = None;
+
+                while let Some((k, v)) = map.next_entry()? {
+                    match k {
+                        "headers" => headers = Some(v),
+                        "libs" => libs = Some(v),
+                        unknown => {
+                            return Err(de::Error::unknown_field(unknown, &["headers", "libs"]));
+                        }
+                    }
+                }
+
+                Ok(Block {
+                    headers: headers.ok_or_else(|| de::Error::missing_field("headers"))?,
+                    libs: libs.ok_or_else(|| de::Error::missing_field("libs"))?,
+                })
+            }
+        }
+
+        deserializer.deserialize_map(V)
+    }
+}
+
+impl Serialize for Block {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        let mut s = serializer.serialize_map(None)?;
+
+        s.serialize_entry("headers", &self.headers)?;
+        s.serialize_entry("libs", &self.libs)?;
+
+        s.end()
+    }
 }
 
 impl Block {
@@ -856,12 +978,70 @@ pub enum SectionKind {
     VcrDebug,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Default)]
+#[derive(Default)]
 pub struct Section {
-    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub filter: BTreeSet<String>,
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub symlinks: BTreeMap<String, Vec<String>>,
+}
+
+impl<'de> Deserialize<'de> for Section {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct V;
+
+        impl<'de> de::Visitor<'de> for V {
+            type Value = Section;
+
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("xwin::Section")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::MapAccess<'de>,
+            {
+                let mut filter = BTreeSet::default();
+                let mut symlinks = BTreeMap::default();
+
+                while let Some(k) = map.next_key()? {
+                    match k {
+                        "filter" => filter = map.next_value()?,
+                        "symlinks" => symlinks = map.next_value()?,
+                        unknown => {
+                            return Err(de::Error::unknown_field(unknown, &["filter", "symlinks"]));
+                        }
+                    }
+                }
+
+                Ok(Section { filter, symlinks })
+            }
+        }
+
+        deserializer.deserialize_map(V)
+    }
+}
+
+impl Serialize for Section {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        let mut s = serializer.serialize_map(None)?;
+
+        if !self.filter.is_empty() {
+            s.serialize_entry("filter", &self.filter)?;
+        }
+
+        if !self.symlinks.is_empty() {
+            s.serialize_entry("symlinks", &self.symlinks)?;
+        }
+
+        s.end()
+    }
 }
 
 impl Section {

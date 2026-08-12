@@ -1,26 +1,97 @@
 use anyhow::{Context as _, ensure};
-use serde::Deserialize;
+use serde::{Deserialize, de};
 use std::{cmp, collections::BTreeMap};
 
 use crate::Ctx;
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct Payload {
-    #[serde(rename = "fileName")]
     pub file_name: String,
     pub sha256: crate::util::Sha256,
     pub size: u64,
     pub url: String,
 }
 
-#[derive(Copy, Clone, Deserialize, PartialEq, Eq, Debug)]
-#[serde(rename_all = "snake_case")]
+impl<'de> Deserialize<'de> for Payload {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct V;
+
+        impl<'de> de::Visitor<'de> for V {
+            type Value = Payload;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("payload")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::MapAccess<'de>,
+            {
+                let mut file_name = None;
+                let mut sha256 = None;
+                let mut size = None;
+                let mut url = None;
+
+                while let Some(k) = map.next_key()? {
+                    match k {
+                        "fileName" => file_name = Some(map.next_value()?),
+                        "sha256" => sha256 = Some(map.next_value()?),
+                        "size" => size = Some(map.next_value()?),
+                        "url" => url = Some(map.next_value()?),
+                        _ => _ = map.next_value::<de::IgnoredAny>()?,
+                    }
+                }
+
+                Ok(Payload {
+                    file_name: file_name.ok_or_else(|| de::Error::missing_field("fileName"))?,
+                    sha256: sha256.ok_or_else(|| de::Error::missing_field("sha256"))?,
+                    size: size.ok_or_else(|| de::Error::missing_field("size"))?,
+                    url: url.ok_or_else(|| de::Error::missing_field("url"))?,
+                })
+            }
+        }
+
+        deserializer.deserialize_map(V)
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum Chip {
     X86,
     X64,
     Arm,
     Arm64,
     Neutral,
+}
+
+impl<'de> Deserialize<'de> for Chip {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        use Chip::*;
+
+        let s: std::borrow::Cow<'de, str> = de::Deserialize::deserialize(deserializer)?;
+
+        let v = match s.as_ref() {
+            "x86" => X86,
+            "x64" => X64,
+            "arm" => Arm,
+            "arm64" => Arm64,
+            "neutral" => Neutral,
+            _ => {
+                return Err(de::Error::unknown_variant(
+                    s.as_ref(),
+                    &["x86", "x64", "arm", "arm64", "neutral"],
+                ));
+            }
+        };
+
+        Ok(v)
+    }
 }
 
 impl Chip {
@@ -36,7 +107,7 @@ impl Chip {
     }
 }
 
-#[derive(Copy, Clone, Deserialize, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum ItemKind {
     /// Unused.
     Bootstrapper,
@@ -70,25 +141,151 @@ pub enum ItemKind {
     Zip,
 }
 
-#[derive(Deserialize, Debug, Clone, Copy)]
-#[serde(rename_all = "camelCase")]
+impl<'de> Deserialize<'de> for ItemKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        use ItemKind::*;
+
+        let s: std::borrow::Cow<'de, str> = de::Deserialize::deserialize(deserializer)?;
+
+        let v = match s.as_ref() {
+            "Vsix" => Vsix,
+            "Msi" => Msi,
+            "Manifest" => Manifest,
+
+            "Bootstrapper" => Bootstrapper,
+            "Channel" => Channel,
+            "ChannelProduct" => ChannelProduct,
+            "Component" => Component,
+            "Exe" => Exe,
+            "Group" => Group,
+            "Msu" => Msu,
+            "Nupkg" => Nupkg,
+            "Product" => Product,
+            "WindowsFeature" => WindowsFeature,
+            "Workload" => Workload,
+            "Zip" => Zip,
+            _ => {
+                return Err(de::Error::unknown_variant(
+                    s.as_ref(),
+                    &["Vsix", "Msi", "Manifest"],
+                ));
+            }
+        };
+
+        Ok(v)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct InstallSizes {
     pub target_drive: Option<u64>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+impl<'de> Deserialize<'de> for InstallSizes {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct V;
+
+        impl<'de> de::Visitor<'de> for V {
+            type Value = InstallSizes;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("installSizes")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::MapAccess<'de>,
+            {
+                let mut td = None;
+
+                while let Some(k) = map.next_key::<std::borrow::Cow<'_, str>>()? {
+                    if k == "targetDrive" {
+                        td = Some(map.next_value()?);
+                    } else {
+                        _ = map.next_value::<de::IgnoredAny>()?;
+                    }
+                }
+
+                Ok(InstallSizes { target_drive: td })
+            }
+        }
+
+        deserializer.deserialize_map(V)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct ManifestItem {
     pub id: String,
     pub version: String,
-    #[serde(rename = "type")]
     pub kind: ItemKind,
     pub chip: Option<Chip>,
-    #[serde(default)]
     pub payloads: Vec<Payload>,
-    #[serde(default)]
     pub dependencies: BTreeMap<String, serde_json::Value>,
     pub install_sizes: Option<InstallSizes>,
+}
+
+impl<'de> Deserialize<'de> for ManifestItem {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct V;
+
+        impl<'de> de::Visitor<'de> for V {
+            type Value = ManifestItem;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("manifest item")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::MapAccess<'de>,
+            {
+                let mut id = None;
+                let mut version = None;
+                let mut kind = None;
+                let mut chip = None;
+                let mut payloads = Vec::new();
+                let mut dependencies = BTreeMap::default();
+                let mut install_sizes = None;
+
+                while let Some(k) = map.next_key()? {
+                    match k {
+                        "id" => id = Some(map.next_value()?),
+                        "version" => version = Some(map.next_value()?),
+                        "type" => kind = Some(map.next_value()?),
+                        "chip" => chip = Some(map.next_value()?),
+                        "payloads" => payloads = map.next_value()?,
+                        "dependencies" => dependencies = map.next_value()?,
+                        "installSizes" => install_sizes = Some(map.next_value()?),
+                        _ => {
+                            _ = map.next_value::<de::IgnoredAny>()?;
+                        }
+                    }
+                }
+
+                Ok(ManifestItem {
+                    id: id.ok_or_else(|| de::Error::missing_field("id"))?,
+                    version: version.ok_or_else(|| de::Error::missing_field("version"))?,
+                    kind: kind.ok_or_else(|| de::Error::missing_field("type"))?,
+                    chip,
+                    payloads,
+                    dependencies,
+                    install_sizes,
+                })
+            }
+        }
+
+        deserializer.deserialize_map(V)
+    }
 }
 
 impl PartialEq for ManifestItem {
@@ -114,10 +311,48 @@ impl cmp::PartialOrd for ManifestItem {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug)]
 pub struct Manifest {
-    #[serde(rename = "channelItems")]
     channel_items: Vec<ManifestItem>,
+}
+
+impl<'de> Deserialize<'de> for Manifest {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct V;
+
+        impl<'de> serde::de::Visitor<'de> for V {
+            type Value = Manifest;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("list of channel items")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::MapAccess<'de>,
+            {
+                let mut channel_items = None;
+
+                while let Some(k) = map.next_key::<std::borrow::Cow<'_, str>>()? {
+                    if k == "channelItems" {
+                        channel_items = Some(map.next_value()?);
+                    } else {
+                        _ = map.next_value::<de::IgnoredAny>()?;
+                    }
+                }
+
+                Ok(Manifest {
+                    channel_items: channel_items
+                        .ok_or_else(|| de::Error::missing_field("channelItems"))?,
+                })
+            }
+        }
+
+        deserializer.deserialize_map(V)
+    }
 }
 
 /// Retrieves the top-level manifest which contains license links as well as the
@@ -178,9 +413,47 @@ pub fn get_package_manifest(
         progress,
     )?;
 
-    #[derive(Deserialize, Debug)]
+    #[derive(Debug)]
     struct PkgManifest {
         packages: Vec<ManifestItem>,
+    }
+
+    impl<'de> de::Deserialize<'de> for PkgManifest {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: de::Deserializer<'de>,
+        {
+            struct V;
+
+            impl<'de> de::Visitor<'de> for V {
+                type Value = PkgManifest;
+
+                fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    f.write_str("package manifest")
+                }
+
+                fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+                where
+                    A: de::MapAccess<'de>,
+                {
+                    let mut packages = None;
+
+                    while let Some(k) = map.next_key::<std::borrow::Cow<'_, str>>()? {
+                        if k == "packages" {
+                            packages = Some(map.next_value()?);
+                        } else {
+                            _ = map.next_value::<de::IgnoredAny>()?;
+                        }
+                    }
+
+                    Ok(PkgManifest {
+                        packages: packages.ok_or_else(|| de::Error::missing_field("packages"))?,
+                    })
+                }
+            }
+
+            deserializer.deserialize_map(V)
+        }
     }
 
     let manifest: PkgManifest =

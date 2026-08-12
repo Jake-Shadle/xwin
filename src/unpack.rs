@@ -1,13 +1,80 @@
 use crate::{Ctx, Error, Path, PathBuf, download::PayloadContents};
 use anyhow::Context as _;
 
-#[derive(serde::Serialize, serde::Deserialize)]
 pub(crate) struct UnpackMeta {
-    #[serde(serialize_with = "crate::util::serialize_sha256")]
     pub(crate) sha256: crate::util::Sha256,
     pub(crate) compressed: u64,
     pub(crate) decompressed: u64,
     pub(crate) num_files: u32,
+}
+
+impl<'de> serde::Deserialize<'de> for UnpackMeta {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct V;
+
+        impl<'de> serde::de::Visitor<'de> for V {
+            type Value = UnpackMeta;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("xwin::unpack::UnpackMeta")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                let mut sha256 = None;
+                let mut compressed = None;
+                let mut decompressed = None;
+                let mut num_files = None;
+
+                while let Some(k) = map.next_key::<std::borrow::Cow<'_, str>>()? {
+                    match k.as_ref() {
+                        "sha256" => sha256 = Some(map.next_value()?),
+                        "compressed" => compressed = Some(map.next_value()?),
+                        "decompressed" => decompressed = Some(map.next_value()?),
+                        "num_files" => num_files = Some(map.next_value()?),
+                        _ => {
+                            _ = map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+
+                Ok(UnpackMeta {
+                    sha256: sha256.ok_or_else(|| serde::de::Error::missing_field("sha256"))?,
+                    compressed: compressed
+                        .ok_or_else(|| serde::de::Error::missing_field("compressed"))?,
+                    decompressed: decompressed
+                        .ok_or_else(|| serde::de::Error::missing_field("decompressed"))?,
+                    num_files: num_files
+                        .ok_or_else(|| serde::de::Error::missing_field("num_files"))?,
+                })
+            }
+        }
+
+        deserializer.deserialize_map(V)
+    }
+}
+
+impl serde::Serialize for UnpackMeta {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        let mut s = serializer.serialize_map(None)?;
+
+        s.serialize_entry("sha256", &self.sha256.to_string())?;
+        s.serialize_entry("compressed", &self.compressed)?;
+        s.serialize_entry("decompressed", &self.decompressed)?;
+        s.serialize_entry("num_files", &self.num_files)?;
+
+        s.end()
+    }
 }
 
 #[derive(Debug)]
