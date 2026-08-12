@@ -54,8 +54,11 @@ pub(crate) fn download(
                     .map(|pay| Cab {
                         filename: pay
                             .file_name
-                            .strip_prefix("Installers\\")
-                            .unwrap_or(&pay.file_name)
+                            .strip_prefix("Installers")
+                            // v18 now includes files that have correct path separators, so we just skip the path separator
+                            // regardless of it it's forward or backwards, and hope that MS doesn't decide to start naming
+                            // stuff with Installers as a prefix instead of a directory name
+                            .map_or(pay.file_name.as_str(), |s| &s[1..])
                             .into(),
                         sha256: pay.sha256.clone(),
                         url: pay.url.clone(),

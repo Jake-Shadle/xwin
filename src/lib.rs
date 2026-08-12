@@ -588,6 +588,28 @@ fn get_latest_sdk_version<'keys>(
     Some((format!("Win{major}SDK_{full}"), full))
 }
 
+#[inline]
+fn stupid_naming(fname: &str, arch: Arch, which: &'static str) -> bool {
+    let Some(installers) = fname.strip_prefix("Installers") else {
+        return false;
+    };
+    if !matches!(&installers[..1], "\\" | "/") {
+        return false;
+    }
+
+    let Some(maybe_desktop) = installers.strip_suffix("-x86_en-us.msi") else {
+        return false;
+    };
+    let Some(desktop) = maybe_desktop[1..].strip_prefix("Windows SDK Desktop ") else {
+        return false;
+    };
+    let Some(only_arch) = desktop.strip_prefix(which) else {
+        return false;
+    };
+
+    arch.as_ms_str() == &only_arch[1..]
+}
+
 fn get_sdk(
     pkgs: &BTreeMap<String, manifest::ManifestItem>,
     arches: u32,
@@ -712,13 +734,7 @@ fn get_sdk(
             let header_payload = sdk
                 .payloads
                 .iter()
-                .find(|payload| {
-                    payload
-                        .file_name
-                        .strip_prefix("Installers\\Windows SDK Desktop Headers ")
-                        .and_then(|fname| fname.strip_suffix("-x86_en-us.msi"))
-                        .is_some_and(|fname| fname == arch.as_ms_str())
-                })
+                .find(|payload| stupid_naming(&payload.file_name, arch, "Headers"))
                 .with_context(|| format!("unable to find {arch} headers for {}", sdk.id))?;
 
             pruned.push(Payload {
@@ -742,13 +758,7 @@ fn get_sdk(
             let lib = sdk
                 .payloads
                 .iter()
-                .find(|payload| {
-                    payload
-                        .file_name
-                        .strip_prefix("Installers\\Windows SDK Desktop Libs ")
-                        .and_then(|fname| fname.strip_suffix("-x86_en-us.msi"))
-                        .is_some_and(|arch_id| arch_id == arch.as_ms_str())
-                })
+                .find(|payload| stupid_naming(&payload.file_name, arch, "Libs"))
                 .with_context(|| format!("unable to find SDK libs for '{arch}'"))?;
 
             pruned.push(Payload {
@@ -792,16 +802,17 @@ fn get_sdk(
 
     // We also need the Universal CRT, which is luckily all just in a single MSI
     {
-        let ucrt = pkgs
-            .get("Microsoft.Windows.UniversalCRT.HeadersLibsSources.Msi")
-            .context("unable to find Universal CRT")?;
-
-        let msi = ucrt
-            .payloads
-            .iter()
-            .find(|payload| {
-                payload.file_name == "Universal CRT Headers Libraries and Sources-x86_en-us.msi"
-            })
+        let msi =
+            if let Some(ucrt) = pkgs.get("Microsoft.Windows.UniversalCRT.HeadersLibsSources.Msi") {
+                ucrt.payloads.iter().find(|payload| {
+                    payload.file_name == "Universal CRT Headers Libraries and Sources-x86_en-us.msi"
+                })
+            } else {
+                sdk.payloads.iter().find(|payload| {
+                    payload.file_name
+                        == "Installers/Universal CRT Headers Libraries and Sources-x86_en-us.msi"
+                })
+            }
             .context("unable to find Universal CRT MSI")?;
 
         pruned.push(Payload {
