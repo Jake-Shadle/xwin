@@ -47,10 +47,10 @@ jobs:
       - name: symlinks
         run: |
           set -eux
-          sudo ln -s clang-14 /usr/bin/clang-cl
-          sudo ln -s llvm-ar-14 /usr/bin/llvm-lib
-          sudo ln -s lld-link-14 /usr/bin/lld-link
-          sudo ln -s lld-14 /usr/bin/ld.lld
+          sudo ln -s clang-16 /usr/bin/clang-cl
+          sudo ln -s llvm-ar-16 /usr/bin/llvm-lib
+          sudo ln -s lld-link-16 /usr/bin/lld-link
+          sudo ln -s lld-16 /usr/bin/ld.lld
           clang++ -v
           ld.lld -v
           llvm-lib -v
