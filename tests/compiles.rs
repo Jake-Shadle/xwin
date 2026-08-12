@@ -285,7 +285,7 @@ fn verify_compiles_minimized() {
 }
 
 #[test]
-fn verify_compiles_aarch64() {
+fn verify_aarch64_compiles() {
     let ctx = xwin::Ctx::with_dir(
         xwin::PathBuf::from(".xwin-cache/compiles-aarch64"),
         xwin::util::ProgressTarget::Hidden,
