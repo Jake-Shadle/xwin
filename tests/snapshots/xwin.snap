@@ -70,6 +70,9 @@ Options:
           to use instead of defaulting to the latest MSVCRT available in the the
           manifest
 
+      --netfxsdk-version <NETFXSDK_VERSION>
+          If specified, include this .NET Framework SDK version
+
       --include-atl
           Whether to include the Active Template Library (ATL) in the
           installation

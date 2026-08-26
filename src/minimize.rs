@@ -41,6 +41,7 @@ pub(crate) fn minimize(
     config: MinimizeConfig,
     roots: crate::splat::SplatRoots,
     sdk_version: &str,
+    netfxsdk_version: Option<&str>,
 ) -> anyhow::Result<MinimizeResults> {
     let mut used_paths: std::collections::BTreeMap<
         PathBuf,
@@ -95,14 +96,35 @@ pub(crate) fn minimize(
             ]);
 
             let splat_root = canonicalize(&config.splat_output)?;
+            let netfxsdk_root = netfxsdk_version
+                .map(|_| canonicalize(&roots.netfxsdk))
+                .transpose()?;
+            let netfxsdk_include_dir = if config.use_winsysroot_style {
+                "Include"
+            } else {
+                "include"
+            };
+            let netfxsdk_lib_dir = if config.use_winsysroot_style {
+                "Lib"
+            } else {
+                "lib"
+            };
 
-            let includes = format!(
+            let mut includes = format!(
                 "-Wno-unused-command-line-argument -fuse-ld=lld-link /vctoolsdir {splat_root}/crt /winsdkdir {splat_root}/sdk"
             );
+            if let Some(netfxsdk_root) = &netfxsdk_root {
+                includes.push_str(&format!(" /imsvc{netfxsdk_root}/{netfxsdk_include_dir}/um"));
+            }
 
             let mut libs = format!(
                 "-C linker=lld-link -Lnative={splat_root}/crt/lib/x86_64 -Lnative={splat_root}/sdk/lib/um/x86_64 -Lnative={splat_root}/sdk/lib/ucrt/x86_64"
             );
+            if let Some(netfxsdk_root) = &netfxsdk_root {
+                libs.push_str(&format!(
+                    " -Lnative={netfxsdk_root}/{netfxsdk_lib_dir}/um/x86_64"
+                ));
+            }
 
             let rust_flags_env = format!(
                 "CARGO_TARGET_{}_RUSTFLAGS",
@@ -240,34 +262,49 @@ pub(crate) fn minimize(
                     let sdk_root = canonicalize(&roots.sdk).unwrap();
                     let crt_root = canonicalize(&roots.crt).unwrap();
 
+                    enum PathSource {
+                        Sdk,
+                        NetFxSdk,
+                        Crt,
+                    }
+
                     while let Ok(path) = rx.recv() {
                         let path = PathBuf::from(path);
-                        let (hdrs, libs, is_sdk) = if path.starts_with(&sdk_root) {
-                            (&mut sdk_headers, &mut sdk_libs, true)
+                        let source = if path.starts_with(&sdk_root) {
+                            PathSource::Sdk
+                        } else if netfxsdk_root
+                            .as_ref()
+                            .is_some_and(|root| path.starts_with(root))
+                        {
+                            PathSource::NetFxSdk
                         } else if path.starts_with(&crt_root) {
-                            (&mut crt_headers, &mut crt_libs, false)
+                            PathSource::Crt
                         } else {
                             continue;
                         };
 
-                        let (counts, which) = match path.extension() {
+                        let (counts, which) = match (source, path.extension()) {
                             // Some headers don't have extensions, eg ciso646
-                            Some("h" | "hpp") | None => (
-                                hdrs,
-                                if is_sdk {
-                                    SectionKind::SdkHeader
-                                } else {
-                                    SectionKind::CrtHeader
-                                },
-                            ),
-                            Some("lib" | "Lib") => (
-                                libs,
-                                if is_sdk {
-                                    SectionKind::SdkLib
-                                } else {
-                                    SectionKind::CrtLib
-                                },
-                            ),
+                            (PathSource::Sdk, Some("h" | "hpp") | None) => {
+                                (&mut sdk_headers, SectionKind::SdkHeader)
+                            }
+                            (PathSource::Sdk, Some("lib" | "Lib")) => {
+                                (&mut sdk_libs, SectionKind::SdkLib)
+                            }
+                            // NetFxSDK has its own map sections, but contributes to the
+                            // aggregate SDK counts reported in MinimizeResults.
+                            (PathSource::NetFxSdk, Some("h" | "hpp") | None) => {
+                                (&mut sdk_headers, SectionKind::NetFxSdkHeader)
+                            }
+                            (PathSource::NetFxSdk, Some("lib" | "Lib")) => {
+                                (&mut sdk_libs, SectionKind::NetFxSdkLib)
+                            }
+                            (PathSource::Crt, Some("h" | "hpp") | None) => {
+                                (&mut crt_headers, SectionKind::CrtHeader)
+                            }
+                            (PathSource::Crt, Some("lib" | "Lib")) => {
+                                (&mut crt_libs, SectionKind::CrtLib)
+                            }
                             _ => continue,
                         };
 
@@ -377,13 +414,37 @@ pub(crate) fn minimize(
                 (hdrs, libs, symlinks)
             };
 
-            let (sdk, crt) = rayon::join(|| walk(&roots.sdk), || walk(&roots.crt));
+            let ((sdk, netfxsdk), crt) = rayon::join(
+                || {
+                    rayon::join(
+                        || walk(&roots.sdk),
+                        || {
+                            if netfxsdk_version.is_some() {
+                                walk(&roots.netfxsdk)
+                            } else {
+                                Default::default()
+                            }
+                        },
+                    )
+                },
+                || walk(&roots.crt),
+            );
 
             let mut symlinks = sdk.2;
+            let mut netfxsdk_symlinks = netfxsdk.2;
             let mut crt_symlinks = crt.2;
+            symlinks.append(&mut netfxsdk_symlinks);
             symlinks.append(&mut crt_symlinks);
 
-            (crt.0, crt.1, sdk.0, sdk.1, symlinks)
+            let mut sdk_headers = sdk.0;
+            sdk_headers.bytes += netfxsdk.0.bytes;
+            sdk_headers.count += netfxsdk.0.count;
+
+            let mut sdk_libs = sdk.1;
+            sdk_libs.bytes += netfxsdk.1.bytes;
+            sdk_libs.count += netfxsdk.1.count;
+
+            (crt.0, crt.1, sdk_headers, sdk_libs, symlinks)
         },
     );
 
@@ -452,11 +513,25 @@ pub(crate) fn minimize(
                 sp
             };
             let sdk_lib_prefix = roots.sdk.join("lib");
+            let netfxsdk_hdr_prefix = roots.netfxsdk.join(if config.use_winsysroot_style {
+                "Include"
+            } else {
+                "include"
+            });
+            let netfxsdk_lib_prefix = roots.netfxsdk.join(if config.use_winsysroot_style {
+                "Lib"
+            } else {
+                "lib"
+            });
 
             for (p, (which, sls)) in &used_paths {
                 let (prefix, section) = match which {
                     SectionKind::SdkHeader => (&sdk_hdr_prefix, &mut map.sdk.headers),
                     SectionKind::SdkLib => (&sdk_lib_prefix, &mut map.sdk.libs),
+                    SectionKind::NetFxSdkHeader => {
+                        (&netfxsdk_hdr_prefix, &mut map.netfxsdk.headers)
+                    }
+                    SectionKind::NetFxSdkLib => (&netfxsdk_lib_prefix, &mut map.netfxsdk.libs),
                     SectionKind::CrtHeader => (&crt_hdr_prefix, &mut map.crt.headers),
                     SectionKind::CrtLib => (&crt_lib_prefix, &mut map.crt.libs),
                     SectionKind::VcrDebug => (&roots.vcrd, &mut map.vcrd.libs),

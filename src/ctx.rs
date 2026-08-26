@@ -267,6 +267,32 @@ impl Ctx {
         variants: u32,
         ops: crate::Ops,
     ) -> Result<(), Error> {
+        self.execute_with_netfxsdk(
+            packages,
+            payloads,
+            crt_version,
+            sdk_version,
+            None,
+            vcrd_version,
+            arches,
+            variants,
+            ops,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn execute_with_netfxsdk(
+        self: std::sync::Arc<Self>,
+        packages: std::collections::BTreeMap<String, crate::manifest::ManifestItem>,
+        payloads: Vec<WorkItem>,
+        crt_version: String,
+        sdk_version: String,
+        netfxsdk_version: Option<String>,
+        vcrd_version: Option<String>,
+        arches: u32,
+        variants: u32,
+        ops: crate::Ops,
+    ) -> Result<(), Error> {
         use rayon::prelude::*;
 
         let packages = std::sync::Arc::new(packages);
@@ -281,6 +307,7 @@ impl Ctx {
                     self.clone(),
                     &config.output,
                     config.use_winsysroot_style.then_some(&crt_version),
+                    netfxsdk_version.as_deref(),
                 )?;
                 let mut config = config.clone();
                 config.output = splat_roots.root.clone();
@@ -292,6 +319,7 @@ impl Ctx {
                     self.clone(),
                     &config.splat_output,
                     config.use_winsysroot_style.then_some(&crt_version),
+                    netfxsdk_version.as_deref(),
                 )?;
 
                 let config = crate::SplatConfig {
@@ -386,6 +414,7 @@ impl Ctx {
                         map.as_ref()
                             .filter(|_m| !matches!(ops, crate::Ops::Minimize(_))),
                         &sdk_version,
+                        netfxsdk_version.clone(),
                         vcrd_version.clone(),
                         arches,
                         variants,
@@ -433,7 +462,13 @@ impl Ctx {
         match ops {
             crate::Ops::Minimize(config) => {
                 splat_links()?;
-                let results = crate::minimize::minimize(self, config, roots, &sdk_version)?;
+                let results = crate::minimize::minimize(
+                    self,
+                    config,
+                    roots,
+                    &sdk_version,
+                    netfxsdk_version.as_deref(),
+                )?;
 
                 fn emit(name: &str, num: crate::minimize::FileNumbers) {
                     fn hb(bytes: u64) -> String {

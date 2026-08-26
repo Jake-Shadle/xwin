@@ -47,6 +47,7 @@ You can download a prebuilt binary from the [Releases](https://github.com/Jake-S
 * `--manifest` - Specifies a top level manifest to use, rather than downloading it from Microsoft. This can be used to ensure the output is reproducible.
 * `--sdk-version` - The specific SDK version to use. If not specified the latest SDK version in the manifest is used.
 * `--crt-version` - The specific CRT version to use. If not specified the latest CRT version in the manifest is used.
+* `--netfxsdk-version` - The specific .NET Framework SDK version to include. If not specified, the .NET Framework SDK is not included.
 * `--timeout` - Specifies a timeout for long a single HTTP get request is allowed to take. The default is 60s.
 
 ### Env vars
