@@ -262,40 +262,49 @@ pub(crate) fn minimize(
                     let sdk_root = canonicalize(&roots.sdk).unwrap();
                     let crt_root = canonicalize(&roots.crt).unwrap();
 
+                    enum PathSource {
+                        Sdk,
+                        NetFxSdk,
+                        Crt,
+                    }
+
                     while let Ok(path) = rx.recv() {
                         let path = PathBuf::from(path);
-                        let (hdrs, libs, header_kind, lib_kind) = if path.starts_with(&sdk_root) {
-                            (
-                                &mut sdk_headers,
-                                &mut sdk_libs,
-                                SectionKind::SdkHeader,
-                                SectionKind::SdkLib,
-                            )
+                        let source = if path.starts_with(&sdk_root) {
+                            PathSource::Sdk
                         } else if netfxsdk_root
                             .as_ref()
                             .is_some_and(|root| path.starts_with(root))
                         {
-                            (
-                                &mut sdk_headers,
-                                &mut sdk_libs,
-                                SectionKind::NetFxSdkHeader,
-                                SectionKind::NetFxSdkLib,
-                            )
+                            PathSource::NetFxSdk
                         } else if path.starts_with(&crt_root) {
-                            (
-                                &mut crt_headers,
-                                &mut crt_libs,
-                                SectionKind::CrtHeader,
-                                SectionKind::CrtLib,
-                            )
+                            PathSource::Crt
                         } else {
                             continue;
                         };
 
-                        let (counts, which) = match path.extension() {
+                        let (counts, which) = match (source, path.extension()) {
                             // Some headers don't have extensions, eg ciso646
-                            Some("h" | "hpp") | None => (hdrs, header_kind),
-                            Some("lib" | "Lib") => (libs, lib_kind),
+                            (PathSource::Sdk, Some("h" | "hpp") | None) => {
+                                (&mut sdk_headers, SectionKind::SdkHeader)
+                            }
+                            (PathSource::Sdk, Some("lib" | "Lib")) => {
+                                (&mut sdk_libs, SectionKind::SdkLib)
+                            }
+                            // NetFxSDK has its own map sections, but contributes to the
+                            // aggregate SDK counts reported in MinimizeResults.
+                            (PathSource::NetFxSdk, Some("h" | "hpp") | None) => {
+                                (&mut sdk_headers, SectionKind::NetFxSdkHeader)
+                            }
+                            (PathSource::NetFxSdk, Some("lib" | "Lib")) => {
+                                (&mut sdk_libs, SectionKind::NetFxSdkLib)
+                            }
+                            (PathSource::Crt, Some("h" | "hpp") | None) => {
+                                (&mut crt_headers, SectionKind::CrtHeader)
+                            }
+                            (PathSource::Crt, Some("lib" | "Lib")) => {
+                                (&mut crt_libs, SectionKind::CrtLib)
+                            }
                             _ => continue,
                         };
 
