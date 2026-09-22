@@ -55,10 +55,16 @@ fn verify_compiles() {
             continue;
         }
 
+        // Use the xwin default of both filesystem symlinks and a generated
+        // vfsoverlay, exercising the -ivfsoverlay compiler flag and the
+        // /vfsoverlay linker flag below
+        let enable_symlinks = matches!(style, Style::Default);
+
         let op = xwin::Ops::Splat(xwin::SplatConfig {
             include_debug_libs: false,
             include_debug_symbols: false,
-            enable_symlinks: matches!(style, Style::Default),
+            enable_symlinks,
+            vfsoverlay: true,
             preserve_ms_arch_notation: matches!(style, Style::WinSysRoot),
             use_winsysroot_style: matches!(style, Style::WinSysRoot),
             map: None,
@@ -104,9 +110,15 @@ fn verify_compiles() {
 
         let includes = match style {
             Style::Default => {
-                cmd.env("RUSTFLAGS", format!("-C linker=lld-link -Lnative={od}/crt/lib/x86_64 -Lnative={od}/sdk/lib/um/x86_64 -Lnative={od}/sdk/lib/ucrt/x86_64"));
+                cmd.env(
+                    "RUSTFLAGS",
+                    format!(
+                        "-C linker=lld-link -Lnative={od}/crt/lib/x86_64 -Lnative={od}/sdk/lib/um/x86_64 -Lnative={od}/sdk/lib/ucrt/x86_64 -C link-arg=/vfsoverlay:{od}/vfsoverlay.json"
+                    ),
+                );
+
                 format!(
-                    "-Wno-unused-command-line-argument -fuse-ld=lld-link /imsvc{od}/crt/include /imsvc{od}/sdk/include/ucrt /imsvc{od}/sdk/include/um /imsvc{od}/sdk/include/shared"
+                    "-Wno-unused-command-line-argument -fuse-ld=lld-link -imsvc{od}/crt/include -imsvc{od}/sdk/include/ucrt -imsvc{od}/sdk/include/um -imsvc{od}/sdk/include/shared -Xclang -ivfsoverlay -Xclang {od}/vfsoverlay.json"
                 )
             }
             Style::WinSysRoot => {
@@ -131,8 +143,11 @@ fn verify_compiles() {
 
         // Ignore the /vctoolsdir /winsdkdir test below on CI since it fails, I'm assuming
         // due to the clang version in GHA being outdated, but don't have the will to
-        // look into it now
-        if !matches!(style, Style::Default) || std::env::var("CI").is_ok() {
+        // look into it now. It also can only work with symlinks enabled, since
+        // clang probes for versioned `Include` directories in the splat
+        // output that only exist as real directories when symlinks are
+        // created.
+        if !matches!(style, Style::Default) || std::env::var("CI").is_ok() || !enable_symlinks {
             return;
         }
 
@@ -148,10 +163,10 @@ fn verify_compiles() {
         ]);
 
         let includes = format!(
-            "-Wno-unused-command-line-argument -fuse-ld=lld-link /vctoolsdir {od}/crt /winsdkdir {od}/sdk"
+            "-Wno-unused-command-line-argument -fuse-ld=lld-link /vctoolsdir {od}/crt /winsdkdir {od}/sdk -Xclang -ivfsoverlay -Xclang {od}/vfsoverlay.json"
         );
         let libs = format!(
-            "-C linker=lld-link -Lnative={od}/crt/lib/x86_64 -Lnative={od}/sdk/lib/um/x86_64 -Lnative={od}/sdk/lib/ucrt/x86_64"
+            "-C linker=lld-link -Lnative={od}/crt/lib/x86_64 -Lnative={od}/sdk/lib/um/x86_64 -Lnative={od}/sdk/lib/ucrt/x86_64 -C link-arg=/vfsoverlay:{od}/vfsoverlay.json"
         );
 
         let cc_env = [
@@ -334,6 +349,7 @@ fn verify_aarch64_compiles() {
             include_debug_libs: false,
             include_debug_symbols: false,
             enable_symlinks: matches!(style, Style::Default),
+            vfsoverlay: false,
             preserve_ms_arch_notation: matches!(style, Style::WinSysRoot),
             use_winsysroot_style: matches!(style, Style::WinSysRoot),
             map: None,

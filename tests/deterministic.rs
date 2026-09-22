@@ -40,6 +40,7 @@ fn verify_deterministic() {
         include_debug_libs: false,
         include_debug_symbols: false,
         enable_symlinks: true,
+        vfsoverlay: false,
         preserve_ms_arch_notation: false,
         use_winsysroot_style: false,
         map: None,

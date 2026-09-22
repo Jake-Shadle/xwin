@@ -63,12 +63,13 @@ Decompresses all of the downloaded package contents to disk. `download` is run a
 
 ### `xwin splat`
 
-Fixes the packages to prune unneeded files and adds symlinks to address file casing issues and then splats the final artifacts into directories. This is the main command you will want to run as it also `download`s and `unpack`s automatically, providing the desired headers at the path specified to `--output` (`./.xwin-cache/splat`).
+Fixes the packages to prune unneeded files and adds symlinks to address file casing issues and then splats the final artifacts into directories. This is the main command you will want to run as it also `download`s and `unpack`s automatically, providing the desired headers at the path specified to `--output` (`./.xwin-cache/splat`). A vfsoverlay is generated at `$output/vfsoverlay.json`.
 
 #### Splat options
 
 * `--copy` - Copies files from the unpack directory to the splat directory instead of moving them, which preserves the original unpack directories but increases overall execution time and disk usage.
-* `--disable-symlinks` - By default, symlinks are added to both the CRT and `WindowsSDK` to address casing issues in general usage. For example, if you are compiling C/C++ code that does `#include <windows.h>`, it will break on a case-sensitive file system, as the actual path in the `WindowsSDK` is `Windows.h`. This also applies even if the C/C++ you are compiling uses correct casing for all CRT/SDK includes, as the internal headers also use incorrect casing in most cases
+* `--disable-symlinks` - By default, symlinks are added to both the CRT and `WindowsSDK` to address casing issues in general usage. For example, if you are compiling C/C++ code that does `#include <windows.h>`, it will break on a case-sensitive file system, as the actual path in the `WindowsSDK` is `Windows.h`. This also applies even if the C/C++ you are compiling uses correct casing for all CRT/SDK includes, as the internal headers also use incorrect casing in most cases.
+* `--disable-vfsoverlay` - By default, a `vfsoverlay.json` file is generated in the splat directory that can be used with clang's `-ivfsoverlay` option (`--vfsoverlay` when linking with `lld-link`) to resolve case-variant header and library paths to their original files, regardless of whether symlinks are enabled.
 * `--include-debug-libs` - The MSVCRT includes (non-redistributable) debug versions of the various libs that are generally uninteresting to keep for most usage
 * `--include-debug-symbols` - The MSVCRT includes PDB (debug symbols) files for several of the libraries that are generally uninteresting to keep for most usage
 * `--preserve-ms-arch-notation` - By default, we convert the MS specific `x64`, `arm`, and `arm64` target architectures to the more canonical `x86_64`, `aarch`, and `aarch64` of LLVM etc when creating directories/names. Passing this flag will preserve the MS names for those targets

@@ -65,6 +65,13 @@ pub struct SplatOptions {
     /// and --disable-symlinks for use with clang-cl on Windows.
     #[arg(long)]
     use_winsysroot_style: bool,
+    /// By default, a `vfsoverlay.json` file is generated in the splat directory
+    /// that can be used with clang's `-ivfsoverlay` option. The overlay ignores
+    /// any filesystem symlinks and resolves the case-variant paths to their
+    /// original files. It is a no-op on case-insensitive filesystems, where it
+    /// is skipped automatically.
+    #[arg(long)]
+    disable_vfsoverlay: bool,
 }
 
 #[derive(Subcommand)]
@@ -352,6 +359,7 @@ fn main() -> Result<(), Error> {
             include_debug_libs: options.include_debug_libs,
             include_debug_symbols: options.include_debug_symbols,
             enable_symlinks: !options.disable_symlinks,
+            vfsoverlay: !options.disable_vfsoverlay,
             preserve_ms_arch_notation: options.preserve_ms_arch_notation,
             use_winsysroot_style: options.use_winsysroot_style,
             copy,

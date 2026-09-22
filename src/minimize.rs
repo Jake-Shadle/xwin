@@ -523,8 +523,12 @@ pub(crate) fn minimize(
 
                 for sl in sls {
                     let sl = np.parent().unwrap().join(sl);
-                    crate::symlink(np.file_name().unwrap(), &sl)
-                        .context("failed to create link")?;
+                    crate::symlink(
+                        np.file_name().unwrap(),
+                        &sl,
+                        crate::SymlinkTarget::symlinks(),
+                    )
+                    .context("failed to create link")?;
                 }
             }
 

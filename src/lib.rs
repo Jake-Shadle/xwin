@@ -15,6 +15,7 @@ mod minimize;
 mod splat;
 mod unpack;
 pub mod util;
+pub mod vfs;
 
 pub use ctx::Ctx;
 pub use minimize::MinimizeConfig;
@@ -1083,26 +1084,79 @@ impl Section {
     }
 }
 
-#[cfg(unix)]
-#[inline]
-fn symlink(original: &str, link: &Path) -> Result<(), Error> {
-    std::os::unix::fs::symlink(original, link)
-        .with_context(|| format!("unable to symlink from {link} to {original}"))
+use parking_lot::Mutex;
+
+/// Describes how a case-variant path should be resolved.
+#[derive(Copy, Clone, Default)]
+pub struct SymlinkTarget<'vfs> {
+    /// Create a real filesystem symlink
+    pub create: bool,
+    /// Add vfs overlay entry (no-op on case-insensitive fs or `--disable-vfsoverlay`)
+    pub overlay: Option<(&'vfs Mutex<vfs::VfsOverlay>, &'vfs Path)>,
 }
 
-#[cfg(windows)]
+impl<'vfs> SymlinkTarget<'vfs> {
+    pub fn new(
+        create: bool,
+        vfsoverlay: bool,
+        output_root: &'vfs Path,
+        overlay: &'vfs Mutex<vfs::VfsOverlay>,
+    ) -> Self {
+        Self {
+            create,
+            overlay: vfsoverlay.then_some((overlay, output_root)),
+        }
+    }
+
+    /// Only create real filesystem symlinks
+    pub fn symlinks() -> Self {
+        Self {
+            create: true,
+            overlay: None,
+        }
+    }
+}
+
 #[inline]
-fn symlink(_original: &str, _link: &Path) -> Result<(), Error> {
+fn symlink(original: &str, link: &Path, target: SymlinkTarget<'_>) -> Result<(), Error> {
+    if let Some((vfs, output_root)) = target.overlay {
+        let external_contents_path = link.parent().unwrap().join(original);
+        let external_contents_abs = util::canonicalize(&external_contents_path)?;
+        let name_abs = util::canonicalize(link.parent().unwrap())?.join(link.file_name().unwrap());
+
+        let name = name_abs.strip_prefix(output_root)?.to_path_buf();
+        let external_contents = external_contents_abs
+            .strip_prefix(output_root)?
+            .to_path_buf();
+
+        let entry = if external_contents_abs.is_dir() {
+            vfs::VfsEntry::DirectoryRemap {
+                name,
+                external_contents,
+            }
+        } else {
+            vfs::VfsEntry::File {
+                name,
+                external_contents,
+            }
+        };
+
+        vfs.lock().roots.push(entry);
+    }
+
+    if target.create {
+        create_symlink(original, link)?;
+    }
+
     Ok(())
 }
 
-#[inline]
-fn symlink_on_windows_too(original: &str, link: &Path) -> Result<(), Error> {
+fn create_symlink(original: &str, link: &Path) -> Result<(), Error> {
     #[cfg(unix)]
     {
-        symlink(original, link)
+        std::os::unix::fs::symlink(original, link)
+            .with_context(|| format!("unable to symlink from {link} to {original}"))
     }
-
     #[cfg(windows)]
     {
         let full_path = link.parent().unwrap().join(original);
@@ -1110,9 +1164,38 @@ fn symlink_on_windows_too(original: &str, link: &Path) -> Result<(), Error> {
             std::os::windows::fs::symlink_dir(original, link)
                 .with_context(|| format!("unable to symlink from {link} to {original}"))
         } else {
-            Ok(())
+            std::os::windows::fs::symlink_file(original, link)
+                .with_context(|| format!("unable to symlink from {link} to {original}"))
         }
     }
+}
+
+#[inline]
+fn symlink_on_windows_too(
+    original: &str,
+    link: &Path,
+    target: SymlinkTarget<'_>,
+) -> Result<(), Error> {
+    if let Some((vfs, output_root)) = target.overlay {
+        let external_contents_path = link.parent().unwrap().join(original);
+        let external_contents_abs = util::canonicalize(&external_contents_path)?;
+        let name_abs = util::canonicalize(link.parent().unwrap())?.join(link.file_name().unwrap());
+
+        let name = name_abs.strip_prefix(output_root)?.to_path_buf();
+        let external_contents = external_contents_abs
+            .strip_prefix(output_root)?
+            .to_path_buf();
+
+        vfs.lock().roots.push(vfs::VfsEntry::DirectoryRemap {
+            name,
+            external_contents,
+        });
+    }
+
+    // Unlike [`symlink`], this always creates the real symlink, as the
+    // versioned directory aliases it emits are required regardless of
+    // filesystem case sensitivity
+    create_symlink(original, link)
 }
 
 #[cfg(test)]

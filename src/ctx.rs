@@ -275,6 +275,8 @@ impl Ctx {
         let crt_ft = parking_lot::Mutex::new(None);
         let atl_ft = parking_lot::Mutex::new(None);
 
+        let vfs = parking_lot::Mutex::new(crate::vfs::VfsOverlay::new());
+
         let mut splat_config = match &ops {
             crate::Ops::Splat(config) => {
                 let splat_roots = crate::splat::prep_splat(
@@ -299,6 +301,7 @@ impl Ctx {
                     include_debug_libs: config.include_debug_libs,
                     include_debug_symbols: config.include_debug_symbols,
                     enable_symlinks: config.enable_symlinks,
+                    vfsoverlay: false,
                     use_winsysroot_style: config.use_winsysroot_style,
                     output: splat_roots.root.clone(),
                     map: Some(config.map.clone()),
@@ -311,33 +314,35 @@ impl Ctx {
         };
 
         // Detect if the output root directory is case sensitive or not,
-        // if it's not, disable symlinks as they won't work
-        let enable_symlinks = if let Some((root, sc_enable_symlinks)) =
+        // if it's not, disable symlinks and the vfs overlay as they won't
+        // work / aren't needed
+        if let Some((root, enable_symlinks, vfsoverlay)) =
             splat_config.as_mut().and_then(|(sr, c)| {
-                c.enable_symlinks
-                    .then_some((&sr.root, &mut c.enable_symlinks))
-            }) {
+                (c.enable_symlinks || c.vfsoverlay).then_some((
+                    &sr.root,
+                    &mut c.enable_symlinks,
+                    &mut c.vfsoverlay,
+                ))
+            })
+        {
             let test_path = root.join("BIG.xwin");
             std::fs::write(&test_path, "").with_context(|| {
                 format!("failed to write case-sensitivity test file {test_path}")
             })?;
 
-            let enable_symlinks = if std::fs::read(root.join("big.xwin")).is_ok() {
-                tracing::warn!(
-                    "detected splat root '{root}' is on a case-insensitive file system, disabling symlinks"
-                );
-                false
-            } else {
-                true
-            };
+            let case_insensitive = std::fs::read(root.join("big.xwin")).is_ok();
 
             // Will be ugly but won't harm anything if file is left
             let _ = std::fs::remove_file(test_path);
-            *sc_enable_symlinks = enable_symlinks;
-            enable_symlinks
-        } else {
-            false
-        };
+
+            if case_insensitive {
+                tracing::warn!(
+                    "detected splat root '{root}' is on a case-insensitive file system, disabling symlinks and the vfs overlay"
+                );
+                *enable_symlinks = false;
+                *vfsoverlay = false;
+            }
+        }
 
         let map = if let Some(map) = splat_config.as_ref().and_then(|(_, sp)| sp.map.as_ref()) {
             match std::fs::read_to_string(map) {
@@ -378,6 +383,13 @@ impl Ctx {
                 }
 
                 let sdk_headers = if let Some((splat_roots, config)) = &splat_config {
+                    let symlink_target = crate::SymlinkTarget::new(
+                        config.enable_symlinks,
+                        config.vfsoverlay,
+                        splat_roots.root.as_path(),
+                        &vfs,
+                    );
+
                     crate::splat::splat(
                         config,
                         splat_roots,
@@ -385,6 +397,7 @@ impl Ctx {
                         &ft,
                         map.as_ref()
                             .filter(|_m| !matches!(ops, crate::Ops::Minimize(_))),
+                        symlink_target,
                         &sdk_version,
                         vcrd_version.clone(),
                         arches,
@@ -413,7 +426,14 @@ impl Ctx {
         };
 
         let splat_links = || -> anyhow::Result<()> {
-            if enable_symlinks {
+            let symlink_target = crate::SymlinkTarget::new(
+                sc.enable_symlinks,
+                sc.vfsoverlay,
+                roots.root.as_path(),
+                &vfs,
+            );
+
+            if sc.enable_symlinks || sc.vfsoverlay {
                 let crt_ft = crt_ft.lock().take();
                 let atl_ft = atl_ft.lock().take();
 
@@ -424,7 +444,16 @@ impl Ctx {
                     sdk_headers,
                     crt_ft,
                     atl_ft,
+                    symlink_target,
                 )?;
+            }
+
+            if sc.vfsoverlay {
+                let vfs_path = sc.output.join("vfsoverlay.json");
+                let vfs_file = std::fs::File::create(&vfs_path)
+                    .with_context(|| format!("failed to create VFS overlay file at {vfs_path}"))?;
+                serde_json::to_writer_pretty(vfs_file, &*vfs.lock())
+                    .with_context(|| format!("failed to write VFS overlay file to {vfs_path}"))?;
             }
 
             Ok(())

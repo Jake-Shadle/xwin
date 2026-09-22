@@ -41,6 +41,13 @@ Options:
           --preserve-ms-arch-notation and --disable-symlinks for use with
           clang-cl on Windows
 
+      --disable-vfsoverlay
+          By default, a `vfsoverlay.json` file is generated in the splat
+          directory that can be used with clang's `-ivfsoverlay` option. The
+          overlay ignores any filesystem symlinks and resolves the case-variant
+          paths to their original files. It is a no-op on case-insensitive
+          filesystems, where it is skipped automatically
+
       --output <OUTPUT>
           The root output directory. Defaults to `./.xwin-cache/splat` if not
           specified

@@ -2,13 +2,15 @@ use crate::{Path, PathBuf};
 use anyhow::{Context as _, Error};
 use std::fmt;
 
+use std::path; // Import the path module
+
 #[inline]
 pub fn canonicalize(path: &Path) -> anyhow::Result<PathBuf> {
     PathBuf::from_path_buf(
-        path.canonicalize()
-            .with_context(|| format!("unable to canonicalize path '{path}'"))?,
+        path::absolute(path.to_path_buf()) // Use path::absolute
+            .with_context(|| format!("unable to absolutize path '{path}'"))?,
     )
-    .map_err(|pb| anyhow::anyhow!("canonicalized path {} is not utf-8", pb.display()))
+    .map_err(|pb| anyhow::anyhow!("absolutized path {} is not utf-8", pb.display()))
 }
 
 #[derive(Copy, Clone)]
