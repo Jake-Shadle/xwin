@@ -27,7 +27,8 @@ anyhow = "1.0"
 # Network/file buffers
 bytes = "1.10"
 # CAB files are used in conjunction with MSI files for SDK packages
-cab = "0.6"
+# TODO: revert to cab = "0.6.x" when https://github.com/mdsteele/rust-cab/pull/44 merged
+cab = { package = "cab-superewald", version = "0.6.1" }
 # Nicer to use utf-8 paths
 camino = "1.0"
 # Easy CLI tables
@@ -66,12 +67,16 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
     "json",
 ] }
 # Hashing
-twox-hash = { version = "2.1", default-features = false, features = ["xxhash64"] }
+twox-hash = { version = "2.1", default-features = false, features = [
+    "xxhash64",
+] }
 # Determine the latest CRT and SDK versions
 versions = "7.0"
 walkdir = "2.3"
 # Unpacking of VSIX "packages"
-zip = { version = "8.0", default-features = false, features = ["deflate-flate2"] }
+zip = { version = "8.0", default-features = false, features = [
+    "deflate-flate2",
+] }
 
 # HTTP requests
 [dependencies.ureq]

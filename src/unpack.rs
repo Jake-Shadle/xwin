@@ -1,5 +1,6 @@
 use crate::{Ctx, Error, Path, PathBuf, download::PayloadContents};
 use anyhow::Context as _;
+use std::io::Read as _;
 
 pub(crate) struct UnpackMeta {
     pub(crate) sha256: crate::util::Sha256,
@@ -434,7 +435,6 @@ pub(crate) fn unpack(
             struct CabFile {
                 id: String,
                 name: PathBuf,
-                size: u64,
                 sequence: u32,
             }
 
@@ -492,7 +492,6 @@ pub(crate) fn unpack(
                             id: id.to_owned(),
                             name: dir.join(fname),
                             sequence: seq,
-                            size,
                         };
 
                         Some(Ok(cf))
@@ -507,64 +506,32 @@ pub(crate) fn unpack(
 
             item.progress.set_length(uncompressed);
 
-            // Some MSIs have a lot of cabs and take an _extremely_ long time to
-            // decompress, so we just split the files into roughly equal sized
-            // chunks and decompress in parallel to reduce wall time
-            let mut chunks = Vec::new();
-
-            struct Chunk {
-                cab: bytes::Bytes,
-                cab_index: usize,
-                files: Vec<CabFile>,
-                chunk_size: u64,
-            }
-
-            chunks.push(Chunk {
-                cab: cabs[0].cab.clone(),
-                cab_index: 0,
-                files: Vec::new(),
-                chunk_size: 0,
-            });
-
-            let mut cur_chunk = 0;
+            // The `cab` crate's `read_file` API restarts decompression from the
+            // very start of a folder for every file, which is O(files * size)
+            // since MSI-produced CABs put (nearly) all files in a single
+            // folder. To avoid that, we group the files per CAB and stream each
+            // folder exactly once, decoding every data block a single time and
+            // only ever seeking *forwards* within the decompressed stream.
+            //
+            // First, associate every file with the CAB that contains it. Both
+            // `files` and `cabs` are sorted by sequence number, and a file
+            // belongs to the first CAB whose `sequence` (max sequence number)
+            // is >= its own.
+            let mut per_cab: Vec<Vec<CabFile>> = cabs.iter().map(|_| Vec::new()).collect();
             let mut cur_cab = 0;
-            const CHUNK_SIZE: u64 = 1024 * 1024;
-
             for file in files {
-                let chunk = &mut chunks[cur_chunk];
-
-                if chunk.chunk_size + file.size < CHUNK_SIZE
-                    && file.sequence <= cabs[cur_cab].sequence
-                {
-                    chunk.chunk_size += file.size;
-                    chunk.files.push(file);
-                } else {
-                    let cab = if file.sequence <= cabs[cur_cab].sequence {
-                        chunk.cab.clone()
-                    } else {
-                        match cabs[cur_cab + 1..]
-                            .iter()
-                            .position(|cab| file.sequence <= cab.sequence)
-                        {
-                            Some(i) => cur_cab += i + 1,
-                            None => anyhow::bail!(
-                                "unable to find cab file containing {} {}",
-                                file.name,
-                                file.sequence
-                            ),
-                        }
-
-                        cabs[cur_cab].cab.clone()
-                    };
-
-                    cur_chunk += 1;
-                    chunks.push(Chunk {
-                        cab,
-                        cab_index: cur_cab,
-                        chunk_size: file.size,
-                        files: vec![file],
-                    });
+                while cur_cab + 1 < cabs.len() && file.sequence > cabs[cur_cab].sequence {
+                    cur_cab += 1;
                 }
+
+                anyhow::ensure!(
+                    file.sequence <= cabs[cur_cab].sequence,
+                    "unable to find cab file containing {} {}",
+                    file.name,
+                    file.sequence
+                );
+
+                per_cab[cur_cab].push(file);
             }
 
             let mut results = Vec::new();
@@ -573,56 +540,101 @@ pub(crate) fn unpack(
 
             let tree = parking_lot::Mutex::new(FileTree::new());
 
-            chunks
+            struct Wrapper<'pb> {
+                pb: &'pb indicatif::ProgressBar,
+                uf: std::fs::File,
+            }
+
+            impl std::io::Write for Wrapper<'_> {
+                fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+                    self.pb.inc(buf.len() as u64);
+                    self.uf.write(buf)
+                }
+
+                fn flush(&mut self) -> std::io::Result<()> {
+                    self.uf.flush()
+                }
+            }
+
+            per_cab
                 .into_par_iter()
-                .map(|chunk| -> Result<(), Error> {
-                    let mut cab = cab::Cabinet::new(std::io::Cursor::new(chunk.cab)).unwrap();
+                .enumerate()
+                .map(|(cab_index, files)| -> Result<(), Error> {
+                    if files.is_empty() {
+                        return Ok(());
+                    }
 
-                    let cab_path = &cabs[chunk.cab_index].path;
+                    let cab_meta = &cabs[cab_index];
+                    let mut cab = cab::Cabinet::new(std::io::Cursor::new(cab_meta.cab.clone()))
+                        .with_context(|| format!("CAB {} is invalid", cab_meta.path))?;
 
-                    for file in chunk.files {
-                        let mut cab_file = match cab.read_file(file.id.as_str()) {
-                            Ok(cf) => cf,
-                            Err(e) => Err(e).with_context(|| {
-                                format!("unable to read '{}' from {cab_path}", file.name)
-                            })?,
-                        };
+                    let targets: std::collections::HashMap<_, _> =
+                        files.iter().map(|f| (f.id.as_str(), &f.name)).collect();
 
-                        let unpack_path = output_dir.join(&file.name);
-
-                        if let Some(parent) = unpack_path.parent()
-                            && !parent.exists()
-                        {
-                            std::fs::create_dir_all(parent)?;
-                        }
-
-                        let unpacked_file = std::fs::File::create(&unpack_path)?;
-
-                        struct Wrapper<'pb> {
-                            pb: &'pb indicatif::ProgressBar,
-                            uf: std::fs::File,
-                        }
-
-                        impl std::io::Write for Wrapper<'_> {
-                            fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-                                self.pb.inc(buf.len() as u64);
-                                self.uf.write(buf)
-                            }
-
-                            fn flush(&mut self) -> std::io::Result<()> {
-                                self.uf.flush()
+                    // Collect the (offset, size, target path) of every file we
+                    // want from each folder, in folder byte order.
+                    let mut folders: Vec<Vec<(u64, u64, PathBuf)>> = Vec::new();
+                    for folder in cab.folder_entries() {
+                        let mut extracted = Vec::new();
+                        for entry in folder.file_entries() {
+                            if let Some(target) = targets.get(entry.name()) {
+                                extracted.push((
+                                    entry.uncompressed_offset() as u64,
+                                    entry.uncompressed_size() as u64,
+                                    (*target).clone(),
+                                ));
                             }
                         }
+                        extracted.sort_by_key(|(offset, ..)| *offset);
+                        folders.push(extracted);
+                    }
 
-                        let size = std::io::copy(
-                            &mut cab_file,
-                            &mut Wrapper {
-                                pb: &item.progress,
-                                uf: unpacked_file,
-                            },
-                        )?;
+                    for (folder_index, extracted) in folders.iter().enumerate() {
+                        if extracted.is_empty() {
+                            continue;
+                        }
 
-                        tree.lock().push(&file.name, size);
+                        let mut folder_reader =
+                            cab.read_folder(folder_index).with_context(|| {
+                                format!(
+                                    "unable to read folder {folder_index} from {}",
+                                    cab_meta.path
+                                )
+                            })?;
+
+                        for (offset, size, target) in extracted {
+                            folder_reader
+                                .seek_to_uncompressed_offset(*offset)
+                                .with_context(|| {
+                                    format!(
+                                        "unable to seek to {offset} in folder {folder_index} of {}",
+                                        cab_meta.path
+                                    )
+                                })?;
+
+                            let unpack_path = output_dir.join(target);
+
+                            if let Some(parent) = unpack_path.parent()
+                                && !parent.exists()
+                            {
+                                std::fs::create_dir_all(parent)?;
+                            }
+
+                            let unpacked_file = std::fs::File::create(&unpack_path)?;
+
+                            let size = std::io::copy(
+                                &mut (&mut folder_reader).take(*size),
+                                &mut Wrapper {
+                                    pb: &item.progress,
+                                    uf: unpacked_file,
+                                },
+                            )
+                            .with_context(|| {
+                                format!("unable to decompress '{target}' from {}", cab_meta.path)
+                            })?;
+
+                            tree.lock().push(target, size);
+                        }
                     }
 
                     Ok(())
