@@ -32,6 +32,7 @@ pub struct SplatConfig {
     pub enable_symlinks: bool,
     pub preserve_ms_arch_notation: bool,
     pub use_winsysroot_style: bool,
+    pub preserve_versions: bool,
     pub output: PathBuf,
     pub map: Option<PathBuf>,
     pub copy: bool,
@@ -79,6 +80,9 @@ pub(crate) fn prep_splat(
     ctx: std::sync::Arc<Ctx>,
     root: &Path,
     winroot: Option<&str>,
+    sdk_version: Option<&str>,
+    vcrd_version: Option<&str>,
+    preserve_versions: bool,
 ) -> Result<SplatRoots, Error> {
     // Ensure we create the path first, you can't canonicalize a non-existant path
     if !root.exists() {
@@ -107,14 +111,40 @@ pub(crate) fn prep_splat(
             .with_context(|| format!("unable to delete existing CRT directory {crt_root}"))?;
     }
 
-    if sdk_root.exists() {
-        std::fs::remove_dir_all(&sdk_root)
-            .with_context(|| format!("unable to delete existing SDK directory {sdk_root}"))?;
-    }
+    // In winsysroot style, the CRT root is already version scoped, but the SDK
+    // and VCR roots contain every version that has ever been splatted, so when
+    // the user wants to preserve previously installed versions we only remove
+    // the directories belonging to the version being (re)installed
+    if preserve_versions && winroot.is_some() {
+        if let Some(sdk_version) = sdk_version {
+            for subdir in ["Include", "Lib"] {
+                let versioned = sdk_root.join(subdir).join(sdk_version);
+                if versioned.exists() {
+                    std::fs::remove_dir_all(&versioned).with_context(|| {
+                        format!("unable to delete existing SDK {subdir} directory {versioned}")
+                    })?;
+                }
+            }
+        }
 
-    if vcrd_root.exists() {
-        std::fs::remove_dir_all(&vcrd_root)
-            .with_context(|| format!("unable to delete existing VCR directory {vcrd_root}"))?;
+        if let Some(vcrd_version) = vcrd_version {
+            let versioned = vcrd_root.join(vcrd_version);
+            if versioned.exists() {
+                std::fs::remove_dir_all(&versioned).with_context(|| {
+                    format!("unable to delete existing VCR directory {versioned}")
+                })?;
+            }
+        }
+    } else {
+        if sdk_root.exists() {
+            std::fs::remove_dir_all(&sdk_root)
+                .with_context(|| format!("unable to delete existing SDK directory {sdk_root}"))?;
+        }
+
+        if vcrd_root.exists() {
+            std::fs::remove_dir_all(&vcrd_root)
+                .with_context(|| format!("unable to delete existing VCR directory {vcrd_root}"))?;
+        }
     }
 
     std::fs::create_dir_all(&crt_root)

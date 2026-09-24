@@ -65,6 +65,11 @@ pub struct SplatOptions {
     /// and --disable-symlinks for use with clang-cl on Windows.
     #[arg(long)]
     use_winsysroot_style: bool,
+    /// Keep other CRT/SDK/VCR versions already present in the splat output;
+    /// only the version being installed is removed first
+    /// (requires --use-winsysroot-style)
+    #[arg(long, requires = "use_winsysroot_style")]
+    preserve_versions: bool,
 }
 
 #[derive(Subcommand)]
@@ -354,6 +359,7 @@ fn main() -> Result<(), Error> {
             enable_symlinks: !options.disable_symlinks,
             preserve_ms_arch_notation: options.preserve_ms_arch_notation,
             use_winsysroot_style: options.use_winsysroot_style,
+            preserve_versions: options.preserve_versions,
             copy,
             map,
             output: output.unwrap_or_else(|| ctx.work_dir.join("splat")),
@@ -373,6 +379,7 @@ fn main() -> Result<(), Error> {
             enable_symlinks: !options.disable_symlinks,
             preserve_ms_arch_notation: options.preserve_ms_arch_notation,
             use_winsysroot_style: options.use_winsysroot_style,
+            preserve_versions: options.preserve_versions,
             splat_output: output.unwrap_or_else(|| ctx.work_dir.join("splat")),
             copy,
             minimize_output,

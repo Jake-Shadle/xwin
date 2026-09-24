@@ -41,6 +41,11 @@ Options:
           --preserve-ms-arch-notation and --disable-symlinks for use with
           clang-cl on Windows
 
+      --preserve-versions
+          Keep other CRT/SDK/VCR versions already present in the splat output;
+          only the version being installed is removed first (requires
+          --use-winsysroot-style)
+
       --output <OUTPUT>
           The root output directory. Defaults to `./.xwin-cache/splat` if not
           specified

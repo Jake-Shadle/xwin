@@ -277,10 +277,17 @@ impl Ctx {
 
         let mut splat_config = match &ops {
             crate::Ops::Splat(config) => {
+                if config.preserve_versions && !config.use_winsysroot_style {
+                    anyhow::bail!("preserve_versions requires use_winsysroot_style");
+                }
+
                 let splat_roots = crate::splat::prep_splat(
                     self.clone(),
                     &config.output,
                     config.use_winsysroot_style.then_some(&crt_version),
+                    Some(&sdk_version),
+                    vcrd_version.as_deref(),
+                    config.preserve_versions,
                 )?;
                 let mut config = config.clone();
                 config.output = splat_roots.root.clone();
@@ -288,10 +295,17 @@ impl Ctx {
                 Some((splat_roots, config))
             }
             crate::Ops::Minimize(config) => {
+                if config.preserve_versions && !config.use_winsysroot_style {
+                    anyhow::bail!("preserve_versions requires use_winsysroot_style");
+                }
+
                 let splat_roots = crate::splat::prep_splat(
                     self.clone(),
                     &config.splat_output,
                     config.use_winsysroot_style.then_some(&crt_version),
+                    Some(&sdk_version),
+                    vcrd_version.as_deref(),
+                    config.preserve_versions,
                 )?;
 
                 let config = crate::SplatConfig {
@@ -300,6 +314,7 @@ impl Ctx {
                     include_debug_symbols: config.include_debug_symbols,
                     enable_symlinks: config.enable_symlinks,
                     use_winsysroot_style: config.use_winsysroot_style,
+                    preserve_versions: config.preserve_versions,
                     output: splat_roots.root.clone(),
                     map: Some(config.map.clone()),
                     copy: config.copy,
