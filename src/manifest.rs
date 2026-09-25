@@ -376,8 +376,12 @@ pub fn get_manifest(
 
     let url = format!("https://aka.ms/vs/{version}/{channel}/channel");
 
-    let manifest_bytes =
-        ctx.get_and_validate(&url, &format!("manifest_{version}.json"), None, progress)?;
+    let manifest_bytes = ctx.get_and_validate(
+        &url,
+        &format!("manifest_{version}_{channel}.json"),
+        None,
+        progress,
+    )?;
 
     let manifest: Manifest = serde_json::from_slice(&manifest_bytes)
         .with_context(|| format!("failed to deserialize manifest from {url}"))?;
