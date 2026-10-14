@@ -415,6 +415,10 @@ pub fn get_package_manifest(
         progress,
     )?;
 
+    parse_package_manifest(&manifest_bytes)
+}
+
+fn parse_package_manifest(manifest_bytes: &[u8]) -> Result<PackageManifest, anyhow::Error> {
     #[derive(Debug)]
     struct PkgManifest {
         packages: Vec<ManifestItem>,
@@ -459,7 +463,7 @@ pub fn get_package_manifest(
     }
 
     let manifest: PkgManifest =
-        serde_json::from_slice(&manifest_bytes).context("unable to parse manifest")?;
+        serde_json::from_slice(manifest_bytes).context("unable to parse manifest")?;
 
     let mut packages = BTreeMap::new();
     let mut package_counts = BTreeMap::new();
