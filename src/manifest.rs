@@ -418,7 +418,7 @@ pub fn get_package_manifest(
     parse_package_manifest(&manifest_bytes)
 }
 
-fn parse_package_manifest(manifest_bytes: &[u8]) -> Result<PackageManifest, anyhow::Error> {
+pub fn parse_package_manifest(manifest_bytes: &[u8]) -> Result<PackageManifest, anyhow::Error> {
     #[derive(Debug)]
     struct PkgManifest {
         packages: Vec<ManifestItem>,

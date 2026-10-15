@@ -45,6 +45,7 @@ You can download a prebuilt binary from the [Releases](https://github.com/Jake-S
 * `--channel <channel>` - The product channel to use [default: release]
 * `--manifest-version <version>` - The manifest version to retrieve  [default: 17].
 * `--manifest` - Specifies a top level manifest to use, rather than downloading it from Microsoft. This can be used to ensure the output is reproducible.
+* `--package-manifest` - Specifies the VS package manifest (the `.vsman` catalog referenced by the top level manifest) to use, rather than downloading it.
 * `--sdk-version` - The specific SDK version to use. If not specified the latest SDK version in the manifest is used.
 * `--crt-version` - The specific CRT version to use. If not specified the latest CRT version in the manifest is used.
 * `--timeout` - Specifies a timeout for long a single HTTP get request is allowed to take. The default is 60s.

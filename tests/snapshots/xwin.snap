@@ -50,6 +50,10 @@ Options:
           Specifies a VS manifest to use from a file, rather than downloading it
           from the Microsoft site
 
+      --package-manifest <PACKAGE_MANIFEST>
+          Specifies a VS package manifest (the `.vsman` catalog referenced by
+          the VS manifest) to use from a file, rather than downloading it
+
       --manifest-version <MANIFEST_VERSION>
           The manifest version to retrieve
           
