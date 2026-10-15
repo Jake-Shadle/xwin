@@ -211,6 +211,10 @@ pub struct Args {
     /// VS manifest) to use from a file, rather than downloading it.
     #[arg(long, conflicts_with_all = &["manifest", "manifest_version", "channel"])]
     package_manifest: Option<PathBuf>,
+    /// The base URL of a Visual Studio layout. Packages are retrieved from the
+    /// layout rather than from the Microsoft site.
+    #[arg(long, conflicts_with_all = &["manifest", "manifest_version", "channel"])]
+    layout_url: Option<String>,
     /// The manifest version to retrieve
     #[arg(long, default_value = "17")]
     manifest_version: u8,
@@ -320,6 +324,7 @@ fn main() -> Result<(), Error> {
         &ctx,
         args.manifest.as_ref(),
         args.package_manifest.as_ref(),
+        args.layout_url.as_deref(),
         args.manifest_version,
         &args.channel,
         draw_target,
@@ -531,6 +536,7 @@ fn load_manifest(
     ctx: &xwin::Ctx,
     manifest: Option<&PathBuf>,
     package_manifest: Option<&PathBuf>,
+    layout_url: Option<&str>,
     manifest_version: u8,
     channel: &str,
     dt: xwin::util::ProgressTarget,
@@ -549,11 +555,21 @@ fn load_manifest(
     if let Some(package_manifest_path) = package_manifest {
         let package_manifest_content = std::fs::read(package_manifest_path)
             .with_context(|| format!("failed to read path '{package_manifest_path}'"))?;
-        let pkg_manifest = xwin::manifest::parse_package_manifest(&package_manifest_content)
+        let mut pkg_manifest = xwin::manifest::parse_package_manifest(&package_manifest_content)
             .with_context(|| {
                 format!("failed to deserialize package manifest in '{package_manifest_path}'")
             })?;
+        if let Some(layout_url) = layout_url {
+            xwin::manifest::use_layout_payloads(&mut pkg_manifest, layout_url);
+        }
         manifest_pb.finish_with_message("📥 loaded");
+        return Ok(pkg_manifest);
+    }
+
+    if let Some(layout_url) = layout_url {
+        let pkg_manifest =
+            xwin::manifest::get_layout_package_manifest(ctx, layout_url, manifest_pb.clone())?;
+        manifest_pb.finish_with_message("📥 downloaded");
         return Ok(pkg_manifest);
     }
 

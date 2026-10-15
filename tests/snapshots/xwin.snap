@@ -54,6 +54,10 @@ Options:
           Specifies a VS package manifest (the `.vsman` catalog referenced by
           the VS manifest) to use from a file, rather than downloading it
 
+      --layout-url <LAYOUT_URL>
+          The base URL of a Visual Studio layout. Packages are retrieved from
+          the layout rather than from the Microsoft site
+
       --manifest-version <MANIFEST_VERSION>
           The manifest version to retrieve
           
