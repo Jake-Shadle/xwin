@@ -823,18 +823,26 @@ fn get_sdk(
 
     // We also need the Universal CRT, which is luckily all just in a single MSI
     {
-        let msi =
-            if let Some(ucrt) = pkgs.get("Microsoft.Windows.UniversalCRT.HeadersLibsSources.Msi") {
-                ucrt.payloads.iter().find(|payload| {
-                    payload.file_name == "Universal CRT Headers Libraries and Sources-x86_en-us.msi"
-                })
-            } else {
-                sdk.payloads.iter().find(|payload| {
-                    payload.file_name
-                        == "Installers/Universal CRT Headers Libraries and Sources-x86_en-us.msi"
-                })
-            }
-            .context("unable to find Universal CRT MSI")?;
+        // There are two places to take the UCRT from: either bundled within the
+        // SDK, or from the standalone package `Microsoft.Windows.UniversalCRT.HeadersLibsSources.Msi`.
+        // The later is only used in very old toolsets and when installing the
+        // Windows XP target, while the former is what is used by default by
+        // Visual Studio. As such, we use the UCRT version found within the SDK.
+        let msi = sdk
+            .payloads
+            .iter()
+            .find(|payload| {
+                // The separator is `\`, `/` or even `\\` depending on the Visual
+                // Studio version.
+                payload
+                    .file_name
+                    .strip_prefix("Installers")
+                    .is_some_and(|name| {
+                        name.trim_start_matches(['\\', '/'])
+                            == "Universal CRT Headers Libraries and Sources-x86_en-us.msi"
+                    })
+            })
+            .with_context(|| format!("unable to find Universal CRT MSI in {}", sdk.id))?;
 
         pruned.push(Payload {
             filename: "ucrt.msi".into(),
