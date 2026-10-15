@@ -377,23 +377,42 @@ fn get_crt(
         versions::Version::new(&user)
             .with_context(|| format!("invalid CRT version '{user}' specified"))?;
 
-        build_tools
-            .dependencies
-            .get(&format!(
+        anyhow::ensure!(
+            build_tools.dependencies.contains_key(&format!(
                 "Microsoft.VisualStudio.Component.VC.{user}.x86.x64"
-            ))
-            .with_context(|| format!("CRT version '{user}' does not exist in the manifest"))?;
+            )) || pkgs.contains_key(&format!("Microsoft.VC.{user}.CRT.Headers.base")),
+            "CRT version '{user}' does not exist in the manifest"
+        );
 
         user
     } else {
+        // By default, we want to install the latest version of the CRT. The
+        // easiest way is to use the Microsoft.VisualCpp.CRT.Headers alias, which
+        // always points to the latest version, and grab the actual version from
+        // its dependencies.
+        //
+        // While versioned components of the form `Microsoft.VisualStudio.Component.VC.<VERSION>.*` exists,
+        // those don't always contain the latest version, especially in older
+        // versions of Visual Studio.
+        // newest one.
+        let latest_toolset = pkgs
+            .get("Microsoft.VisualCpp.CRT.Headers")
+            .into_iter()
+            .flat_map(|alias| alias.dependencies.keys())
+            .filter_map(|key| {
+                key.strip_prefix("Microsoft.VC.")?
+                    .strip_suffix(".CRT.Headers.base")
+            });
+
         let crt_version_rs_versions = build_tools
             .dependencies
             .keys()
             .filter_map(|key| {
                 key.strip_prefix("Microsoft.VisualStudio.Component.VC.")
                     .and_then(|s| s.strip_suffix(".x86.x64"))
-                    .and_then(versions::Version::new)
             })
+            .chain(latest_toolset)
+            .filter_map(versions::Version::new)
             .max()
             .context("unable to find latest CRT version")?;
 
