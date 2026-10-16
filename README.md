@@ -45,6 +45,8 @@ You can download a prebuilt binary from the [Releases](https://github.com/Jake-S
 * `--channel <channel>` - The product channel to use [default: release]
 * `--manifest-version <version>` - The manifest version to retrieve  [default: 17].
 * `--manifest` - Specifies a top level manifest to use, rather than downloading it from Microsoft. This can be used to ensure the output is reproducible.
+* `--package-manifest` - Specifies the VS package manifest (the `.vsman` catalog referenced by the top level manifest) to use, rather than downloading it. When combined with `--layout-url`, it is used instead of the layout's own catalog, while packages are still retrieved from the layout.
+* `--layout-url <url>` - The base URL of a Visual Studio offline layout (created with `vs_<edition>.exe --layout`) served over HTTP. The package catalog and every package are retrieved from the layout rather than from Microsoft. Use with --package-manifest for reproducible builds that don't communicate with Microsoft servers.
 * `--sdk-version` - The specific SDK version to use. If not specified the latest SDK version in the manifest is used.
 * `--crt-version` - The specific CRT version to use. If not specified the latest CRT version in the manifest is used.
 * `--timeout` - Specifies a timeout for long a single HTTP get request is allowed to take. The default is 60s.

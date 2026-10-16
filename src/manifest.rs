@@ -228,6 +228,9 @@ pub struct ManifestItem {
     pub version: String,
     pub kind: ItemKind,
     pub chip: Option<Chip>,
+    pub language: Option<String>,
+    pub product_arch: Option<String>,
+    pub machine_arch: Option<String>,
     pub payloads: Vec<Payload>,
     pub dependencies: BTreeMap<String, serde_json::Value>,
     pub install_sizes: Option<InstallSizes>,
@@ -255,6 +258,9 @@ impl<'de> Deserialize<'de> for ManifestItem {
                 let mut version = None;
                 let mut kind = None;
                 let mut chip = None;
+                let mut language = None;
+                let mut product_arch = None;
+                let mut machine_arch = None;
                 let mut payloads = Vec::new();
                 let mut dependencies = BTreeMap::default();
                 let mut install_sizes = None;
@@ -265,6 +271,9 @@ impl<'de> Deserialize<'de> for ManifestItem {
                         "version" => version = Some(map.next_value()?),
                         "type" => kind = Some(map.next_value()?),
                         "chip" => chip = Some(map.next_value()?),
+                        "language" => language = Some(map.next_value()?),
+                        "productArch" => product_arch = Some(map.next_value()?),
+                        "machineArch" => machine_arch = Some(map.next_value()?),
                         "payloads" => payloads = map.next_value()?,
                         "dependencies" => dependencies = map.next_value()?,
                         "installSizes" => install_sizes = Some(map.next_value()?),
@@ -279,6 +288,9 @@ impl<'de> Deserialize<'de> for ManifestItem {
                     version: version.ok_or_else(|| de::Error::missing_field("version"))?,
                     kind: kind.ok_or_else(|| de::Error::missing_field("type"))?,
                     chip,
+                    language,
+                    product_arch,
+                    machine_arch,
                     payloads,
                     dependencies,
                     install_sizes,
@@ -287,6 +299,29 @@ impl<'de> Deserialize<'de> for ManifestItem {
         }
 
         deserializer.deserialize_map(V)
+    }
+}
+
+impl ManifestItem {
+    /// The directory holding this package's payloads in a layout created with
+    /// `vs_<edition>.exe --layout`
+    fn layout_dir(&self) -> String {
+        use std::fmt::Write as _;
+
+        let mut dir = format!("{},version={}", self.id, self.version);
+        if let Some(chip) = self.chip {
+            _ = write!(dir, ",chip={}", chip.as_str());
+        }
+        for (key, value) in [
+            ("language", &self.language),
+            ("productarch", &self.product_arch),
+            ("machinearch", &self.machine_arch),
+        ] {
+            if let Some(value) = value {
+                _ = write!(dir, ",{key}={value}");
+            }
+        }
+        dir
     }
 }
 
@@ -415,6 +450,75 @@ pub fn get_package_manifest(
         progress,
     )?;
 
+    parse_package_manifest(&manifest_bytes)
+}
+
+/// Retrieves the package manifest of an offline layout hosted over HTTP, and
+/// points every payload at its copy in the layout instead of the Microsoft CDN.
+pub fn get_layout_package_manifest(
+    ctx: &Ctx,
+    layout_url: &str,
+    progress: indicatif::ProgressBar,
+) -> Result<PackageManifest, anyhow::Error> {
+    let layout_url = layout_url.trim_end_matches('/');
+    let url = format!("{layout_url}/Catalog.json");
+
+    let cache_key = twox_hash::XxHash64::oneshot(0, layout_url.as_bytes());
+    let catalog_bytes = ctx.get_and_validate(
+        &url,
+        &format!("layout_catalog_{cache_key:016x}.json"),
+        None,
+        progress,
+    )?;
+
+    let mut pkg_manifest = parse_package_manifest(&catalog_bytes)
+        .with_context(|| format!("failed to parse layout catalog {url}"))?;
+    use_layout_payloads(&mut pkg_manifest, layout_url);
+
+    Ok(pkg_manifest)
+}
+
+/// Points every payload of the package manifest at its copy in the offline
+/// layout hosted at `layout_url`, instead of the Microsoft CDN.
+pub fn use_layout_payloads(pkg_manifest: &mut PackageManifest, layout_url: &str) {
+    let layout_url = layout_url.trim_end_matches('/');
+
+    for pkg in pkg_manifest.packages.values_mut() {
+        let dir = pkg.layout_dir();
+        for payload in &mut pkg.payloads {
+            // The layout always stores VSIX packages as `payload.vsix`, regardless
+            // of the payload's file name
+            let file_name = if pkg.kind == ItemKind::Vsix {
+                "payload.vsix".to_owned()
+            } else {
+                payload.file_name.replace('\\', "/")
+            };
+
+            payload.url = format!(
+                "{layout_url}/{}/{}",
+                percent_encode_path(&dir),
+                percent_encode_path(&file_name)
+            );
+        }
+    }
+}
+
+/// Layout paths contain spaces (eg. SDK MSI names), which aren't valid in a URI.
+fn percent_encode_path(path: &str) -> String {
+    use std::fmt::Write as _;
+
+    let mut encoded = String::with_capacity(path.len());
+    for b in path.bytes() {
+        if b.is_ascii_alphanumeric() || b"-._~!$&'()*+,;=:@/".contains(&b) {
+            encoded.push(b as char);
+        } else {
+            _ = write!(encoded, "%{b:02X}");
+        }
+    }
+    encoded
+}
+
+pub fn parse_package_manifest(manifest_bytes: &[u8]) -> Result<PackageManifest, anyhow::Error> {
     #[derive(Debug)]
     struct PkgManifest {
         packages: Vec<ManifestItem>,
@@ -459,7 +563,7 @@ pub fn get_package_manifest(
     }
 
     let manifest: PkgManifest =
-        serde_json::from_slice(&manifest_bytes).context("unable to parse manifest")?;
+        serde_json::from_slice(manifest_bytes).context("unable to parse manifest")?;
 
     let mut packages = BTreeMap::new();
     let mut package_counts = BTreeMap::new();
