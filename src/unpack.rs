@@ -214,7 +214,7 @@ pub(crate) fn unpack(
             for findex in 0..zip.len() {
                 let file = zip.by_index_raw(findex)?;
 
-                let fname = file.name();
+                let fname = file.name()?;
 
                 if fname.starts_with("Contents/")
                     && (fname.contains("lib") || fname.contains("include"))
@@ -230,7 +230,8 @@ pub(crate) fn unpack(
 
             for findex in to_extract {
                 let mut file = zip.by_index(findex).unwrap();
-                let zip_path = Path::new(file.name());
+                let name = file.name()?.into_owned();
+                let zip_path = Path::new(&name);
                 let mut fs_path = output_dir.clone();
 
                 for comp in zip_path
@@ -248,17 +249,11 @@ pub(crate) fn unpack(
                 }
 
                 let mut dest = std::fs::File::create(&fs_path).with_context(|| {
-                    format!(
-                        "unable to create {fs_path} to decompress {} from {pkg}",
-                        file.name(),
-                    )
+                    format!("unable to create {fs_path} to decompress {name} from {pkg}")
                 })?;
 
                 let decompressed = std::io::copy(&mut file, &mut dest).with_context(|| {
-                    format!(
-                        "unable to decompress {} from {pkg} to {fs_path}",
-                        file.name(),
-                    )
+                    format!("unable to decompress {name} from {pkg} to {fs_path}")
                 })?;
 
                 item.progress.inc(decompressed);
