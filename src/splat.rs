@@ -724,6 +724,7 @@ pub(crate) fn splat(
                                     if let Some(additional_name) = match fname_str {
                                         "kernel32.Lib" => Some("Kernel32.lib"),
                                         "iphlpapi.lib" => Some("Iphlpapi.lib"),
+                                        "AdvAPI32.Lib" => Some("Advapi32.lib"),
                                         _ => None,
                                     } {
                                         tar.pop();
