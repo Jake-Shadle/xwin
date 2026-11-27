@@ -237,6 +237,11 @@ pub(crate) fn unpack(
                     .components()
                     .skip_while(|comp| comp.as_str() != "lib" && comp.as_str() != "include")
                 {
+                    anyhow::ensure!(
+                        comp != camino::Utf8Component::ParentDir,
+                        "invalid VSIX member path '{}' in {pkg}",
+                        file.name()
+                    );
                     fs_path.push(comp);
                 }
 
@@ -653,4 +658,79 @@ pub(crate) fn unpack(
     )?;
 
     Ok(tree)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::{io::Write as _, sync::Arc};
+
+    fn unpack_vsix(ctx: Arc<Ctx>, names: &[&str]) -> Result<FileTree, Error> {
+        let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        for name in names {
+            zip.start_file(*name, zip::write::SimpleFileOptions::default())?;
+            zip.write_all(b"fixture")?;
+        }
+        let bytes = zip.finish()?.into_inner();
+        let item = crate::WorkItem {
+            progress: indicatif::ProgressBar::hidden(),
+            payload: Arc::new(crate::Payload {
+                filename: "fixture.vsix".into(),
+                sha256: crate::util::Sha256::digest(&bytes),
+                url: String::new(),
+                size: bytes.len() as u64,
+                install_size: None,
+                kind: crate::PayloadKind::AtlHeaders,
+                target_arch: None,
+                variant: None,
+            }),
+        };
+        unpack(ctx, &item, PayloadContents::Vsix(bytes.into()))
+    }
+
+    #[test]
+    fn vsix_rejects_parent_paths() {
+        for name in [
+            "Contents/lib/../../outside.txt",
+            "Contents/include/../../outside.txt",
+            "Contents/prefix/lib/../../../outside.txt",
+        ] {
+            let ctx = Arc::new(
+                Ctx::with_temp(crate::util::ProgressTarget::Hidden, ureq::agent(), 0).unwrap(),
+            );
+            let outside = ctx.work_dir.join("unpack/outside.txt");
+            std::fs::create_dir_all(outside.parent().unwrap()).unwrap();
+            std::fs::write(&outside, b"keep").unwrap();
+            let err = unpack_vsix(ctx.clone(), &["Contents/lib/valid.lib", name]).unwrap_err();
+            assert!(
+                err.to_string().contains("invalid VSIX member path"),
+                "{err:#}"
+            );
+            assert_eq!(std::fs::read(&outside).unwrap(), b"keep");
+            assert!(!ctx.work_dir.join("unpack/fixture.vsix/.unpack").exists());
+        }
+    }
+
+    #[test]
+    fn vsix_preserves_normal_extraction() {
+        let ctx = Arc::new(
+            Ctx::with_temp(crate::util::ProgressTarget::Hidden, ureq::agent(), 0).unwrap(),
+        );
+        let tree = unpack_vsix(
+            ctx.clone(),
+            &[
+                "Contents/VC/lib/x64/example.lib",
+                "Contents/VC/include/example.h",
+                "metadata.txt",
+            ],
+        )
+        .unwrap();
+        assert_eq!(tree.stats(), (2, 14));
+        let output = ctx.work_dir.join("unpack/fixture.vsix");
+        for path in ["lib/x64/example.lib", "include/example.h"] {
+            assert_eq!(std::fs::read(output.join(path)).unwrap(), b"fixture");
+        }
+        assert!(output.join(".unpack").exists());
+        assert!(!output.join("metadata.txt").exists());
+    }
 }
